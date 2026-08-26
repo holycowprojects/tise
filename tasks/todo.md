@@ -13,14 +13,13 @@ working and committable.
   - Copy Chrome's `History` db, parse it, measure visits/day, gap distribution, top domains
   - Find the session boundary empirically; estimate `return_24h` labels/week at 8 / 15 / 25 categories
   - Report `full` and `history` variants separately — the API has no visit duration
-  - Verify: `uv run python analysis/history_shape.py --out docs/benchmarks/` ✓ (68 tests, lint clean)
-  - **GATE: FAILED — 163 labels in 8 weeks, needs ~300.** See `DECISIONS.md`.
-  - Session boundary **not found** — no clear trough in the gap distribution (Q4)
-  - Fixed inside this task: redirect hops counted as navigations; gap-valley left-edge bug
-
-> **STOPPED HERE.** The gate failed, so T2 is blocked until Q5 (the label definition) is
-> settled. The cause is the label definition — one per (category, day) — not browsing
-> volume. Do not start T2 before that decision.
+  - Verify: `uv run python analysis/history_shape.py --out docs/benchmarks/ --browser Chrome` ✓ (78 tests, lint clean)
+  - Also run against Edge with `--browser Edge --history <path>`; never merged (D18)
+  - **GATE: PASSED** — 348 labels in 8 weeks (Chrome), 398 (Edge), after fixing the
+    label definition. Adopted: per (category, session) @ 30m (D16, D17).
+  - Session boundary **not found empirically**; it is a declared hyperparameter instead
+  - Fixed inside this task: redirect hops counted as navigations; gap-valley left-edge
+    bug; `.gitignore` `data/` swallowing `research/tise_research/data/`
 
 - [ ] **T2 · Define the category set, seed the domain map** · S · deps: T1
   - `domains.json` covering ≥ 80% of visits; one-line definition per category

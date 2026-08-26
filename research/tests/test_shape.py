@@ -10,6 +10,8 @@ import pytest
 from tise_research.data.shape import (
     ascii_histogram,
     estimate_return_24h_labels,
+    estimate_return_24h_labels_by_session,
+    estimate_return_24h_labels_by_window,
     find_gap_valley,
     inter_visit_gaps,
     percentiles,
@@ -136,6 +138,77 @@ class TestEstimateReturn24hLabels:
 
     def test_empty_input_is_all_zeroes_not_a_crash(self):
         stats = estimate_return_24h_labels([])
+        assert stats.total == 0
+        assert stats.positive_rate is None
+
+
+class TestEstimateBySession:
+    """One label per (category, session) instead of per (category, day).
+
+    A day is an enormous bucket: forty visits to one domain across a Tuesday produce a
+    single label and the rest of the structure is discarded. Sessions keep it.
+    """
+
+    def test_two_sessions_same_day_yield_two_labels(self):
+        events = [(t(1, 10, 0), "news"), (t(1, 10, 10), "news"), (t(1, 14, 0), "news")]
+        stats = estimate_return_24h_labels_by_session(events, timeout_seconds=1800)
+        assert stats.total == 2
+        assert stats.positives == 1  # session 1 recurs at 14:00; session 2 never does
+
+    def test_yields_more_labels_than_the_daily_definition(self):
+        """The whole reason to consider this definition. Same events, same day."""
+        events = [(t(1, 10, 0), "news"), (t(1, 14, 0), "news"), (t(1, 20, 0), "news")]
+        daily = estimate_return_24h_labels(events)
+        per_session = estimate_return_24h_labels_by_session(events, timeout_seconds=1800)
+        assert daily.total == 1
+        assert per_session.total == 3
+
+    def test_window_end_is_the_session_end_not_its_start(self):
+        """A visit inside the same session must never make its own label positive."""
+        events = [(t(1, 10, 0), "news"), (t(1, 10, 10), "news")]
+        stats = estimate_return_24h_labels_by_session(events, timeout_seconds=1800)
+        assert stats.total == 1
+        assert stats.positives == 0
+
+    def test_categories_in_one_session_get_separate_labels(self):
+        events = [(t(1, 10, 0), "news"), (t(1, 10, 5), "shopping")]
+        stats = estimate_return_24h_labels_by_session(events, timeout_seconds=1800)
+        assert stats.total == 2
+
+    def test_recurrence_after_the_horizon_is_negative(self):
+        events = [(t(1, 10, 0), "news"), (t(3, 10, 0), "news")]
+        stats = estimate_return_24h_labels_by_session(events, timeout_seconds=1800)
+        assert stats.positives == 0
+
+    def test_empty_input(self):
+        stats = estimate_return_24h_labels_by_session([], timeout_seconds=1800)
+        assert stats.total == 0
+        assert stats.positive_rate is None
+
+
+class TestEstimateByWindow:
+    """Fixed windows anchored at local midnight — a middle ground between the two."""
+
+    def test_events_in_different_windows_yield_separate_labels(self):
+        events = [(t(1, 1), "news"), (t(1, 7), "news")]
+        stats = estimate_return_24h_labels_by_window(events, window_hours=6)
+        assert stats.total == 2
+        assert stats.positives == 1  # 07:00 falls after the 06:00 window close
+
+    def test_events_in_the_same_window_collapse_to_one_label(self):
+        events = [(t(1, 1), "news"), (t(1, 2), "news"), (t(1, 3), "news")]
+        assert estimate_return_24h_labels_by_window(events, window_hours=6).total == 1
+
+    def test_window_hours_of_24_matches_the_daily_definition(self):
+        """Sanity anchor: the daily estimator is this one with a 24-hour window."""
+        events = [(t(1, 10), "news"), (t(2, 9), "news"), (t(4, 3), "shopping")]
+        daily = estimate_return_24h_labels(events)
+        windowed = estimate_return_24h_labels_by_window(events, window_hours=24)
+        assert windowed.total == daily.total
+        assert windowed.positives == daily.positives
+
+    def test_empty_input(self):
+        stats = estimate_return_24h_labels_by_window([], window_hours=6)
         assert stats.total == 0
         assert stats.positive_rate is None
 

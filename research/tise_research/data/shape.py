@@ -13,6 +13,7 @@ audit of the original documents flagged.
 from __future__ import annotations
 
 import math
+from bisect import bisect_right
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
@@ -22,6 +23,8 @@ __all__ = [
     "LabelStats",
     "ascii_histogram",
     "estimate_return_24h_labels",
+    "estimate_return_24h_labels_by_session",
+    "estimate_return_24h_labels_by_window",
     "find_gap_valley",
     "inter_visit_gaps",
     "percentiles",
@@ -173,6 +176,63 @@ class LabelStats:
     per_category: dict[str, int] = field(default_factory=dict)
 
 
+_EMPTY_STATS = LabelStats(0, 0, None, 0.0, 0.0, {})
+
+
+def _index_events(
+    events: Sequence[tuple[datetime, str]],
+) -> tuple[dict[str, list[datetime]], float]:
+    """Group event times by category (each list sorted) and measure the observed span."""
+    by_category: dict[str, list[datetime]] = defaultdict(list)
+    for moment, category in events:
+        by_category[category].append(moment)
+    for moments in by_category.values():
+        moments.sort()
+
+    ordered = sorted(moment for moment, _ in events)
+    span_days = (
+        (ordered[-1] - ordered[0]).total_seconds() / 86_400 if len(ordered) > 1 else 0.0
+    )
+    return dict(by_category), span_days
+
+
+def _score_buckets(
+    buckets: Sequence[tuple[datetime, str]],
+    by_category: dict[str, list[datetime]],
+    *,
+    horizon_hours: float,
+    span_days: float,
+) -> LabelStats:
+    """Resolve one label per (window_end, category) bucket.
+
+    A label is positive if that category recurs **strictly after** `window_end` and
+    within the horizon. `bisect_right` places the cut past any exact match, which is
+    what makes "strictly after" true even when a visit lands on the boundary — the same
+    strictness `sessionise` documents, for the same reason.
+    """
+    horizon = timedelta(hours=horizon_hours)
+    total = 0
+    positives = 0
+    per_category: dict[str, int] = defaultdict(int)
+
+    for window_end, category in buckets:
+        moments = by_category[category]
+        total += 1
+        per_category[category] += 1
+        index = bisect_right(moments, window_end)
+        if index < len(moments) and moments[index] <= window_end + horizon:
+            positives += 1
+
+    return LabelStats(
+        total=total,
+        positives=positives,
+        positive_rate=positives / total if total else None,
+        span_days=span_days,
+        labels_per_week=total / (span_days / 7) if span_days > 0 else 0.0,
+        per_category=dict(per_category),
+    )
+
+
 def estimate_return_24h_labels(
     events: Sequence[tuple[datetime, str]],
     *,
@@ -187,40 +247,96 @@ def estimate_return_24h_labels(
     Note what this does *not* do: activity on the day itself never decides the label.
     That is the leakage guard in its simplest form — a feature computed at `window_end`
     can see the whole day, and the label can see none of it.
+
+    Measured at T1: this definition is the reason the gate failed. A day is a very large
+    bucket, so the dataset is capped at (categories x active days) however much browsing
+    happens inside one. See `estimate_return_24h_labels_by_session`.
     """
     if not events:
-        return LabelStats(0, 0, None, 0.0, 0.0, {})
+        return _EMPTY_STATS
 
-    by_category: dict[str, list[datetime]] = defaultdict(list)
+    by_category, span_days = _index_events(events)
+    buckets = [
+        (datetime.combine(day + timedelta(days=1), time.min, tzinfo=tz), category)
+        for category, moments in by_category.items()
+        for day in sorted({moment.astimezone(tz).date() for moment in moments})
+    ]
+    return _score_buckets(
+        buckets, by_category, horizon_hours=horizon_hours, span_days=span_days
+    )
+
+
+def estimate_return_24h_labels_by_session(
+    events: Sequence[tuple[datetime, str]],
+    *,
+    timeout_seconds: float,
+    horizon_hours: float = 24.0,
+) -> LabelStats:
+    """Count `return_24h` labels: one example per (category, session).
+
+    The window closes at the **end of the session**, so a visit inside the same session
+    can never make its own label positive.
+
+    This is the definition that matches what the product actually claims to predict —
+    "will you come back to this" is a question about the next session, not the next
+    calendar day — and it discards far less structure than the daily definition.
+
+    The session timeout is a declared hyperparameter, not a constant: T1 found no
+    empirical trough in the gap distribution to derive one from, so it is reported
+    rather than assumed.
+    """
+    if not events:
+        return _EMPTY_STATS
+
+    by_category, span_days = _index_events(events)
+    ordered = sorted(events)
+    sessions = sessionise([moment for moment, _ in ordered], timeout_seconds=timeout_seconds)
+
+    buckets: list[tuple[datetime, str]] = []
+    position = 0
+    for session in sessions:
+        window_end = session[-1]
+        categories = {ordered[position + offset][1] for offset in range(len(session))}
+        position += len(session)
+        buckets.extend((window_end, category) for category in sorted(categories))
+
+    return _score_buckets(
+        buckets, by_category, horizon_hours=horizon_hours, span_days=span_days
+    )
+
+
+def estimate_return_24h_labels_by_window(
+    events: Sequence[tuple[datetime, str]],
+    *,
+    window_hours: float = 6.0,
+    horizon_hours: float = 24.0,
+    tz: tzinfo = UTC,
+) -> LabelStats:
+    """Count `return_24h` labels in fixed windows anchored at local midnight.
+
+    A middle ground between the daily and per-session definitions: it does not depend on
+    a session timeout, but it still splits a day into several label opportunities. With
+    `window_hours=24` it is exactly the daily definition, which is a useful sanity anchor.
+
+    Assumes windows tile the day evenly and that local midnight is well defined. In a
+    timezone with daylight saving the transition days are slightly ragged; India, where
+    this was measured, has none.
+    """
+    if not events:
+        return _EMPTY_STATS
+
+    by_category, span_days = _index_events(events)
+
+    buckets: set[tuple[datetime, str]] = set()
     for moment, category in events:
-        by_category[category].append(moment)
+        local = moment.astimezone(tz)
+        midnight = datetime.combine(local.date(), time.min, tzinfo=tz)
+        elapsed_hours = (local - midnight).total_seconds() / 3600
+        index = int(elapsed_hours // window_hours)
+        buckets.add((midnight + timedelta(hours=window_hours * (index + 1)), category))
 
-    total = 0
-    positives = 0
-    per_category: dict[str, int] = {}
-
-    for category, moments in by_category.items():
-        moments.sort()
-        days = sorted({moment.astimezone(tz).date() for moment in moments})
-        for day in days:
-            window_end = datetime.combine(day + timedelta(days=1), time.min, tzinfo=tz)
-            horizon_end = window_end + timedelta(hours=horizon_hours)
-            if any(window_end < moment <= horizon_end for moment in moments):
-                positives += 1
-            total += 1
-        per_category[category] = len(days)
-
-    ordered = sorted(moment for moment, _ in events)
-    span_days = (ordered[-1] - ordered[0]).total_seconds() / 86_400
-    labels_per_week = total / (span_days / 7) if span_days > 0 else 0.0
-
-    return LabelStats(
-        total=total,
-        positives=positives,
-        positive_rate=positives / total if total else None,
-        span_days=span_days,
-        labels_per_week=labels_per_week,
-        per_category=per_category,
+    return _score_buckets(
+        sorted(buckets), by_category, horizon_hours=horizon_hours, span_days=span_days
     )
 
 
