@@ -1095,3 +1095,20 @@ Tise's own collection begins"* rather than letting a short import look like a fa
 deleted before the import ran. It was visible only in the arithmetic of a screenshot:
 total events equalled imported events exactly, which is true when nothing was collected
 live and would have been false the moment it was.
+
+### D43 addendum — pausing leaves a hole, and the hole is correct
+
+Written straight after D43, appended rather than folded in, because the entry is already
+recorded.
+
+The import window ends at the *earliest* live event, so any period after that is never
+backfilled — including a period the user **paused** through, when Tise was installed and
+consented but deliberately not watching.
+
+That looked like a limitation and is not. Pausing means "do not record this". An import
+that later reached back and filled in exactly the stretch someone paused for would
+undo the only thing pausing does. Refusing to backfill a paused period is the behaviour
+the pause button promises.
+
+What this does cost is honesty in the UI, and that lands in T15: a user who pauses for a
+week should be told that week is gone rather than discovering it in a chart.
