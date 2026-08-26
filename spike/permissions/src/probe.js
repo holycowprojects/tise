@@ -1,15 +1,17 @@
 // Tise permission spike — THROWAWAY CODE. Deleted at the end of T5.
 //
-// It answers one question: what is the smallest permission set that lets Tise observe
-// a navigation and learn its URL? The original design documents shipped a manifest that
-// could not have collected anything (audit finding 7), so nothing here is assumed.
+// Answers three questions:
+//   1. What is the smallest permission set that lets Tise learn a navigation's URL?
+//   2. Can `history` be requested at runtime, after the user clicks, rather than at
+//      install? (If so, Tise installs with no warning and no capability at all.)
+//   3. What does it actually take to read a person's WHOLE history — the documented
+//      defaults truncate hard and do so silently.
 //
-// Everything is recorded to IndexedDB rather than chrome.storage, which also settles a
-// question T6 depends on: whether IndexedDB works with no storage permission at all.
+// The original design documents shipped a manifest that could not have collected
+// anything (audit finding 7), so nothing here is assumed.
 
 const DB_NAME = "tise-spike";
 const STORE = "observations";
-
 const MANIFEST = chrome.runtime.getManifest();
 
 function openDb() {
@@ -37,13 +39,12 @@ async function record(entry) {
   db.close();
 }
 
-// --- what the manifest actually asked for -------------------------------------------
 record({
   kind: "manifest",
   variant: MANIFEST.name,
   permissions: MANIFEST.permissions ?? [],
+  optionalPermissions: MANIFEST.optional_permissions ?? [],
   hostPermissions: MANIFEST.host_permissions ?? [],
-  optionalHostPermissions: MANIFEST.optional_host_permissions ?? [],
   apisPresent: {
     history: typeof chrome.history !== "undefined",
     webNavigation: typeof chrome.webNavigation !== "undefined",
@@ -53,22 +54,21 @@ record({
   },
 });
 
-// --- chrome.history.onVisited --------------------------------------------------------
-// Hypothesis: fires with a usable URL under the "history" permission alone, with no host
-// permissions. If true, Tise never needs to be able to read a page.
-if (chrome.history?.onVisited) {
+// --- live collection -----------------------------------------------------------------
+
+function attachHistoryListener() {
+  if (!chrome.history?.onVisited || attachHistoryListener.done) return;
+  attachHistoryListener.done = true;
+
   chrome.history.onVisited.addListener(async (item) => {
     await record({
       kind: "history.onVisited",
       urlPresent: typeof item.url === "string" && item.url.length > 0,
-      // Host only. The spike must not persist a full URL any more than the product would.
+      // Host only. The spike stores no more than the product would.
       host: item.url ? new URL(item.url).host : null,
-      titlePresent: typeof item.title === "string",
       fields: Object.keys(item).sort(),
     });
 
-    // The duration trap, tested rather than recalled: dump the exact keys the API
-    // returns for a visit and confirm no duration field is among them.
     if (chrome.history.getVisits && item.url) {
       try {
         const visits = await chrome.history.getVisits({ url: item.url });
@@ -91,19 +91,87 @@ if (chrome.history?.onVisited) {
   });
 }
 
-// --- chrome.webNavigation.onCommitted -------------------------------------------------
-// Hypothesis: without host permissions the event may not fire, or may arrive with the
-// URL redacted. This is the claim audit finding 7 rests on, so it gets measured.
-if (chrome.webNavigation?.onCommitted) {
+function attachNavigationListener() {
+  if (!chrome.webNavigation?.onCommitted || attachNavigationListener.done) return;
+  attachNavigationListener.done = true;
+
   chrome.webNavigation.onCommitted.addListener(async (details) => {
-    if (details.frameId !== 0) return; // top-level navigations only
+    if (details.frameId !== 0) return;
     await record({
       kind: "webNavigation.onCommitted",
       urlPresent: typeof details.url === "string" && details.url.length > 0,
       host: details.url ? new URL(details.url).host : null,
       transitionType: details.transitionType ?? null,
-      transitionQualifiers: details.transitionQualifiers ?? null,
       fields: Object.keys(details).sort(),
     });
   });
 }
+
+attachHistoryListener();
+attachNavigationListener();
+
+// Granting an optional permission mid-session should make the API appear. Whether a
+// listener can then be attached without reloading the extension is a real unknown, and
+// T7's first-run import depends on the answer.
+chrome.permissions?.onAdded?.addListener(async (granted) => {
+  await record({ kind: "permissions.onAdded", granted: granted.permissions ?? [] });
+  attachHistoryListener();
+  attachNavigationListener();
+});
+
+chrome.permissions?.onRemoved?.addListener(async (removed) => {
+  await record({ kind: "permissions.onRemoved", removed: removed.permissions ?? [] });
+});
+
+// --- the import probe ----------------------------------------------------------------
+// chrome.history.search has two defaults that truncate silently:
+//   startTime  -> last 24 hours
+//   maxResults -> 100
+// Called the obvious way it returns a hundred rows from yesterday and looks like it
+// worked. This measures each variation so T7 cannot inherit the mistake.
+
+async function probeImport() {
+  if (!chrome.history?.search) {
+    await record({ kind: "import.unavailable" });
+    return { error: "history API not available" };
+  }
+
+  const attempts = [
+    { label: "defaults", query: { text: "" } },
+    { label: "startTime=0", query: { text: "", startTime: 0 } },
+    { label: "startTime=0,maxResults=0", query: { text: "", startTime: 0, maxResults: 0 } },
+    {
+      label: "startTime=0,maxResults=1e6",
+      query: { text: "", startTime: 0, maxResults: 1000000 },
+    },
+  ];
+
+  const results = [];
+  for (const attempt of attempts) {
+    try {
+      const items = await chrome.history.search(attempt.query);
+      const times = items.map((i) => i.lastVisitTime).filter(Boolean);
+      results.push({
+        label: attempt.label,
+        count: items.length,
+        oldest: times.length ? new Date(Math.min(...times)).toISOString() : null,
+        spanDays: times.length
+          ? (Math.max(...times) - Math.min(...times)) / 86400000
+          : 0,
+      });
+    } catch (error) {
+      results.push({ label: attempt.label, error: String(error) });
+    }
+  }
+
+  await record({ kind: "import.probe", results });
+  return { results };
+}
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === "runImportProbe") {
+    probeImport().then(sendResponse);
+    return true; // async response
+  }
+  return false;
+});

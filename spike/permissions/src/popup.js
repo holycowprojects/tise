@@ -1,5 +1,5 @@
 // Tise permission spike — THROWAWAY CODE. Deleted at the end of T5.
-// Reads what probe.js recorded and states the verdict in plain language.
+// Reads what probe.js recorded and states each verdict in plain language.
 
 const DB_NAME = "tise-spike";
 const STORE = "observations";
@@ -37,38 +37,41 @@ function verdict(label, state, detail) {
   }</div>`;
 }
 
-function row(key, value) {
-  return `<tr><td class="k">${key}</td><td>${value}</td></tr>`;
-}
-
 async function render() {
   const rows = await readAll();
   const manifest = rows.find((r) => r.kind === "manifest");
-  document.getElementById("variant").textContent =
-    manifest?.variant ?? chrome.runtime.getManifest().name;
+  const live = chrome.runtime.getManifest();
+  document.getElementById("variant").textContent = live.name;
+
+  const granted = await chrome.permissions.getAll();
+  const hasHistory = (granted.permissions ?? []).includes("history");
+
+  document.getElementById("grant").hidden =
+    !(live.optional_permissions ?? []).includes("history") || hasHistory;
+  document.getElementById("import").hidden = !hasHistory;
 
   const visited = rows.filter((r) => r.kind === "history.onVisited");
   const visits = rows.filter((r) => r.kind === "history.getVisits");
   const nav = rows.filter((r) => r.kind === "webNavigation.onCommitted");
+  const added = rows.filter((r) => r.kind === "permissions.onAdded");
+  const imports = rows.filter((r) => r.kind === "import.probe");
 
-  const historyUrls = visited.filter((r) => r.urlPresent).length;
-  const navUrls = nav.filter((r) => r.urlPresent).length;
   const lastVisit = visits[visits.length - 1];
-
+  const lastImport = imports[imports.length - 1];
   const parts = [];
 
   parts.push(
     verdict(
-      `chrome.history.onVisited yields a URL &nbsp;<em>(${visited.length} events)</em>`,
-      visited.length === 0 ? null : historyUrls > 0,
+      `history.onVisited yields a URL <em>(${visited.length} events)</em>`,
+      visited.length === 0 ? null : visited.some((r) => r.urlPresent),
       visited.length ? `fields: ${visited[visited.length - 1].fields.join(", ")}` : "",
     ),
   );
 
   parts.push(
     verdict(
-      `chrome.webNavigation.onCommitted yields a URL &nbsp;<em>(${nav.length} events)</em>`,
-      nav.length === 0 ? null : navUrls > 0,
+      `webNavigation.onCommitted yields a URL <em>(${nav.length} events)</em>`,
+      nav.length === 0 ? null : nav.some((r) => r.urlPresent),
       nav.length ? `fields: ${nav[nav.length - 1].fields.join(", ")}` : "",
     ),
   );
@@ -78,27 +81,72 @@ async function render() {
       verdict(
         "getVisits returns a duration field",
         lastVisit.hasAnyDurationField,
-        `VisitItem fields: ${lastVisit.visitItemFields.join(", ")}\ntransition: ${
-          lastVisit.transition
-        }`,
+        `VisitItem: ${lastVisit.visitItemFields.join(", ")}`,
       ),
     );
   }
 
-  parts.push(
-    verdict("IndexedDB works with no storage permission", rows.length > 0, ""),
-  );
+  if ((live.optional_permissions ?? []).includes("history")) {
+    parts.push(
+      verdict(
+        `history granted at runtime, not at install${
+          added.length ? " — and listeners re-attached" : ""
+        }`,
+        hasHistory,
+        added.length ? `onAdded fired: ${added[added.length - 1].granted}` : "",
+      ),
+    );
+  }
 
-  const table = [
-    row("permissions", JSON.stringify(manifest?.permissions ?? [])),
-    row("host_permissions", JSON.stringify(manifest?.hostPermissions ?? [])),
-    row("APIs present", JSON.stringify(manifest?.apisPresent ?? {}, null, 0)),
-    row("observations", rows.length),
-  ].join("");
+  if (lastImport) {
+    const table = lastImport.results
+      .map((r) =>
+        r.error
+          ? `${r.label.padEnd(26)} ERROR ${r.error}`
+          : `${r.label.padEnd(26)} ${String(r.count).padStart(7)} rows  ${r.spanDays.toFixed(
+              1,
+            )}d  oldest ${r.oldest?.slice(0, 10) ?? "?"}`,
+      )
+      .join("\n");
+    const best = Math.max(...lastImport.results.map((r) => r.count ?? 0));
+    const defaults = lastImport.results.find((r) => r.label === "defaults");
+    parts.push(
+      verdict(
+        "reading the WHOLE history needs explicit startTime + maxResults",
+        defaults ? defaults.count < best : null,
+        table,
+      ),
+    );
+  }
+
+  parts.push(verdict("IndexedDB works with no storage permission", rows.length > 0, ""));
 
   document.getElementById("out").innerHTML =
-    parts.join("") + `<table>${table}</table>`;
+    parts.join("") +
+    `<table>
+      <tr><td class="k">permissions</td><td>${JSON.stringify(live.permissions ?? [])}</td></tr>
+      <tr><td class="k">optional</td><td>${JSON.stringify(live.optional_permissions ?? [])}</td></tr>
+      <tr><td class="k">hosts</td><td>${JSON.stringify(live.host_permissions ?? [])}</td></tr>
+      <tr><td class="k">granted now</td><td>${JSON.stringify(granted.permissions ?? [])}</td></tr>
+      <tr><td class="k">observations</td><td>${rows.length}</td></tr>
+      <tr><td class="k">APIs</td><td>${JSON.stringify(manifest?.apisPresent ?? {})}</td></tr>
+    </table>`;
 }
+
+document.getElementById("grant").addEventListener("click", async () => {
+  // Must be inside a click handler: Chrome requires a user gesture.
+  const ok = await chrome.permissions.request({ permissions: ["history"] });
+  document.getElementById("out").innerHTML = ok
+    ? "Granted. Browse a few sites, then reopen this popup."
+    : "Denied. That is a valid outcome — the extension must still work, doing nothing.";
+  setTimeout(render, 1200);
+});
+
+document.getElementById("import").addEventListener("click", async () => {
+  document.getElementById("out").textContent = "Reading history…";
+  await chrome.runtime.sendMessage({ type: "runImportProbe" });
+  render();
+});
 
 document.getElementById("clear").addEventListener("click", async () => {
   const db = await openDb();

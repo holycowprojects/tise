@@ -38,6 +38,14 @@ VARIANTS: dict[str, dict] = {
         "question": "The set Tise intends to ship: history + alarms + offscreen, no hosts.",
         "permissions": ["history", "alarms", "offscreen"],
     },
+    "E-optional-consent-flow": {
+        "question": (
+            "Install with NO capability; the user grants history by clicking. Then read "
+            "the whole history."
+        ),
+        "permissions": ["alarms", "offscreen"],
+        "optional_permissions": ["history"],
+    },
 }
 
 
@@ -53,6 +61,8 @@ def build_manifest(name: str, spec: dict) -> dict:
     }
     if "host_permissions" in spec:
         manifest["host_permissions"] = spec["host_permissions"]
+    if "optional_permissions" in spec:
+        manifest["optional_permissions"] = spec["optional_permissions"]
     return manifest
 
 
