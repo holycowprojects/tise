@@ -1,0 +1,29 @@
+[project]
+name = "tise-research"
+version = "0.1.0"
+description = "Research tier for Tise. Runs on the author's machine only; never shipped."
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["research/tise_research"]
+
+[tool.pytest.ini_options]
+testpaths = ["research/tests"]
+markers = [
+    "parity: TypeScript/Python feature parity. CI-blocking from T17.",
+]
+
+[tool.ruff]
+line-length = 96
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
