@@ -14,7 +14,9 @@ working and committable.
   - Find the session boundary empirically; estimate `return_24h` labels/week at 8 / 15 / 25 categories
   - Report `full` and `history` variants separately — the API has no visit duration
   - Verify: `uv run python analysis/history_shape.py --out docs/benchmarks/ --browser Chrome` ✓ (78 tests, lint clean)
-  - Also run against Edge with `--browser Edge --history <path>`; never merged (D18)
+  - Run per browser, one at a time, never merged (D18) and never automatically (D21).
+    Firefox needs `--engine firefox`; Chrome and Edge share the Chromium schema.
+  - **Edge is the primary research corpus** (D20) — 5,706 visits, 90-day span
   - **GATE: PASSED** — 348 labels in 8 weeks (Chrome), 398 (Edge), after fixing the
     label definition. Adopted: per (category, session) @ 30m (D16, D17).
   - Session boundary **not found empirically**; it is a declared hyperparameter instead

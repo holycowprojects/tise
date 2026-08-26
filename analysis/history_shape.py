@@ -26,6 +26,7 @@ from collections import Counter
 from datetime import datetime, tzinfo
 from pathlib import Path
 
+from tise_research.data import firefox_history
 from tise_research.data.chrome_history import (
     Visit,
     copy_history_db,
@@ -329,21 +330,27 @@ reported in every benchmark, and never quietly assumed.
 
 ## Compat variants — `full` versus `history`
 
-Chrome's history **file** records `visit_duration`. The `chrome.history` **API** that the
-extension must use does **not**. Anything derived from dwell time is therefore research
-only and can never ship.
+A Chromium history **file** records `visit_duration`. The `chrome.history` **API** that
+the extension must use does **not**. Anything derived from dwell time is therefore
+research only and can never ship.
 
 | | `full` (this file) | `history` (what the extension gets) |
 |---|---|---|
 | Visit timestamp | yes | yes |
 | Transition type | yes | yes |
 | Registrable domain | yes | yes |
-| **Dwell duration** | **yes** | **no** |
+| **Dwell duration** | {"**no**" if duration_share == 0 else "**yes**"} | **no** |
 | Referring visit | yes | yes |
 
-Visits in this database carrying a usable duration: **{duration_share:.1%}**
-({len(with_duration):,} of {len(visits):,}). A zero duration means *not recorded*, which
-is an absence rather than a zero-second dwell, and is excluded from that share.
+{
+    f"**{browser} records no dwell duration at all**, which makes this database an "
+    "honest preview of exactly what the shipped extension sees: there is no `full` "
+    "variant here to be tempted by."
+    if duration_share == 0
+    else f"Visits in this database carrying a usable duration: **{duration_share:.1%}** "
+    f"({len(with_duration):,} of {len(visits):,}). A zero duration means *not recorded*, "
+    "which is an absence rather than a zero-second dwell, and is excluded from that share."
+}
 
 Everything else in this report — volume, gaps, sessions, label counts — is identical in
 both variants, because none of it uses duration. **The label estimate above, and the
@@ -360,8 +367,10 @@ The exact field list the API returns is confirmed experimentally at T5, not assu
   multi-part public suffixes rather than the full Public Suffix List. Adding a PSL
   dependency is an "ask first" item, and the choice must be made once for both
   TypeScript and Python because the function is parity-critical. Owed at T2/T6.
-- **Chrome retention.** Chrome expires history on its own schedule, so the span above is
-  what survived, not everything that happened.
+- **Browser retention.** {browser} expires history on its own schedule, so the span above
+  is what survived, not everything that happened.
+- **One browser of several.** This person uses four browsers for different kinds of work.
+  This report describes {browser} alone and is never merged with the others (D18).
 """
 
 
@@ -417,21 +426,44 @@ def main() -> int:
             "are never merged or overwritten. Any Chromium browser works unchanged."
         ),
     )
+    parser.add_argument(
+        "--engine",
+        choices=("chromium", "firefox"),
+        default="chromium",
+        help=(
+            "Which history schema to read. Chrome, Edge, Brave, Opera, Vivaldi and Arc "
+            "all share the Chromium one; Firefox needs its own (different epoch, "
+            "different tables, no duration column)."
+        ),
+    )
     args = parser.parse_args()
 
-    source = args.history or default_history_path()
+    reader = firefox_history if args.engine == "firefox" else None
+
+    if args.history is not None:
+        source = args.history
+    elif reader is not None:
+        found = reader.default_places_path()
+        if found is None:
+            print("Firefox not found. Pass --history explicitly.")
+            return 1
+        source = found
+    else:
+        source = default_history_path()
+
     data_dir: Path = args.data_dir
     slug = args.browser.strip().lower().replace(" ", "-")
-    copy_path = data_dir / f"History-{slug}.copy"
+    copy_path = data_dir / f"history-{slug}.copy"
 
     print(f"Copying {source} -> {copy_path}")
     print("  (the original is opened read-only and never modified)")
     copy_history_db(source, copy_path)
 
-    visits = load_visits(copy_path)
+    load = reader.load_visits if reader is not None else load_visits
+    visits = load(copy_path)
     # Redirect hops are recorded as visits but nobody chose to go there. Counting them
     # is what buried the within-session mode on the first run of this script.
-    with_redirects = load_visits(copy_path, exclude_redirects=False)
+    with_redirects = load(copy_path, exclude_redirects=False)
     redirects_excluded = len(with_redirects) - len(visits)
     print(
         f"Loaded {len(visits):,} chosen navigations "

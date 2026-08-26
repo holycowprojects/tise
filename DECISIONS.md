@@ -239,8 +239,10 @@ Recorded so they are not silently resolved by whoever writes the code first.
   hyperparameter rather than discovered as a constant.
 - ~~**Q5 — How is a `return_24h` label defined?**~~ **Resolved by D16:** one label per
   (category, session).
-- **Q6 — Is Chrome actually the primary surface?** Measurement says Akash browses more in
-  Edge. Does not block anything before T18.
+- ~~**Q6 — Is Chrome actually the primary surface?**~~ **Resolved by D19/D20:** no. Brave
+  is. V1 ships to all Chromium browsers from one codebase.
+- **Q7 — Should the browser split be surfaced to the user?** A Tise user running four
+  browsers sees predictions from one. Silently partial, or stated in the UI? Blocks T15.
 
 ---
 
@@ -375,9 +377,91 @@ A pattern that reproduces across two independent datasets from the same person i
 evidence the structure is real rather than an artifact of one history file. This is the
 first genuine finding of the project.
 
+**Narrowed by the next entry** once a third browser was measured — the claim held for two
+and does not hold universally.
+
 ### Noted, not acted on
 
 Akash browses **more in Edge than in Chrome** (5,706 navigations over 90 days versus
 5,012 over 56). D7 still ships to the Chrome Web Store, and the extension runs unchanged
 in Edge because it is Chromium. But the assumption that Chrome is the primary surface was
 never checked, and it is not obviously right.
+
+---
+
+## 2026-08-26 — Multiple browsers. D19, D20, D21.
+
+Akash uses different browsers for different kinds of work — a deliberate context
+separation, not an accident. Each is measured separately; none are merged (D18).
+
+| Browser | Visits | Span | Active days | Median/day | Domains | Labels/8wk @30m | Positive rate |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Edge | 5,706 | 89.6 | 67 | 67 | 144 | 339 | 67.2% |
+| Chrome | 5,012 | 55.9 | 47 | 27 | 133 | 298 | 67.3% |
+| Firefox | 909 | 38.1 | 34 | 16 | 67 | 300 | 55.9% |
+
+### D21 — One installed browser is excluded from research at the author's request
+
+A fourth browser is installed and in daily use. **Its history is not to be read, copied,
+measured or referenced**, and any numbers previously derived from it have been deleted.
+Nothing derived from it was ever committed.
+
+This is not a technical constraint and needs no justification. It is recorded so that a
+future session does not "helpfully" rediscover the database and sweep it in. **Any browser
+discovery must be opt-in per browser, never automatic.**
+
+*Consequence:* browser sweeps are always explicit. `analysis/history_shape.py` takes one
+database at a time by design, and it stays that way.
+
+### D19 — V1 ships to Chromium browsers from one codebase
+
+Chrome, Edge, Brave, Opera, Vivaldi and Arc share the extension API *and* the history
+schema. Nearly all install extensions directly from the Chrome Web Store, so the shipping
+surface is **one Chrome Web Store listing**, plus optionally a second Edge Add-ons listing
+for discovery. No second codebase.
+
+Note this is a statement about *where the product runs*, which is unrelated to D21 — which
+browsers' history is used for research is a separate question with a separate answer.
+
+**Firefox is measured but not shipped to.** It is a genuine port, not a rebuild: separate
+store, and no offscreen documents — which T11's chunked in-browser training depends on.
+Revisit after V1.
+
+*Consequence for T18:* permission justifications and the privacy policy must cover both
+listings. *Consequence for T5:* the permission spike should confirm the set works in Edge
+as well as Chrome.
+
+### D20 — Edge is the primary research corpus; Chrome is not
+
+Chrome was the default only because it was the first database found. Edge has more visits
+(5,706 vs 5,012), a longer span (90 vs 56 days), more active days (67 vs 47) and more
+domains. **T2 builds the category taxonomy from Edge's domain list**, then checks coverage
+against Chrome and Firefox.
+
+### The generalisation claim, narrowed
+
+The previous entry said positive rates "match to within 0.3 points at every timeout".
+True of Chrome and Edge. **Not true once Firefox is included.** At a 30-minute timeout:
+
+- Chrome 67.3%, Edge 67.2% — two heavily-used contexts, within 0.1 points
+- Firefox 55.9% — an 11-point outlier
+
+The defensible claim is narrower: **the pattern is stable across independent,
+heavily-used contexts and degrades in a lightly-used one** — which is what anyone would
+predict from 909 visits across 38 sporadic days. That is still a real generalisation
+result, and it now carries its own documented failure case, which spec criterion 12
+requires anyway.
+
+### Firefox has no dwell duration at all
+
+0 of 909 visits carry one — the column does not exist. That makes Firefox the only corpus
+here that is `history`-class by construction, with no `full` variant to be tempted by. It
+is an honest preview of exactly what the shipped extension sees.
+
+### Excluded deliberately: WebView2 stores
+
+Sixteen Chromium history databases exist on this machine. Twelve belong to **embedded
+WebView2 runtimes inside applications** — Outlook, Copilot, GitHub Desktop, the LinkedIn
+app, Photos, the Microsoft Store, Ollama. Identical schema, so a naive sweep ingests them
+happily. They are app internals, not browsing, and no extension can run in them. Any
+future browser discovery must exclude `EBWebView` and `WebView2UserData` paths by name.
