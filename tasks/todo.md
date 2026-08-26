@@ -23,9 +23,13 @@ working and committable.
   - Fixed inside this task: redirect hops counted as navigations; gap-valley left-edge
     bug; `.gitignore` `data/` swallowing `research/tise_research/data/`
 
-- [ ] **T2 · Define the category set, seed the domain map** · S · deps: T1
-  - `domains.json` covering ≥ 80% of visits; one-line definition per category
-  - Verify: `uv run pytest research/tests/test_categories.py`
+- [x] **T2 · Define the category set, seed the domain map** · S · deps: T1
+  - 15 categories + `unknown`; **generic map, not the author's domain list** (D22)
+  - Coverage: Edge 86.8% (primary, needs 80%) · Firefox 87.8% · Chrome 78.1% (D23)
+  - Chrome's ceiling is structural — one self-owned domain is 14.5% of it
+  - Verify: `uv run pytest research/tests/test_categories.py` ✓ (138 tests, lint clean)
+  - **Carry into T4: `youtube.com` is 49.6% of the primary corpus.** Baselines must be
+    reported per category, and majority-class is mandatory (D24).
 
 - [ ] **T3 · Resolver, sessioniser, label generator, parity fixture** · M · deps: T2
   - Pure functions; explicit `window_end` everywhere; commit `parity_events.json`

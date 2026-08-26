@@ -465,3 +465,76 @@ WebView2 runtimes inside applications** — Outlook, Copilot, GitHub Desktop, th
 app, Photos, the Microsoft Store, Ollama. Identical schema, so a naive sweep ingests them
 happily. They are app internals, not browsing, and no extension can run in them. Any
 future browser discovery must exclude `EBWebView` and `WebView2UserData` paths by name.
+
+---
+
+## 2026-08-26 — T2: the category map. D22, D23, D24.
+
+Map: `extension/src/categories/domains.json` (v1). Tests: `research/tests/test_categories.py`.
+
+### D22 — Fifteen categories, and the map is generic rather than the author's
+
+`video · search · news · social · shopping · ai · dev · learning · work · finance ·
+government · property · travel · reference · wellness`, plus `unknown`.
+
+**The shipped map contains only domains a large population uses.** It was seeded from
+real browsing but deliberately excludes the author's employer, his child's school,
+locality-specific government portals, neighbourhood businesses, his bank and his
+insurer. This file is committed and public, and a domain list is a profile: publishing
+one would disclose employer, city and family from a file nobody would think to check.
+
+A test enforces it by name, because the failure mode is somebody later adding "just one
+more" domain that happens to be their own.
+
+*Consequence:* the map cannot cover personal browsing, by construction. That is what the
+user override in the resolver is for — see D23.
+
+### D23 — A generic map has a coverage ceiling, and that is a finding, not a shortfall
+
+| Corpus | Coverage | Threshold |
+|---|---:|---:|
+| Edge (primary, D20) | **86.8%** | 80% |
+| Firefox | 87.8% | 70% |
+| Chrome | 78.1% | 70% |
+
+Chrome sits lower for one reason: **`holycowstudios.in` is 14.5% of it.** A person's own
+domain cannot be in a shipped map, so no amount of map work reaches 80% there. Of
+*coverable* browsing, Chrome is at 91%.
+
+The primary corpus therefore carries the 80% criterion, and every other corpus carries a
+70% floor whose job is to catch map rot — a category renamed, a block of domains dropped
+— rather than to relitigate this ceiling. Both numbers are in the test, with the reason.
+
+*Consequence:* the user override is not a nice-to-have. For a user whose own site is a
+sixth of their browsing, it is the difference between a working product and a useless
+one. T15 must make it easy to reach, not bury it in settings.
+
+### D24 — The class distribution is severely skewed, and the benchmark must say so
+
+`youtube.com` alone is **49.6%** of the primary corpus. With `google.com` at 20.2%, two
+domains are 70% of all browsing.
+
+So `video` and `search` will dominate every category-level model. Specifically:
+
+- **`next_session_category` is close to trivial.** Always-guess-`video` is a strong
+  baseline, and any accuracy figure that omits it is misleading.
+- **`return_24h` for `video` is near-certain**, which inflates the headline positive rate
+  while saying nothing about whether the model learned anything.
+- The interesting signal is in the tail, where the labels are scarcest.
+
+*Consequence for T4:* baselines must be reported **per category**, not only in aggregate,
+and the majority-class baseline is mandatory. A model that beats the base rate overall
+while losing to it on eleven of fifteen categories has not worked, and an aggregate-only
+table would hide that completely.
+
+This is the same class of defect as the original documents' unproducible benchmark table:
+a number that is technically correct and practically meaningless.
+
+### Map gaps that the measurement caught
+
+The first draft missed several genuinely generic services — `deepseek.com` alone was 11.8%
+of the Firefox corpus, and `insighttimer.com` 15.7%, which is why `wellness` exists as a
+category at all. Coverage there went from 53.5% to 87.8% once they were added.
+
+Worth noting as method: the taxonomy was not designed and then validated. It was drafted,
+measured, found wanting, and corrected — which is the only reason `wellness` exists.
