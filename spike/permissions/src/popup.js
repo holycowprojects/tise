@@ -117,6 +117,26 @@ async function render() {
         table,
       ),
     );
+
+    const f = lastImport.fanOut;
+    if (f && !f.error) {
+      parts.push(
+        verdict(
+          "a full backfill is practical in one pass",
+          f.projectedSeconds < 30,
+          [
+            `pages (search)        ${f.pageCount}`,
+            `visits in ${String(f.sampled).padStart(4)} sampled  ${f.visitsInSample}`,
+            `visitCount sum        ${f.visitCountSumFromSearch}`,
+            `projected visits      ~${f.projectedVisits}`,
+            `getVisits per page    ${f.msPerPage.toFixed(1)} ms`,
+            `projected full pass   ~${f.projectedSeconds}s`,
+          ].join("\n"),
+        ),
+      );
+    } else if (f?.error) {
+      parts.push(verdict("backfill fan-out probe", false, f.error));
+    }
   }
 
   parts.push(verdict("IndexedDB works with no storage permission", rows.length > 0, ""));

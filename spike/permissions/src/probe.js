@@ -164,8 +164,48 @@ async function probeImport() {
     }
   }
 
-  await record({ kind: "import.probe", results });
-  return { results };
+  // `search` returns PAGES, one row per URL with a visitCount. The label pipeline is
+  // visit-based — sessions come from individual timestamps — so a real backfill needs
+  // getVisits() per URL on top. That fan-out is what decides whether importing a whole
+  // history is practical or has to be chunked across many wake-ups, so it is measured
+  // rather than guessed at.
+  let fanOut = null;
+  try {
+    const pages = await chrome.history.search({
+      text: "",
+      startTime: 0,
+      maxResults: 1000000,
+    });
+    const sample = pages.slice(0, 200);
+    const started = performance.now();
+    let visitTotal = 0;
+    for (const page of sample) {
+      const visits = await chrome.history.getVisits({ url: page.url });
+      visitTotal += visits.length;
+    }
+    const elapsed = performance.now() - started;
+
+    const claimed = pages.reduce((sum, p) => sum + (p.visitCount ?? 0), 0);
+    fanOut = {
+      pageCount: pages.length,
+      sampled: sample.length,
+      visitsInSample: visitTotal,
+      msPerPage: sample.length ? elapsed / sample.length : 0,
+      // Extrapolated only to show the order of magnitude, never used as a result.
+      projectedVisits: sample.length
+        ? Math.round((visitTotal / sample.length) * pages.length)
+        : 0,
+      projectedSeconds: sample.length
+        ? Math.round((elapsed / sample.length) * pages.length) / 1000
+        : 0,
+      visitCountSumFromSearch: claimed,
+    };
+  } catch (error) {
+    fanOut = { error: String(error) };
+  }
+
+  await record({ kind: "import.probe", results, fanOut });
+  return { results, fanOut };
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
