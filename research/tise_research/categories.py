@@ -18,12 +18,32 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-__all__ = ["DEFAULT_MAP_PATH", "CategoryMap", "load_category_map"]
+__all__ = ["DEFAULT_MAP_PATH", "CategoryMap", "CategoryRule", "load_category_map"]
 
 #: research/tise_research/categories.py -> repo root is three parents up.
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
 DEFAULT_MAP_PATH = _REPO_ROOT / "extension" / "src" / "categories" / "domains.json"
+
+
+@dataclass(frozen=True, slots=True)
+class CategoryRule:
+    """One keyword rule, applied only when the domain map misses.
+
+    Kept as data rather than code precisely so the TypeScript port cannot drift: both
+    languages read this list, neither owns it.
+    """
+
+    kind: str  # "suffix" | "contains"
+    value: str
+    category: str
+
+    def matches(self, domain: str) -> bool:
+        if self.kind == "suffix":
+            return domain.endswith(self.value)
+        if self.kind == "contains":
+            return self.value in domain
+        raise ValueError(f"unknown rule kind: {self.kind!r}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +58,8 @@ class CategoryMap:
     version: int
     categories: dict[str, str]
     domains: dict[str, str]
+    #: Ordered. First match wins, and the order is part of the contract.
+    rules: tuple[CategoryRule, ...] = ()
 
     def lookup(self, domain: str) -> str | None:
         """Category for a registrable domain, or None if the map has nothing.
@@ -64,10 +86,29 @@ def load_category_map(path: Path | None = None) -> CategoryMap:
     categories = {str(k): str(v) for k, v in raw["categories"].items()}
     domains = {str(k).lower(): str(v) for k, v in raw["domains"].items()}
 
-    undefined = sorted({c for c in domains.values() if c not in categories})
+    rules = tuple(
+        CategoryRule(
+            kind=str(entry["kind"]),
+            value=str(entry["value"]).lower(),
+            category=str(entry["category"]),
+        )
+        for entry in raw.get("rules", ())
+    )
+
+    undefined = sorted(
+        {c for c in domains.values() if c not in categories}
+        | {r.category for r in rules if r.category not in categories}
+    )
     if undefined:
-        raise ValueError(f"{source} maps domains to undefined categories: {undefined}")
+        raise ValueError(f"{source} references undefined categories: {undefined}")
+
+    bad_kinds = sorted({r.kind for r in rules} - {"suffix", "contains"})
+    if bad_kinds:
+        raise ValueError(f"{source} has unsupported rule kinds: {bad_kinds}")
 
     return CategoryMap(
-        version=int(raw["version"]), categories=categories, domains=domains
+        version=int(raw["version"]),
+        categories=categories,
+        domains=domains,
+        rules=rules,
     )

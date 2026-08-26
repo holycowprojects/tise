@@ -31,6 +31,54 @@
     "wellness": "Health, fitness, meditation and medical information.",
     "unknown": "Nothing matched. A valid outcome, not an error."
   },
+  "rulesNote": [
+    "Keyword rules, applied only when the domain map misses. Ordered - first match wins.",
+    "Both the extension and the research tier read THIS list; neither reimplements it.",
+    "",
+    "Rules catch classes of site the map can never enumerate: every local government",
+    "portal, every school, every regional bank. That matters for privacy as well as",
+    "coverage - a rule categorises someone's council website without that website ever",
+    "being named in a public file.",
+    "",
+    "Deliberately conservative. A wrong category is worse than 'unknown', because",
+    "'unknown' is honest and the user can override it.",
+    "",
+    "kind is 'suffix' (domain ends with value) or 'contains' (value appears anywhere).",
+    "Longer, more specific suffixes must come first."
+  ],
+  "rules": [
+    { "kind": "suffix", "value": ".gov.in", "category": "government" },
+    { "kind": "suffix", "value": ".nic.in", "category": "government" },
+    { "kind": "suffix", "value": ".gov.uk", "category": "government" },
+    { "kind": "suffix", "value": ".gov.au", "category": "government" },
+    { "kind": "suffix", "value": ".gov", "category": "government" },
+    { "kind": "suffix", "value": ".mil", "category": "government" },
+
+    { "kind": "suffix", "value": ".edu.in", "category": "learning" },
+    { "kind": "suffix", "value": ".ac.in", "category": "learning" },
+    { "kind": "suffix", "value": ".ac.uk", "category": "learning" },
+    { "kind": "suffix", "value": ".edu.au", "category": "learning" },
+    { "kind": "suffix", "value": ".edu", "category": "learning" },
+
+    { "kind": "contains", "value": "school", "category": "learning" },
+    { "kind": "contains", "value": "college", "category": "learning" },
+    { "kind": "contains", "value": "university", "category": "learning" },
+    { "kind": "contains", "value": "academy", "category": "learning" },
+
+    { "kind": "contains", "value": "bank", "category": "finance" },
+    { "kind": "contains", "value": "insur", "category": "finance" },
+
+    { "kind": "contains", "value": "news", "category": "news" },
+
+    { "kind": "contains", "value": "hotel", "category": "travel" },
+    { "kind": "contains", "value": "resort", "category": "travel" },
+
+    { "kind": "contains", "value": "realty", "category": "property" },
+    { "kind": "contains", "value": "realestate", "category": "property" },
+
+    { "kind": "contains", "value": "recruit", "category": "work" },
+    { "kind": "contains", "value": "careers", "category": "work" }
+  ],
   "domains": {
     "youtube.com": "video",
     "netflix.com": "video",
