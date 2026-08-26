@@ -32,6 +32,7 @@ from pathlib import Path
 from tise_research.categories import load_category_map
 from tise_research.features.events import Event
 from tise_research.features.labels import return_24h_labels
+from tise_research.features.recency import FEATURE_SET, hours_since_last_seen
 from tise_research.features.resolver import resolve
 from tise_research.features.sessions import sessionise
 
@@ -157,6 +158,24 @@ def build_expected_document() -> dict:
         )
     ]
 
+    # One feature row per label, aligned by index. This is the shape the model consumes:
+    # a vector computed at the instant its label became decidable, and never after.
+    label_objects = return_24h_labels(
+        events, timeout_seconds=TIMEOUT_SECONDS, horizon_hours=HORIZON_HOURS
+    )
+    features = [
+        {
+            "subject": label.subject,
+            "windowEnd": label.window_end.isoformat(),
+            "values": {
+                "hoursSinceLastSeen": hours_since_last_seen(
+                    events, label.subject, window_end=label.window_end
+                ),
+            },
+        }
+        for label in label_objects
+    ]
+
     unknown_count = sum(1 for event in events if event.category == "unknown")
 
     return {
@@ -168,9 +187,11 @@ def build_expected_document() -> dict:
         "categoryMapVersion": category_map.version,
         "timeoutSeconds": TIMEOUT_SECONDS,
         "horizonHours": HORIZON_HOURS,
+        "featureSet": FEATURE_SET,
         "resolutions": resolutions,
         "sessions": sessions,
         "labels": labels,
+        "features": features,
         "summary": {
             "eventCount": len(events),
             "sessionCount": len(sessions),

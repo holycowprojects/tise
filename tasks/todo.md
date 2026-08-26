@@ -149,10 +149,22 @@ working and committable.
 
 ## Phase 2 — Features, twice
 
-- [ ] **T9 · Port sessioniser + one feature to TS; stand up the parity suite** · M · deps: T3, T6
+- [x] **T9 · Port sessioniser + one feature to TS; stand up the parity suite** · M · deps: T3, T6
   - Compare both implementations on the fixture within 1e-9
-  - **Break it deliberately once and confirm the suite fails**
-  - Verify: `uv run pytest -m parity && npm test`
+  - Verify: `uv run pytest -m parity` ✓ (6 parity tests, 339 total) `&& npm test` ✓ (150)
+  - **Broken deliberately twice**: `>` → `>=` on the session boundary failed 6 tests;
+    weakening the leakage guard `>=` → `>` failed 2. Both reverted
+  - **The oracle is a committed file, not a cross-language process call** (D48). Neither
+    suite shells out to the other; either can run alone
+  - **Not compared, deliberately:** session id *strings* (D36 — instants compared as
+    epoch ms instead). **`labels` is not yet checked by TS** — T10. The TS suite asserts
+    the exact top-level key set of the oracle, so a new section fails the build rather
+    than looking verified
+  - **Three implementations of the session rule are now under test in two languages**
+    (D49): Python batch, TS batch, TS incremental. A test replays the fixture through the
+    incremental one and asserts it matches the batch grouping
+  - `featureSet: "fs_1"`. The fixture gained two sections and **nothing frozen changed** —
+    66 insertions, no deletions (D50)
 
 - [ ] **T10 · Port the remaining features** · M · deps: T9
   - Tag each with its compat class (`history` / `full`); set `featureSet` version

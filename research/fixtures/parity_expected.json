@@ -7,6 +7,7 @@
   "categoryMapVersion": 1,
   "timeoutSeconds": 1800.0,
   "horizonHours": 24.0,
+  "featureSet": "fs_1",
   "resolutions": [
     {
       "domain": "youtube.com",
@@ -172,6 +173,71 @@
       "outcome": false,
       "horizonHours": 24.0,
       "sessionId": "2026-06-03T12:00:00+00:00"
+    }
+  ],
+  "features": [
+    {
+      "subject": "search",
+      "windowEnd": "2026-06-01T09:50:00+00:00",
+      "values": {
+        "hoursSinceLastSeen": null
+      }
+    },
+    {
+      "subject": "video",
+      "windowEnd": "2026-06-01T09:50:00+00:00",
+      "values": {
+        "hoursSinceLastSeen": 0.5
+      }
+    },
+    {
+      "subject": "dev",
+      "windowEnd": "2026-06-01T10:35:00+00:00",
+      "values": {
+        "hoursSinceLastSeen": 0.24972222222222223
+      }
+    },
+    {
+      "subject": "government",
+      "windowEnd": "2026-06-01T10:35:00+00:00",
+      "values": {
+        "hoursSinceLastSeen": 0.16666666666666666
+      }
+    },
+    {
+      "subject": "unknown",
+      "windowEnd": "2026-06-01T10:35:00+00:00",
+      "values": {
+        "hoursSinceLastSeen": null
+      }
+    },
+    {
+      "subject": "work",
+      "windowEnd": "2026-06-01T10:35:00+00:00",
+      "values": {
+        "hoursSinceLastSeen": 0.08333333333333333
+      }
+    },
+    {
+      "subject": "search",
+      "windowEnd": "2026-06-02T09:05:00+00:00",
+      "values": {
+        "hoursSinceLastSeen": 23.25
+      }
+    },
+    {
+      "subject": "video",
+      "windowEnd": "2026-06-02T09:05:00+00:00",
+      "values": {
+        "hoursSinceLastSeen": 0.08333333333333333
+      }
+    },
+    {
+      "subject": "dev",
+      "windowEnd": "2026-06-03T12:00:00+00:00",
+      "values": {
+        "hoursSinceLastSeen": 49.66638888888889
+      }
     }
   ],
   "summary": {
