@@ -1,0 +1,53 @@
+# Local data — never commit. This is the whole point of the project.
+# Leading slash matters: a bare `data/` also swallows research/tise_research/data/.
+/data/
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.csv
+!service/tests/**/*.csv
+!ml/**/fixtures/*.csv
+
+# Local-only working notes — never published
+CLAUDE.local.md
+*.local.md
+.claude/settings.local.json
+
+# Secrets
+.env
+.env.*
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+
+# Models and experiment artefacts
+*.pkl
+*.joblib
+*.onnx
+mlruns/
+ml/experiments/**/output/
+
+# Node / extension build
+node_modules/
+extension/dist/
+*.zip
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

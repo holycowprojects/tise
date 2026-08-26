@@ -1,0 +1,8 @@
+# Normalise line endings so a repository developed on Windows reads cleanly on Linux CI
+# and in the browser on GitHub.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.zip binary
+*.sqlite binary
