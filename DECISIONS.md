@@ -732,3 +732,101 @@ fabricating a difference. It becomes live at T10.
 What Phase 0 established, in one line: a per-category base rate beats a global one by
 33% on the best corpus, "always say yes" beats both on the three dominant categories, and
 nine of fifteen categories do not have enough data to model at all.
+
+---
+
+## 2026-08-26 — T5: the permission spike, run. D31, D32, D33.
+
+Five variants loaded in a throwaway Chrome profile. Findings in `docs/permissions.md`;
+the spike is kept under `spike/permissions/` so anyone can re-run it.
+
+### D32 — Correction: `webNavigation` does **not** need host permissions
+
+This project previously recorded, from a web search, that `webNavigation` could not see
+URLs without host permissions. **That is false.**
+
+- Variant B: `webNavigation` alone, no hosts → **26 events, full URLs**
+- Variant C: `webNavigation` + `<all_urls>` → **the same 26 events**
+
+`<all_urls>` buys nothing and would have cost the broadest warning Chrome shows.
+
+Audit finding 7 still stands — the original manifest could not have collected anything —
+but the reason recorded against it was wrong. It failed because it declared neither
+`webNavigation` nor `history` and had no service worker.
+
+This is the second documented-looking claim in this project to fail contact with a
+browser. **T5 was correctly specified as an empirical task**, and the general lesson is
+kept: documentation is good enough to design against and never good enough to promise
+with.
+
+### D31 — Manifest: `webNavigation` required, `history` optional, no hosts
+
+```jsonc
+"permissions":          ["webNavigation", "alarms", "offscreen"],
+"optional_permissions": ["history"],
+// no host_permissions
+```
+
+Supersedes the earlier proposal of `history` as a required permission.
+
+**`webNavigation` collects; `history` backfills.** They are not interchangeable:
+
+| | `history` | `webNavigation` |
+|---|---|---|
+| Install warning | *"Read and change your browsing history on all signed-in devices"* | *"Read your browsing history"* |
+| Transition inline | **no** — `HistoryItem` has no transition field | **yes** — `transitionType`, `transitionQualifiers` |
+| Frame id | no | **yes** |
+| Reads existing history | **yes** | no |
+
+`webNavigation` has the milder warning *and* the richer payload. Its
+`transitionQualifiers` and `frameId` map directly onto the redirect and subframe filters
+built at T1, with no extra API call per visit — where the `history` route would need a
+`getVisits()` call per visit purely to recover what `webNavigation` gives away.
+
+But `webNavigation` only sees the future. Only `history.search()` reads what was already
+browsed, which D10's first-run import needs. Hence one required, one optional.
+
+**No host permissions.** Observed unnecessary for both routes.
+
+### D33 — Consent is granted at runtime, and the dialog defaults to Deny
+
+Variant E proved the flow end to end: installed holding only `alarms` and `offscreen`,
+`chrome.history` genuinely absent, 0 events. After one click the grant landed,
+`permissions.onAdded` fired, and listeners re-attached **without reloading the extension**.
+
+So Tise can install with **no capability to read anything** and acquire it only when the
+user decides. Not a policy — an absence of capability.
+
+The dialog, screenshotted rather than paraphrased:
+
+> *"Tise" has requested additional permissions. It could: Read and change your browsing
+> history on all your signed-in devices.* `[Allow] [Deny]`
+
+**Deny is the focused button.** Chrome designs this dialog to be declined, so the screen
+that precedes it has to do the persuading (T15). The empty state for a user who declines
+must be honest and permanent, never a nag.
+
+### Backfill measured; one question left open honestly
+
+`getVisits` costs **0.7 ms per page**, independent of corpus size. Extrapolated to ~5,000
+pages, a full visit-level backfill is **~3.5 seconds**. T7 imports in one pass; no
+chunking needed.
+
+**What could not be measured:** whether `search`'s defaults truncate to 24 hours and 100
+rows. All four query variations returned 20 rows, because the throwaway profile held 20
+pages all from one day — there was nothing to truncate. The popup's "NO" verdict is an
+artefact of the experiment, not a fact about Chrome, and is recorded as such.
+
+It changes nothing: the mitigation is unconditional. Always pass `startTime` and
+`maxResults` explicitly; never rely on a default. Confirming the truncation would require
+running against real history and would buy nothing the mitigation does not already give.
+
+### Also confirmed
+
+- `VisitItem` = `id, isLocal, referringVisitId, transition, visitId, visitTime`.
+  **No duration field.** The duration trap is now observed, not merely documented.
+- `HistoryItem` = `id, lastVisitTime, title, typedCount, url, visitCount`. No transition.
+- IndexedDB works with **no** `storage` permission.
+- `alarms` and `offscreen` are present only when requested, and silent at install.
+- "Removing a permission breaks collection" holds both ways: A saw 0 navigation events,
+  B saw 0 history events.

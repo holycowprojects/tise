@@ -2,9 +2,9 @@
 
 Every permission Tise requests, why it is needed, and the evidence that it is needed.
 
-> **Status: spike run 2026-08-26. Five variants loaded, all observed.**
-> One outstanding item: the backfill probe (variant E, "Read my whole history") has not
-> been run. Everything else below is now **observed**, and one prior claim was wrong.
+> **Status: spike complete, 2026-08-26.** Five variants loaded, backfill probe run.
+> One claim was disproved and the design changed as a result. One question could not be
+> answered on a clean profile and is recorded as unresolved rather than assumed.
 
 ## Evidence classes
 
@@ -60,7 +60,9 @@ Observed 2026-08-26 on Chrome, five variants, throwaway profile.
 | 10 | `history` works as an **optional** permission, granted at runtime | **observed** — variant E |
 | 11 | `permissions.onAdded` fires and listeners re-attach **without reloading** | **observed** — variant E |
 | 12 | Removing a permission breaks collection | **observed** — A has no webNavigation and saw 0 nav events; B has no history and saw 0 history events |
-| 13 | Backfill: what it takes to read the whole history | *pending* — variant E button not yet clicked |
+| 13 | Backfill fan-out is cheap: **0.7 ms** per `getVisits` call | **observed** — variant E |
+| 14 | `visitCount` from `search` matches what `getVisits` returns | **observed** — 22 = 22 |
+| 15 | `search` defaults truncate to 24h / 100 rows | **documented, NOT observed** — see below |
 
 ## Correction: audit finding 7 was half right
 
@@ -227,3 +229,95 @@ signed-in devices."* Two clarifications the listing owes the reader:
 
 Neither can be reworded — Chrome controls the string — so both are addressed directly in
 the listing and in onboarding rather than left to be misread.
+
+
+## Backfill: measured, with one gap
+
+Run in variant E after granting `history` at runtime.
+
+```
+pages (search)          20
+visits in 20 sampled    22
+visitCount sum          22
+getVisits per page      0.7 ms
+projected full pass     ~0.014 s
+```
+
+**The fan-out is a non-issue.** `getVisits` costs **0.7 ms** per page, and that figure does
+not depend on how much history exists. Extrapolated to a real corpus of ~5,000 pages, a
+complete visit-level backfill takes **around 3.5 seconds**. T7 can import in a single pass;
+no chunking across alarm wake-ups is needed.
+
+`visitCount` from `search` exactly matched the visits `getVisits` returned (22 = 22), so
+the two views of history agree and neither needs reconciling against the other.
+
+### The gap: default truncation could not be tested
+
+All four query variations returned **20 rows** — identical:
+
+```
+defaults                    20 rows   oldest 2026-08-26
+startTime=0                 20 rows   oldest 2026-08-26
+startTime=0,maxResults=0    20 rows   oldest 2026-08-26
+startTime=0,maxResults=1e6  20 rows   oldest 2026-08-26
+```
+
+The popup reported **NO** for "reading the whole history needs explicit parameters". That
+verdict is wrong, and the cause is the test rather than Chrome: the spike ran on a
+**throwaway profile containing 20 pages, all from that same day**. There was nothing for
+the 24-hour window or the 100-row cap to truncate, so every variation returned everything.
+
+**This is a flaw in the experiment, not a finding**, and it is recorded as one. Chrome's
+documentation states `startTime` defaults to 24 hours and `maxResults` to 100; that
+remains *documented, not observed*.
+
+It does not block T7, because **the mitigation is unconditional**: always pass `startTime`
+and `maxResults` explicitly and never rely on a default. Confirming the truncation would
+require running the spike against a profile with real history, which buys nothing the
+mitigation does not already provide.
+
+## The runtime consent dialog, verbatim
+
+Screenshotted rather than paraphrased:
+
+> **"Tise" has requested additional permissions.**
+> It could:
+> Read and change your browsing history on all your signed-in devices
+> `[Allow]`  `[Deny]`
+
+Two things onboarding has to account for:
+
+- **Deny is the focused button.** Chrome defaults this dialog to refusal. The screen that
+  precedes it has to do the persuading, because the dialog itself is designed to be
+  declined.
+- The wording is *"on all your signed-in devices"*, marginally different from the
+  install-time string in Chrome's documentation. The listing must use what the user is
+  actually shown.
+
+## Reproducing this
+
+The spike is kept rather than deleted, under `spike/permissions/`, clearly marked
+throwaway and with its build output gitignored. The plan allowed either. It is kept
+because it produced a design correction, and a reader who doubts these findings should be
+able to re-run them in fifteen minutes rather than take them on trust.
+
+## Evidence
+
+Screenshots taken during the run, kept so a reader can check the findings rather than
+take them on trust. Every "observed" verdict above traces to one of these.
+
+| File | Shows |
+|---|---|
+| `Screenshots/chrome screenshots/ss_chrome1.png` | All five variants loaded, Developer mode |
+| `ss_chrome2.png` | **Variant A** — `history` alone yields URLs, 36 events, no hosts |
+| `ss_chrome3.png` | **Variant B** — `webNavigation` alone yields URLs, 26 events. Disproves the host-permission claim |
+| `ss_chrome4.png` | **Variant C** — `webNavigation` + `<all_urls>`, identical 26 events |
+| `ss_chrome5.png` | **Variant D** — proposed set; `alarms` and `offscreen` present and silent |
+| `ss_chrome6.png` | **Variant E before grant** — `chrome.history` absent, 0 events |
+| `ss_chrome7.png` | **Variant E after grant** — `onAdded` fired, listeners re-attached, no reload |
+| `Screenshots/ss_againcheck2.png` | The runtime consent dialog verbatim, with **Deny** focused |
+| `Screenshots/ss_checkgain3.png` | The four `history.search` variations, all 20 rows |
+| `Screenshots/ss_checkagain3.2.png` | Backfill fan-out: 0.7 ms per page, ~0.014 s projected |
+
+`VisitItem` appears in three separate screenshots as `id, isLocal, referringVisitId,
+transition, visitId, visitTime` — the duration trap, visible rather than asserted.

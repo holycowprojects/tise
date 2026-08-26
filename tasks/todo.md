@@ -63,16 +63,19 @@ working and committable.
 
 ## Phase 1 — Collect
 
-- [~] **T5 · Permission spike** · S · deps: none — **BLOCKED ON YOU, not on code**
-  - Spike built: `uv run python spike/permissions/build.py` → 4 loadable variants
-  - Procedure: `spike/permissions/README.md`. Use a throwaway Chrome profile.
-  - Confirmed from Chrome's docs already: `VisitItem` has **no duration field**, and
-    `history.onVisited` yields the URL with **no host permissions**
-  - **If that holds in practice, Tise ships with zero host permissions** — it *cannot*
-    read page content rather than promising not to
-  - `docs/permissions.md` written with every claim tagged `documented` or
-    `observed: pending`; nothing becomes a listing claim until observed
-  - Verify: removing any one permission demonstrably breaks collection (variants A vs B)
+- [x] **T5 · Permission spike** · S · deps: none — **run 2026-08-26, 5 variants**
+  - **Manifest decided (D31):** `webNavigation`, `alarms`, `offscreen` required;
+    `history` optional; **no host permissions**
+  - **I was wrong (D32):** `webNavigation` needs no host permissions. B and C returned
+    identical results, so `<all_urls>` buys nothing
+  - **Consent flow proven (D33):** installs with zero capability, grant at runtime,
+    listeners re-attach without reload. Chrome focuses **Deny** — T15 must persuade first
+  - Duration trap **observed**, not just documented: `VisitItem` has no duration field
+  - Backfill fan-out 0.7 ms/page → ~3.5 s for 5,000 pages. T7 imports in one pass
+  - **Unresolved, recorded honestly:** default 24h/100-row truncation could not be
+    measured on a 20-page profile. Mitigation is unconditional — always pass explicit
+    `startTime` and `maxResults`
+  - Verify: A saw 0 nav events, B saw 0 history events ✓
 
 - [ ] **T6 · Extension scaffold and live collector** · M · deps: T5, T2
   - Vite + TS + MV3, IndexedDB, normaliser; URL reduced to domain before the event exists
