@@ -89,8 +89,13 @@ working and committable.
     runs before the URL is parsed, and settings live in IndexedDB so no `storage`
     permission is needed
   - Runtime dependencies: **one** (`idb`). `fake-indexeddb` is test-only (D38)
-  - **Still owed — your hands, not mine:** load `extension/dist/` unpacked, browse ten
-    sites, confirm ten events with the right domains and categories
+  - **Verified in Chrome 2026-08-26.** Installed inert (0 events before consent), then
+    26 events from ~10 sites. Every stored domain bare — `dominos.co.in` reduced under
+    the multi-part suffix correctly. Pause held at 26
+  - **Observed, and deliberately not acted on:** `unknown` was 12/26 (46%) on that
+    sample, against 13.2% on the Edge corpus. Ten hand-picked varied sites are not a
+    coverage measurement — fixing the map against them would be tuning on the test.
+    Carried to T10 (D39)
 
 - [ ] **T7 · First-run history import** · M · deps: T6
   - Explicit consent, idempotent, `dwellSeconds: null`, non-blocking

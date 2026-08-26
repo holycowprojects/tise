@@ -926,3 +926,42 @@ Runtime dependencies remain exactly one: `idb`.
   reverted.
 - The popup is a **developer surface**, explicitly labelled as one in its own UI. T14 and
   T15 replace it. It exists so T6 could be verified by hand rather than through devtools.
+
+### T6 verification — observed in Chrome, 2026-08-26
+
+Loaded unpacked from `extension/dist/`. Chrome's install line was *"Read your browsing
+history"* and nothing else — no site access line, because there are no host permissions.
+
+| Claim | Verdict |
+|---|---|
+| Installs holding nothing: 0 events before consent | **observed** — screenshot `ss_tt1` |
+| Consent flips it to collecting, still 0 events | **observed** — `ss_tt2` |
+| Live collection works: 26 events from ~10 sites | **observed** — `ss_tt3` |
+| Every stored domain is bare, no path or query | **observed** — `darkreading.com`, `dominos.co.in`, `nike.in`, `zomato.com`, `google.com` |
+| Multi-part suffixes reduce correctly in the browser | **observed** — `dominos.co.in` kept three labels (D34) |
+| Pause stops writes | **observed** — `ss_tt4`, held at 26 |
+
+26 events from ~10 sites is the expected ratio: several sites committed more than one
+navigation, and three consecutive `nike.in` rows are one site being browsed, not a bug.
+
+### D39 — The map's coverage on unfamiliar browsing is a T10 question, not a T6 fix
+
+`unknown` was **12 of 26** on the verification sample — 46%, against the 13.2% measured
+on the Edge corpus (D23). `dominos.co.in` and `nike.in` both fell through to `unknown`.
+
+**Not acted on, deliberately.** Ten sites chosen to be varied are not a coverage
+measurement; they are the opposite of one, because the whole point of picking them was
+that they differed from each other. Adding those four domains to `domains.json` would
+improve a number computed on the sample that motivated the change — the same mistake as
+picking a 15-minute session timeout at T1 because it scored better.
+
+The real question is whether the keyword rules can catch consumer brands the way they
+catch government portals, and that is answered with a corpus, at T10, or by leaving it
+to the user override which already beats every other layer.
+
+### T6 verification — one interface finding
+
+The popup is taller than Chrome's popup viewport and scrolls; the "Filtered out" counts
+sit below the fold and were not visible in the verification screenshots. Harmless in a
+developer surface, and a fixed constraint for T14: the dashboard has a height budget,
+and the popup is not where the scorecard goes.
