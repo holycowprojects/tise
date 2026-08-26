@@ -124,11 +124,26 @@ working and committable.
   - Cheaper wins first: surface the user override in T14; spike titles → keyword rules
   - Verify: `uv run pytest -m parity`; tournament reports both taxonomies side by side
 
-- [ ] **T8 · Retention, deletion, export** · M · deps: T6
+- [x] **T8 · Retention, deletion, export** · M · deps: T6
   - `raw_retention_days` default 30, `0` = forever; delete-all leaves zero rows
-  - Verify: `npm test -- privacy retention export` then load the export into Python
+  - Verify: `npm test` ✓ (135 TS tests) and
+    `uv run python -m tise_research.data.load --export research/fixtures/export_v1.json` ✓
+  - **Delete-all takes consent and the `history` permission with it** (D44) — after it
+    runs, Tise is in the state it installs in and cannot store anything
+  - **The export carries everything, including the user's overrides** (D45), and the map
+    and suffix versions, without which a benchmark is unrepeatable
+  - **The alarm is created on install/startup, never at module scope** (D46) —
+    re-creating an alarm resets its schedule, so a worker that wakes per navigation would
+    push retention forward forever and silently never expire anything
 
-- [ ] **CHECKPOINT B** — loop closed: browser → export → Python → numbers
+- [x] **CHECKPOINT B** — loop closed: browser → export → Python → labels
+  - `research/fixtures/export_v1.json` is the third shared-data contract. The extension
+    asserts its exporter reproduces it; Python asserts its loader reads it and that
+    `sessionise` and `return_24h_labels` run on the result unaided
+  - Broken deliberately: dropping `suffixListVersion` from the exporter failed three
+    TypeScript tests, then reverted
+  - **Still owed — your hands:** export from the browser, then run the loader on the real
+    file rather than the fixture
 
 ---
 

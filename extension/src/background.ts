@@ -12,6 +12,11 @@
  */
 import { collect } from "./collect/collector";
 import { chromeHistoryApi, runImport } from "./collect/import";
+import {
+  enforceRetention,
+  RETENTION_ALARM,
+  RETENTION_PERIOD_MINUTES,
+} from "./storage/retention";
 import { isCollecting, loadSettings } from "./storage/settings";
 
 chrome.webNavigation.onCommitted.addListener(
@@ -22,6 +27,28 @@ chrome.webNavigation.onCommitted.addListener(
   // are rejected by `registrableDomain` anyway; this just avoids the wake-up.
   { url: [{ schemes: ["http", "https"] }] },
 );
+
+/**
+ * Retention runs on an alarm, not a timer.
+ *
+ * The alarm is created on install and on browser startup, and **not** at the top level
+ * of this file. Re-creating an alarm resets its schedule, and a service worker that wakes
+ * for every navigation would reset it constantly — the alarm would then never fire, and
+ * raw events would never expire. That failure is silent, which is the worst kind.
+ */
+function scheduleRetention(): void {
+  chrome.alarms.create(RETENTION_ALARM, { periodInMinutes: RETENTION_PERIOD_MINUTES });
+}
+
+chrome.runtime.onInstalled.addListener(scheduleRetention);
+chrome.runtime.onStartup.addListener(scheduleRetention);
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name !== RETENTION_ALARM) return;
+  void (async () => {
+    await enforceRetention(await loadSettings(), Date.now());
+  })();
+});
 
 interface ImportMessage {
   readonly type: "tise:import";

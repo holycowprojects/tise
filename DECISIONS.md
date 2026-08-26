@@ -1112,3 +1112,84 @@ the pause button promises.
 
 What this does cost is honesty in the UI, and that lands in T15: a user who pauses for a
 week should be told that week is gone rather than discovering it in a chart.
+
+---
+
+## T8 — retention, deletion, export
+
+### D44 — "Delete all" takes consent and the permission with it
+
+`deleteEverything()` clears both stores: every event, every setting, the session cursor,
+the import progress, the rejection counters. After it runs, `loadSettings()` returns the
+defaults — `consentGrantedAt: null` — so Tise is in exactly the state it installs in and
+cannot store anything until asked again.
+
+The popup goes one step further and calls `chrome.permissions.remove({permissions:
+["history"]})`. Keeping a granted permission after "delete everything" would leave Tise
+able to read a history it has just promised to have forgotten. Giving the capability back
+is the difference between deleting the record and deleting the ability to remake it.
+
+Confirmation is a second click on the same button, not a `confirm()` dialog: in a popup a
+modal can dismiss the popup along with itself, and a destructive action whose
+confirmation can eat itself is worse than no confirmation. The armed state disarms after
+six seconds.
+
+### D45 — An export contains everything Tise holds, including the user's overrides
+
+`tise.export.v1` carries the events *and* the settings that produced them — category map
+version, suffix list version, session timeout, retention setting, and the user's own
+domain overrides.
+
+Two reasons, and the second is the one that decided it:
+
+1. **Reproducibility.** A benchmark is meaningless without knowing which map produced the
+   categories. The version numbers travel with the data or they are lost.
+2. **An export that omits part of the store is the visible half of the truth.** The
+   overrides are the user's own annotations about their own browsing; leaving them out to
+   look more minimal would make the file a summary rather than an export.
+
+The file is written indented rather than minified. A privacy claim nobody can open and
+read is a claim nobody can check.
+
+`sessionId` is exported but **deliberately dropped by the loader**. `Event` in the
+research tier has no such field, so it is not possible to compare the extension's session
+ids against re-derived ones (D36) — the rule is enforced by absence rather than by
+discipline.
+
+### D46 — The retention alarm is created on install and startup, never at the top level
+
+`chrome.alarms.create` with an existing name **resets that alarm's schedule**. A service
+worker that wakes on every navigation and re-creates its alarm at module scope would push
+the next firing forward forever: raw events would never expire, the extension would look
+fine, and the retention promise would quietly be false.
+
+So it is registered from `onInstalled` and `onStartup` only. Period is six hours —
+frequent enough that a day's expiry is never far off, cheap enough to ignore.
+
+Retention touches the `events` store and nothing else, by construction. When the
+`features` store arrives at T10 it must survive raw deletion (D11), and the safest
+guarantee is that the code which deletes knows about exactly one store.
+
+`rawRetentionDays: 0` means keep everything. Zero is the natural way to write "no limit"
+in a settings field; a magic `null` or `-1` is the kind of thing that gets mishandled
+once and silently deletes a corpus. Both settings are tested, and so is the boundary —
+an event exactly at the cutoff is kept.
+
+### CHECKPOINT B — the loop is closed
+
+Browser → export → Python → labels, with no server, no API and no database connection
+between them.
+
+`research/fixtures/export_v1.json` is the third shared-data contract, after
+`domains.json` and `domain_cases.json`. The extension asserts its exporter reproduces
+that file exactly; Python asserts its loader reads it and that
+`sessionise` and `return_24h_labels` run on the result unaided. Broken deliberately once
+by dropping `suffixListVersion` from the exporter: three TypeScript tests failed, then
+reverted.
+
+The loader refuses an unrecognised `schema` string rather than guessing. A loader that
+silently accepts a format it does not understand produces a corpus that looks fine and is
+wrong, which is the failure this project can least afford.
+
+Counts at the checkpoint: **327 Python tests, 135 TypeScript tests**, Ruff and ESLint
+clean.

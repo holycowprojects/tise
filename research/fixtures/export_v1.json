@@ -1,0 +1,74 @@
+{
+  "schema": "tise.export.v1",
+  "exportedAt": "2026-08-26T12:00:00.000Z",
+  "extensionVersion": "0.1.0",
+  "categoryMapVersion": 1,
+  "suffixListVersion": 1,
+  "sessionTimeoutSeconds": 1800,
+  "rawRetentionDays": 30,
+  "overrides": {
+    "youtube.com": "learning"
+  },
+  "events": [
+    {
+      "eventId": "imp_101",
+      "occurredAt": "2026-08-24T09:00:00.000Z",
+      "source": "import",
+      "domain": "news.ycombinator.com",
+      "category": "news",
+      "transition": "typed",
+      "dwellSeconds": null,
+      "sessionId": "2026-08-24T09:00:00.000Z"
+    },
+    {
+      "eventId": "imp_102",
+      "occurredAt": "2026-08-24T09:04:00.000Z",
+      "source": "import",
+      "domain": "github.com",
+      "category": "dev",
+      "transition": "link",
+      "dwellSeconds": null,
+      "sessionId": "2026-08-24T09:00:00.000Z"
+    },
+    {
+      "eventId": "imp_103",
+      "occurredAt": "2026-08-24T14:30:00.000Z",
+      "source": "import",
+      "domain": "youtube.com",
+      "category": "learning",
+      "transition": "link",
+      "dwellSeconds": null,
+      "sessionId": "2026-08-24T14:30:00.000Z"
+    },
+    {
+      "eventId": "d1e4a0c2-0000-4000-8000-000000000001",
+      "occurredAt": "2026-08-26T08:15:00.000Z",
+      "source": "live",
+      "domain": "google.com",
+      "category": "search",
+      "transition": "typed",
+      "dwellSeconds": null,
+      "sessionId": "2026-08-26T08:15:00.000Z"
+    },
+    {
+      "eventId": "d1e4a0c2-0000-4000-8000-000000000002",
+      "occurredAt": "2026-08-26T08:16:00.000Z",
+      "source": "live",
+      "domain": "example.co.uk",
+      "category": "unknown",
+      "transition": "link",
+      "dwellSeconds": null,
+      "sessionId": "2026-08-26T08:15:00.000Z"
+    },
+    {
+      "eventId": "d1e4a0c2-0000-4000-8000-000000000003",
+      "occurredAt": "2026-08-26T11:00:00.000Z",
+      "source": "live",
+      "domain": "youtube.com",
+      "category": "learning",
+      "transition": "link",
+      "dwellSeconds": null,
+      "sessionId": "2026-08-26T11:00:00.000Z"
+    }
+  ]
+}

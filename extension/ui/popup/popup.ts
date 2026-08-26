@@ -10,7 +10,9 @@
  */
 import { rejectionCounts } from "../../src/collect/collector";
 import { DEFAULT_IMPORT_DAYS, importProgress } from "../../src/collect/import";
-import { clearEvents, countsByCategory, countEvents, recentEvents } from "../../src/storage/events";
+import { deleteEverything } from "../../src/storage/delete";
+import { buildExport, exportFilename, serialiseExport } from "../../src/storage/export";
+import { countsByCategory, countEvents, recentEvents } from "../../src/storage/events";
 import { isCollecting, loadSettings, saveSettings } from "../../src/storage/settings";
 
 function element(id: string): HTMLElement {
@@ -200,9 +202,60 @@ element("import").addEventListener("click", async () => {
   setTimeout(() => void render(), 300);
 });
 
+element("export").addEventListener("click", async () => {
+  const data = await buildExport({
+    now: Date.now(),
+    extensionVersion: chrome.runtime.getManifest().version,
+  });
+
+  // A blob URL and an anchor: no `downloads` permission, and the file is written by the
+  // browser's own save flow rather than by anything Tise controls.
+  const blob = new Blob([serialiseExport(data)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = exportFilename(Date.now());
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+
+  element("detail").textContent = `Exported ${data.events.length.toLocaleString()} events.`;
+});
+
+/**
+ * Two clicks, no dialog.
+ *
+ * "Delete all" wipes every store including consent, so it deserves a confirmation — but
+ * a `confirm()` in a popup dismisses the popup on some platforms, and a destructive
+ * action whose confirmation can eat itself is worse than no confirmation.
+ */
+let deleteArmed = false;
+
 element("clear").addEventListener("click", async () => {
-  await clearEvents();
+  const button = element("clear") as HTMLButtonElement;
+
+  if (!deleteArmed) {
+    deleteArmed = true;
+    button.textContent = "Really delete everything?";
+    element("detail").textContent =
+      "This removes every event, your settings, and Tise's permission to read history. It is the install state.";
+    setTimeout(() => {
+      deleteArmed = false;
+      button.textContent = "Delete all";
+    }, 6000);
+    return;
+  }
+
+  deleteArmed = false;
+  button.textContent = "Delete all";
+
+  const outcome = await deleteEverything();
+
+  // Hand the capability back too. Keeping a granted permission after "delete everything"
+  // would leave Tise able to read a history it has just promised to have forgotten.
+  await chrome.permissions.remove({ permissions: ["history"] });
+
   await render();
+  element("detail").textContent = `Deleted ${outcome.eventsDeleted.toLocaleString()} events and every setting.`;
 });
 
 void render();
