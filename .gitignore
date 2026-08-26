@@ -14,10 +14,12 @@ CLAUDE.local.md
 *.local.md
 .claude/settings.local.json
 
-# T6 verification screenshots. Kept local by decision: they show real browsing domains,
+# T6/T7 verification screenshots. Kept local by decision: they show browsing domains,
 # and DECISIONS.md cites them by name, so the claims stay traceable without publishing
 # the evidence. The T5 spike screenshots ran on a throwaway profile and are published.
-Screenshots/ss_tt*.png
+# Path-independent: these get moved between folders.
+**/ss_tt*.png
+**/ss_ta*.png
 
 # Secrets
 .env
