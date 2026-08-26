@@ -63,10 +63,16 @@ working and committable.
 
 ## Phase 1 — Collect
 
-- [ ] **T5 · Permission spike** · S · deps: none *(can run during Phase 0)*
-  - Determine the minimum permission set experimentally; confirm what `chrome.history` returns
-  - Write a justification sentence for each; output `docs/permissions.md`
-  - Verify: removing any one permission demonstrably breaks collection
+- [~] **T5 · Permission spike** · S · deps: none — **BLOCKED ON YOU, not on code**
+  - Spike built: `uv run python spike/permissions/build.py` → 4 loadable variants
+  - Procedure: `spike/permissions/README.md`. Use a throwaway Chrome profile.
+  - Confirmed from Chrome's docs already: `VisitItem` has **no duration field**, and
+    `history.onVisited` yields the URL with **no host permissions**
+  - **If that holds in practice, Tise ships with zero host permissions** — it *cannot*
+    read page content rather than promising not to
+  - `docs/permissions.md` written with every claim tagged `documented` or
+    `observed: pending`; nothing becomes a listing claim until observed
+  - Verify: removing any one permission demonstrably breaks collection (variants A vs B)
 
 - [ ] **T6 · Extension scaffold and live collector** · M · deps: T5, T2
   - Vite + TS + MV3, IndexedDB, normaliser; URL reduced to domain before the event exists

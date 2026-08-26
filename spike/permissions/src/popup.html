@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Tise permission spike</title>
+    <style>
+      body {
+        font: 13px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace;
+        margin: 0;
+        padding: 12px;
+        width: 460px;
+        background: #14161a;
+        color: #e6e8eb;
+      }
+      h1 { font-size: 13px; margin: 0 0 4px; }
+      .variant { color: #7dd3fc; }
+      .verdict { padding: 8px; border-radius: 4px; margin: 8px 0; }
+      .yes { background: #052e16; color: #86efac; }
+      .no { background: #3f1d1d; color: #fca5a5; }
+      .none { background: #292524; color: #d6d3d1; }
+      table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+      td { padding: 2px 6px 2px 0; vertical-align: top; }
+      td.k { color: #94a3b8; white-space: nowrap; }
+      pre { white-space: pre-wrap; word-break: break-all; margin: 4px 0 0; }
+      button { font: inherit; margin-top: 10px; }
+    </style>
+  </head>
+  <body>
+    <h1>Tise permission spike — <span class="variant" id="variant">…</span></h1>
+    <div id="out">Loading…</div>
+    <button id="clear">Clear observations</button>
+    <script src="popup.js" type="module"></script>
+  </body>
+</html>
