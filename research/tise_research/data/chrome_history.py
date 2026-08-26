@@ -23,6 +23,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from tise_research.categories import load_multi_part_suffixes
+
 __all__ = [
     "SECONDS_1601_TO_1970",
     "Visit",
@@ -69,32 +71,18 @@ CLIENT_REDIRECT = 0x4000_0000
 SERVER_REDIRECT = 0x8000_0000
 REDIRECT_MASK = CLIENT_REDIRECT | SERVER_REDIRECT
 
-# --- Provisional public suffix handling -------------------------------------------
+# --- Public suffix handling ---------------------------------------------------------
 #
-# PROVISIONAL (T1 only). A real Public Suffix List decision is owed at T2/T6, because
-# the extension needs the identical reduction in TypeScript and this function is
-# parity-critical: if TS and Python disagree on one domain, every benchmark drifts.
-# Adding a PSL dependency is an "ask first" item, so T1 measures with an embedded list
-# and reports how many domains fall outside it.
-_MULTI_PART_SUFFIXES = frozenset(
-    {
-        "co.uk", "org.uk", "ac.uk", "gov.uk", "me.uk", "net.uk", "sch.uk",
-        "co.in", "net.in", "org.in", "gen.in", "firm.in", "ind.in", "res.in",
-        "ac.in", "edu.in", "gov.in", "nic.in",
-        "com.au", "net.au", "org.au", "edu.au", "gov.au",
-        "co.jp", "ne.jp", "or.jp", "ac.jp", "go.jp",
-        "com.br", "com.cn", "net.cn", "org.cn", "gov.cn", "edu.cn",
-        "co.nz", "net.nz", "org.nz", "co.za", "org.za",
-        "com.sg", "com.my", "com.hk", "com.tw", "com.ph", "com.vn",
-        "co.kr", "co.id", "or.id", "ac.id", "co.th", "in.th",
-        "com.mx", "com.ar", "com.co", "com.pe", "com.tr", "com.sa", "com.eg",
-        "com.pk", "com.bd", "com.lk", "com.np", "co.il", "co.ke", "com.ng",
-        "com.ua", "com.ru", "co.ve",
-        "github.io", "gitlab.io", "pages.dev", "workers.dev", "vercel.app",
-        "netlify.app", "web.app", "firebaseapp.com", "herokuapp.com",
-        "s3.amazonaws.com", "blob.core.windows.net",
-    }
-)
+# The list lives in `extension/src/categories/suffixes.json` and is read by the
+# extension's `collect/domain.ts` as well. It is deliberately **not** the full Public
+# Suffix List (D34): the real thing is ~230KB and changes monthly, which needs a
+# staleness policy before a benchmark computed against it means anything.
+#
+# This function is parity-critical. If the two languages disagree about one domain,
+# every session-derived feature computed on that domain drifts, and the drift is silent.
+# Loaded once at import: the file ships with the extension and cannot change under a
+# running process, and re-reading it per URL would cost an I/O call per visit.
+_MULTI_PART_SUFFIXES = load_multi_part_suffixes()
 
 _WEB_SCHEMES = frozenset({"http", "https"})
 

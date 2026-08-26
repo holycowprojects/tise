@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Tise</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --ink: #16181d;
+        --muted: #6b7280;
+        --line: #e5e7eb;
+        --bg: #ffffff;
+        --accent: #1f6feb;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --ink: #e8eaed;
+          --muted: #9aa0a6;
+          --line: #2c2f36;
+          --bg: #17181c;
+          --accent: #6ea8ff;
+        }
+      }
+      body {
+        width: 340px;
+        margin: 0;
+        padding: 14px 16px 16px;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          13px/1.45 system-ui,
+          -apple-system,
+          Segoe UI,
+          sans-serif;
+      }
+      h1 {
+        font-size: 14px;
+        margin: 0 0 2px;
+        letter-spacing: 0.01em;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 11px;
+        margin-bottom: 12px;
+      }
+      .state {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-bottom: 12px;
+      }
+      .state strong {
+        display: block;
+        margin-bottom: 2px;
+      }
+      .state p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 11.5px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      button {
+        flex: 1;
+        padding: 7px 10px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: transparent;
+        color: var(--ink);
+        font: inherit;
+        cursor: pointer;
+      }
+      button.primary {
+        border-color: var(--accent);
+        color: var(--accent);
+        font-weight: 600;
+      }
+      button:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+      h2 {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        margin: 14px 0 6px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+      td {
+        padding: 3px 0;
+        vertical-align: top;
+      }
+      td.n {
+        text-align: right;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+      td.cat {
+        color: var(--muted);
+        text-align: right;
+      }
+      .empty {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      footer {
+        margin-top: 14px;
+        padding-top: 10px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 10.5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Tise</h1>
+    <div class="sub">Developer view — the real interface arrives at T14.</div>
+
+    <div class="state">
+      <strong id="status">Loading…</strong>
+      <p id="detail"></p>
+    </div>
+
+    <div class="row">
+      <button id="toggle" class="primary" disabled>…</button>
+      <button id="clear">Delete all</button>
+    </div>
+
+    <h2>Categories</h2>
+    <div id="categories"><p class="empty">Nothing collected yet.</p></div>
+
+    <h2>Most recent</h2>
+    <div id="recent"><p class="empty">Nothing collected yet.</p></div>
+
+    <h2>Filtered out</h2>
+    <div id="rejected"><p class="empty">Nothing filtered yet.</p></div>
+
+    <footer>Everything above is stored on this device only. Tise makes no network requests.</footer>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

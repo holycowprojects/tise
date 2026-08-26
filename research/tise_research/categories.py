@@ -18,12 +18,26 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-__all__ = ["DEFAULT_MAP_PATH", "CategoryMap", "CategoryRule", "load_category_map"]
+__all__ = [
+    "DEFAULT_MAP_PATH",
+    "SUFFIXES_PATH",
+    "CategoryMap",
+    "CategoryRule",
+    "load_category_map",
+    "load_multi_part_suffixes",
+]
 
 #: research/tise_research/categories.py -> repo root is three parents up.
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
-DEFAULT_MAP_PATH = _REPO_ROOT / "extension" / "src" / "categories" / "domains.json"
+_SHIPPED = _REPO_ROOT / "extension" / "src" / "categories"
+
+DEFAULT_MAP_PATH = _SHIPPED / "domains.json"
+
+#: Multi-part public suffixes, read by `data.chrome_history.registrable_domain` here and
+#: by `collect/domain.ts` in the extension. Same reasoning as the map above: one file,
+#: two readers, no owner, so the domain reduction cannot drift between the languages.
+SUFFIXES_PATH = _SHIPPED / "suffixes.json"
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +82,21 @@ class CategoryMap:
         decision the resolver makes after every layer has declined.
         """
         return self.domains.get(domain.strip().lower())
+
+
+def load_multi_part_suffixes(path: Path | None = None) -> frozenset[str]:
+    """Read the shared multi-part public-suffix list.
+
+    Not the full Public Suffix List, and deliberately so — see D34. What matters here is
+    that the extension reads this exact file, so a domain reduced to `bbc.co.uk` in the
+    browser is reduced to `bbc.co.uk` in the research tier, on every input.
+    """
+    source = path or SUFFIXES_PATH
+    raw: dict[str, Any] = json.loads(source.read_text(encoding="utf-8"))
+    entries = raw.get("multiPartSuffixes")
+    if not isinstance(entries, list) or not entries:
+        raise ValueError(f"{source} has no multiPartSuffixes list")
+    return frozenset(str(entry).strip().lower() for entry in entries)
 
 
 def load_category_map(path: Path | None = None) -> CategoryMap:

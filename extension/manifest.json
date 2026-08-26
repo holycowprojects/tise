@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Tise",
+  "version": "0.1.0",
+  "description": "Learns from your own browsing and predicts what you'll do next, entirely on your device. Nothing is ever transmitted.",
+  "minimum_chrome_version": "116",
+
+  "permissions": ["webNavigation", "alarms", "offscreen"],
+  "optional_permissions": ["history"],
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Tise"
+  }
+}

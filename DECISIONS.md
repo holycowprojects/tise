@@ -830,3 +830,99 @@ running against real history and would buy nothing the mitigation does not alrea
 - `alarms` and `offscreen` are present only when requested, and silent at install.
 - "Removing a permission breaks collection" holds both ways: A saw 0 navigation events,
   B saw 0 history events.
+
+---
+
+## T6 — extension scaffold and live collector
+
+### D34 — The public suffix list stays provisional, and moves to a file both languages read
+
+`registrable_domain` needs a list of multi-part public suffixes to know that `bbc.co.uk`
+is a site and `co.uk` is not. T1 embedded that list in Python and marked the real
+decision as owed at T6. This is it.
+
+**Not the Public Suffix List.** The real PSL is ~230KB and changes monthly. Bundling it
+would mean deciding what a stale copy does to a benchmark computed six months later, and
+that is a bigger commitment than V1 has earned.
+
+**The list moves to `extension/src/categories/suffixes.json`**, which the extension's
+`collect/domain.ts` and the research tier's `chrome_history.py` both read. Same reasoning
+as `domains.json`: one file, two readers, no owner, so the two implementations cannot
+drift. The file carries its own disclaimer, and a test asserts the disclaimer is there —
+a partial list that presents itself as complete is exactly the thing that ends up quoted
+in a benchmark.
+
+Verified behaviourally neutral: all 283 Phase 0 tests pass unchanged after the move, and
+map coverage stays at Edge 86.8% / Firefox 87.8% / Chrome 78.1%.
+
+### D35 — Dwell time is never measured, in either direction
+
+`TiseEvent.dwellSeconds` is `null` for live events as well as imported ones, and
+`assertStorable` throws if anything sets it.
+
+The obvious alternative — measure dwell live, since the extension *can*, and accept
+`null` only for imports — is worse. Imported and observed events would then differ in
+feature space, and a model trained across that boundary degrades silently as the import
+ages out under retention. Uniform absence is a worse dataset and a more honest one.
+
+The consequence is stated plainly: the `full` compat class is research-only, permanently.
+Nothing that ships can ever use a dwell-derived feature. That is the duration trap
+resolved rather than worked around.
+
+### D36 — Session ids are locally assigned and opaque
+
+The extension assigns a session id as browsing happens; the research tier re-derives
+sessions from timestamps with `sessionise` and **never compares its ids to the
+extension's**.
+
+What the two implementations must agree on is the *grouping* — which events fall in which
+session — and that is what the parity suite checks. Requiring the id strings to match
+would mean pinning Python's `isoformat` against JavaScript's `toISOString` across
+microsecond precision, which buys nothing and breaks quietly.
+
+The boundary rule itself is shared and strict: a new session opens on a gap **strictly
+greater** than the timeout. A `>` versus `>=` disagreement shifts every session-derived
+feature by one event and is invisible until a test catches it, so both implementations
+carry a test at exactly 30 minutes.
+
+### D37 — Consent and pause are separate states; install collects nothing
+
+`consentGrantedAt: string | null` and `paused: boolean`, both in IndexedDB, not one
+boolean. Collapsing them would make "I paused this for an hour" indistinguishable from
+"I never agreed to this", and only one of those should survive a reinstall.
+
+Fresh install: `consentGrantedAt` is `null` and **nothing is written**. The
+`webNavigation` listener is still registered at the top level of the service worker —
+MV3 requires that for the worker to be woken at all — so the gate lives one layer down,
+in `collect()`, and is checked *before the URL is parsed*.
+
+Settings live in IndexedDB rather than `chrome.storage.local` because
+`chrome.storage` needs a `storage` permission and IndexedDB does not (observed at T5, all
+five variants). A test asserts no source file uses `chrome.storage`, so the manifest
+cannot acquire that permission by accident.
+
+### D38 — `fake-indexeddb` added as a test-only dependency
+
+Asked and approved. It never reaches `dist/` — the Web Store only ever sees the bundle.
+
+The alternative was a hand-rolled in-memory store behind an interface, and it was
+rejected for a specific reason: the assertions it would carry are the ones that claim *no
+URL is ever stored*. Against a mock, those assertions prove that the mock behaves the way
+I expected IndexedDB to behave. T5 disproved two of my expectations about Chrome in one
+afternoon.
+
+Runtime dependencies remain exactly one: `idb`.
+
+### T6 findings
+
+- **`npm run build` type-checks twice, against two configs.** The shipped source compiles
+  with no Node types at all, so anything in `src/` or `ui/` reaching for a Node API is a
+  compile error rather than a runtime one in someone's browser.
+- **Domain reduction is under cross-language test already**, five tasks before the parity
+  suite was scheduled. `research/fixtures/domain_cases.json` holds 30 URLs and both
+  languages assert against it. Broken deliberately once (`bbc.co.uk` → `co.uk`): both
+  suites failed on the same row, then reverted.
+- **The pause gate was broken deliberately too** — two storage tests failed, then
+  reverted.
+- The popup is a **developer surface**, explicitly labelled as one in its own UI. T14 and
+  T15 replace it. It exists so T6 could be verified by hand rather than through devtools.

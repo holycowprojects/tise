@@ -1,0 +1,37 @@
+{
+  "note": "Shared expectations for URL -> registrable domain. Read by research/tests/test_domain_parity.py and by extension/tests/domain.test.ts. Neither language owns this file; if they disagree about one row, one of them is wrong and the suite says which.",
+  "why": "Domain reduction is the privacy boundary and the first parity-critical function in the project. T9 stands up the full parity suite for features; this file starts it early, because every feature is computed on the output of this function and a disagreement here would move all of them.",
+  "cases": [
+    { "url": "https://www.youtube.com/watch?v=abc", "domain": "youtube.com" },
+    { "url": "http://news.ycombinator.com/item?id=1", "domain": "ycombinator.com" },
+    { "url": "https://amazon.in", "domain": "amazon.in" },
+    { "url": "https://chat.openai.com/c/1234", "domain": "openai.com" },
+    { "url": "https://www.bbc.co.uk/news", "domain": "bbc.co.uk" },
+    { "url": "https://someone.github.io/project/", "domain": "someone.github.io" },
+    { "url": "https://passport.gov.in/apply", "domain": "passport.gov.in" },
+    { "url": "https://a.b.c.example.com/deep/path", "domain": "example.com" },
+    { "url": "https://co.uk/", "domain": null },
+    { "url": "https://gov.in/", "domain": null },
+    { "url": "https://example/", "domain": null },
+    { "url": "chrome://extensions", "domain": null },
+    { "url": "chrome-extension://abcdef/popup.html", "domain": null },
+    { "url": "file:///C:/Users/someone/tax-return-2025.pdf", "domain": null },
+    { "url": "about:blank", "domain": null },
+    { "url": "data:text/html,<h1>hi</h1>", "domain": null },
+    { "url": "", "domain": null },
+    { "url": "http://localhost:5173/", "domain": null },
+    { "url": "http://app.localhost/", "domain": null },
+    { "url": "http://127.0.0.1:8000/admin", "domain": null },
+    { "url": "http://192.168.1.1/", "domain": null },
+    { "url": "http://[::1]:3000/", "domain": null },
+    { "url": "javascript:void(0)", "domain": null },
+    { "url": "https://WWW.Example.COM:8443/x", "domain": "example.com" },
+    { "url": "https://example.com./", "domain": "example.com" },
+    { "url": "https://user:pass@example.com/private", "domain": "example.com" },
+    {
+      "url": "https://mail.google.com/mail/u/0/?tab=rm#inbox/FMfcgz?token=secret",
+      "domain": "google.com"
+    },
+    { "url": "https://bank.example.co.uk/accounts/12345678/statement.pdf", "domain": "example.co.uk" }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  // Tests and the build config run in Node, so they get Node's types. The shipped
+  // source does not — see the comment in tsconfig.json.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["chrome", "node", "vitest/globals"]
+  },
+  "include": ["src", "ui", "tests", "vite.config.ts", "eslint.config.js"]
+}

@@ -1,0 +1,58 @@
+/**
+ * Settings, stored in the `meta` store rather than `chrome.storage.local`, so that the
+ * manifest needs no `storage` permission (see `db.ts`).
+ *
+ * Consent and pause are separate fields on purpose. Consent is a one-time decision the
+ * user makes knowingly (T15); pause is a switch they flip whenever they like. Collapsing
+ * them into one boolean would make "I paused it for an hour" indistinguishable from
+ * "I never agreed to this", and only one of those should survive a reinstall.
+ */
+import { readMeta, writeMeta } from "./db";
+
+const SETTINGS_KEY = "settings";
+
+/** D17: a declared hyperparameter. T1 looked for an empirical trough and found none. */
+export const DEFAULT_SESSION_TIMEOUT_SECONDS = 1800;
+
+/** D11: raw events expire, derived features do not. `0` means keep raw events forever. */
+export const DEFAULT_RAW_RETENTION_DAYS = 30;
+
+export interface Settings {
+  /** ISO 8601, or `null` when the user has never agreed. Nothing is stored while null. */
+  consentGrantedAt: string | null;
+  paused: boolean;
+  sessionTimeoutSeconds: number;
+  rawRetentionDays: number;
+  /** Registrable domain -> category. The user is always right about their own browsing. */
+  overrides: Record<string, string>;
+}
+
+export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
+  consentGrantedAt: null,
+  paused: false,
+  sessionTimeoutSeconds: DEFAULT_SESSION_TIMEOUT_SECONDS,
+  rawRetentionDays: DEFAULT_RAW_RETENTION_DAYS,
+  overrides: {},
+});
+
+export async function loadSettings(): Promise<Settings> {
+  const stored = await readMeta<Partial<Settings>>(SETTINGS_KEY);
+  return { ...DEFAULT_SETTINGS, ...(stored ?? {}) };
+}
+
+export async function saveSettings(patch: Partial<Settings>): Promise<Settings> {
+  const next = { ...(await loadSettings()), ...patch };
+  await writeMeta(SETTINGS_KEY, next);
+  return next;
+}
+
+/**
+ * Whether an event may be written at all.
+ *
+ * The single gate. The navigation listener is registered unconditionally — MV3 requires
+ * top-level registration for the service worker to be woken at all — so this function,
+ * not the listener, is what makes "installed but not collecting" a real state.
+ */
+export function isCollecting(settings: Settings): boolean {
+  return settings.consentGrantedAt !== null && !settings.paused;
+}

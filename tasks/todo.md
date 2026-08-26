@@ -77,9 +77,20 @@ working and committable.
     `startTime` and `maxResults`
   - Verify: A saw 0 nav events, B saw 0 history events ✓
 
-- [ ] **T6 · Extension scaffold and live collector** · M · deps: T5, T2
+- [x] **T6 · Extension scaffold and live collector** · M · deps: T5, T2
   - Vite + TS + MV3, IndexedDB, normaliser; URL reduced to domain before the event exists
-  - Verify: `npm run build && npm test -- privacy`
+  - Verify: `npm run build && npm test` ✓ (90 TS tests, ESLint clean, `dist/` loads)
+  - **Domain reduction is already cross-language tested** (D34) — `research/fixtures/`
+    `domain_cases.json`, 30 URLs, asserted by both languages. Broken once on purpose;
+    both suites failed the same row
+  - **Dwell is never measured, live or imported** (D35) — uniform absence beats a
+    distribution shift between import and live. `full` is research-only, permanently
+  - **Install collects nothing** (D37) — consent and pause are separate states, the gate
+    runs before the URL is parsed, and settings live in IndexedDB so no `storage`
+    permission is needed
+  - Runtime dependencies: **one** (`idb`). `fake-indexeddb` is test-only (D38)
+  - **Still owed — your hands, not mine:** load `extension/dist/` unpacked, browse ten
+    sites, confirm ten events with the right domains and categories
 
 - [ ] **T7 · First-run history import** · M · deps: T6
   - Explicit consent, idempotent, `dwellSeconds: null`, non-blocking
