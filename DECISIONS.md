@@ -1193,3 +1193,28 @@ wrong, which is the failure this project can least afford.
 
 Counts at the checkpoint: **327 Python tests, 135 TypeScript tests**, Ruff and ESLint
 clean.
+
+---
+
+## Open questions, resolved late (recorded 2026-08-26, after T8)
+
+The "Open questions" list near the top of this file still marks Q1, Q2 and Q3 as
+undecided. They were decided by the work rather than by an entry, which is exactly how a
+reasoning trail goes stale. Appended rather than edited, per the append-only rule.
+
+- **Q1 — What exactly does V1 predict?** **Resolved.** `return_24h` per (category,
+  session), D16. `next_session_category` remains in the `Prediction` schema but is not
+  evaluated in V1, and the dashboard must say so (D6). Purchase intent is not predicted
+  at all — that was the audit's first finding.
+- **Q2 — How is a domain mapped to a category?** **Resolved by D22/D23**: a shipped,
+  deliberately generic `domains.json`, then ordered keyword rules, then `unknown`, with a
+  user override on top. Measured coverage: Edge 86.8%, Firefox 87.8%, Chrome 78.1%. D42
+  adds what happens next and, more importantly, why `unknown` is not a defect.
+- **Q3 — Does a separate web dashboard survive?** **Resolved: no.** There is no server,
+  no API and no local Python service in the product. The extension does everything; Python
+  runs only on the author's machine, fed by the export file. Checkpoint B is that decision
+  working end to end.
+
+**Still open: Q7** — a Tise user running four browsers sees predictions from one. Silently
+partial, or stated in the UI? Blocks T15, and it is a product question rather than a
+technical one.
