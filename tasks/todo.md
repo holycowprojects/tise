@@ -31,9 +31,19 @@ working and committable.
   - **Carry into T4: `youtube.com` is 49.6% of the primary corpus.** Baselines must be
     reported per category, and majority-class is mandatory (D24).
 
-- [ ] **T3 · Resolver, sessioniser, label generator, parity fixture** · M · deps: T2
-  - Pure functions; explicit `window_end` everywhere; commit `parity_events.json`
-  - Verify: `uv run pytest research/tests/test_sessions.py research/tests/test_labels.py`
+- [x] **T3 · Resolver, sessioniser, label generator, parity fixture** · M · deps: T2
+  - Resolver: override → map → keyword rules → `unknown`; rules live in `domains.json`
+    so TypeScript reads them rather than reimplementing them
+  - `sessionise` moved to `features/` (parity-critical); verified behaviourally neutral
+  - Labels: one per (category, session); leakage test appends future events and asserts
+    no earlier label moves
+  - Fixture frozen, and **the freeze was tested by breaking it** — flipping `>` to `>=`
+    failed three tests
+  - Verify: `uv run pytest research/tests/test_sessions.py research/tests/test_labels.py` ✓
+    (211 tests, lint clean)
+  - Labels vs T1 estimate: Chrome +5.4%, Edge −7.2%, Firefox −15.2% — all inside ±20%
+  - **Carry into T4:** nine of fifteen categories have <10 labels (D26); `unknown` is the
+    2nd largest category at 84% positive and must be reported separately (D27)
 
 - [ ] **T4 · Baselines and the first honest backtest** · M · deps: T3
   - 3 baselines, rolling-origin folds, Brier + log loss + base rate, both variants

@@ -1,0 +1,184 @@
+{
+  "note": [
+    "Parity fixture EXPECTED OUTPUT, produced by the Python implementation.",
+    "TypeScript must match this exactly. A mismatch means one side is wrong;",
+    "it is never a reason to regenerate this file without understanding why."
+  ],
+  "categoryMapVersion": 1,
+  "timeoutSeconds": 1800.0,
+  "horizonHours": 24.0,
+  "resolutions": [
+    {
+      "domain": "youtube.com",
+      "category": "video",
+      "source": "map"
+    },
+    {
+      "domain": "google.com",
+      "category": "search",
+      "source": "map"
+    },
+    {
+      "domain": "github.com",
+      "category": "dev",
+      "source": "map"
+    },
+    {
+      "domain": "someministry.gov.in",
+      "category": "government",
+      "source": "rule"
+    },
+    {
+      "domain": "nothing-here.example",
+      "category": "work",
+      "source": "override"
+    },
+    {
+      "domain": "personal-site.example",
+      "category": "unknown",
+      "source": "fallback"
+    }
+  ],
+  "sessions": [
+    {
+      "sessionId": "2026-06-01T09:00:00+00:00",
+      "startedAt": "2026-06-01T09:00:00+00:00",
+      "endedAt": "2026-06-01T09:50:00+00:00",
+      "durationSeconds": 3000.0,
+      "eventIds": [
+        "evt-000",
+        "evt-001",
+        "evt-002"
+      ],
+      "categories": [
+        "search",
+        "video"
+      ]
+    },
+    {
+      "sessionId": "2026-06-01T10:20:01+00:00",
+      "startedAt": "2026-06-01T10:20:01+00:00",
+      "endedAt": "2026-06-01T10:35:00+00:00",
+      "durationSeconds": 899.0,
+      "eventIds": [
+        "evt-003",
+        "evt-004",
+        "evt-005",
+        "evt-006"
+      ],
+      "categories": [
+        "dev",
+        "government",
+        "unknown",
+        "work"
+      ]
+    },
+    {
+      "sessionId": "2026-06-02T09:00:00+00:00",
+      "startedAt": "2026-06-02T09:00:00+00:00",
+      "endedAt": "2026-06-02T09:05:00+00:00",
+      "durationSeconds": 300.0,
+      "eventIds": [
+        "evt-007",
+        "evt-008"
+      ],
+      "categories": [
+        "search",
+        "video"
+      ]
+    },
+    {
+      "sessionId": "2026-06-03T12:00:00+00:00",
+      "startedAt": "2026-06-03T12:00:00+00:00",
+      "endedAt": "2026-06-03T12:00:00+00:00",
+      "durationSeconds": 0.0,
+      "eventIds": [
+        "evt-009"
+      ],
+      "categories": [
+        "dev"
+      ]
+    }
+  ],
+  "labels": [
+    {
+      "target": "return_24h",
+      "subject": "search",
+      "windowEnd": "2026-06-01T09:50:00+00:00",
+      "outcome": true,
+      "horizonHours": 24.0,
+      "sessionId": "2026-06-01T09:00:00+00:00"
+    },
+    {
+      "target": "return_24h",
+      "subject": "video",
+      "windowEnd": "2026-06-01T09:50:00+00:00",
+      "outcome": true,
+      "horizonHours": 24.0,
+      "sessionId": "2026-06-01T09:00:00+00:00"
+    },
+    {
+      "target": "return_24h",
+      "subject": "dev",
+      "windowEnd": "2026-06-01T10:35:00+00:00",
+      "outcome": false,
+      "horizonHours": 24.0,
+      "sessionId": "2026-06-01T10:20:01+00:00"
+    },
+    {
+      "target": "return_24h",
+      "subject": "government",
+      "windowEnd": "2026-06-01T10:35:00+00:00",
+      "outcome": false,
+      "horizonHours": 24.0,
+      "sessionId": "2026-06-01T10:20:01+00:00"
+    },
+    {
+      "target": "return_24h",
+      "subject": "unknown",
+      "windowEnd": "2026-06-01T10:35:00+00:00",
+      "outcome": false,
+      "horizonHours": 24.0,
+      "sessionId": "2026-06-01T10:20:01+00:00"
+    },
+    {
+      "target": "return_24h",
+      "subject": "work",
+      "windowEnd": "2026-06-01T10:35:00+00:00",
+      "outcome": false,
+      "horizonHours": 24.0,
+      "sessionId": "2026-06-01T10:20:01+00:00"
+    },
+    {
+      "target": "return_24h",
+      "subject": "search",
+      "windowEnd": "2026-06-02T09:05:00+00:00",
+      "outcome": false,
+      "horizonHours": 24.0,
+      "sessionId": "2026-06-02T09:00:00+00:00"
+    },
+    {
+      "target": "return_24h",
+      "subject": "video",
+      "windowEnd": "2026-06-02T09:05:00+00:00",
+      "outcome": false,
+      "horizonHours": 24.0,
+      "sessionId": "2026-06-02T09:00:00+00:00"
+    },
+    {
+      "target": "return_24h",
+      "subject": "dev",
+      "windowEnd": "2026-06-03T12:00:00+00:00",
+      "outcome": false,
+      "horizonHours": 24.0,
+      "sessionId": "2026-06-03T12:00:00+00:00"
+    }
+  ],
+  "summary": {
+    "eventCount": 10,
+    "sessionCount": 4,
+    "labelCount": 9,
+    "positiveCount": 2,
+    "unknownEventCount": 1
+  }
+}

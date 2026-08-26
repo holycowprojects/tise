@@ -19,6 +19,8 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, time, timedelta, tzinfo
 
+from tise_research.features.sessions import session_boundaries
+
 __all__ = [
     "LabelStats",
     "ascii_histogram",
@@ -79,27 +81,11 @@ def visits_per_day(
     return dict(counts)
 
 
-def sessionise(
-    times: Sequence[datetime], *, timeout_seconds: float
-) -> list[list[datetime]]:
-    """Group visits into sessions, splitting on any gap **strictly greater** than the
-    timeout.
-
-    The strictness is stated here because the TypeScript port at T9 must reproduce this
-    boundary exactly. A `>` versus `>=` disagreement is invisible until the parity suite
-    catches it, and would shift every session-derived feature by one visit.
-    """
-    ordered = sorted(times)
-    if not ordered:
-        return []
-
-    sessions: list[list[datetime]] = [[ordered[0]]]
-    for previous, current in zip(ordered, ordered[1:], strict=False):
-        if (current - previous).total_seconds() > timeout_seconds:
-            sessions.append([current])
-        else:
-            sessions[-1].append(current)
-    return sessions
+#: Moved to `features.sessions` at T3, where the parity-critical code lives — the
+#: TypeScript port mirrors that package, not this one. Re-exported here so the T1
+#: measurement code reads unchanged, and so there is exactly one implementation rather
+#: than two that have to be kept in step by hand.
+sessionise = session_boundaries
 
 
 def find_gap_valley(gaps: Sequence[float], *, bins: int = 40) -> float | None:

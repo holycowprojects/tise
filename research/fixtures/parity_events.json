@@ -1,0 +1,96 @@
+{
+  "note": [
+    "Parity fixture INPUT. Synthetic, hand-designed, never real browsing.",
+    "TypeScript must reproduce parity_expected.json from exactly this.",
+    "Events carry no category: resolving the domain is part of what is compared.",
+    "Regenerate with: uv run python -m tise_research.parity_fixture"
+  ],
+  "categoryMapVersion": 1,
+  "timeoutSeconds": 1800.0,
+  "horizonHours": 24.0,
+  "overrides": {
+    "nothing-here.example": "work"
+  },
+  "events": [
+    {
+      "eventId": "evt-000",
+      "occurredAt": "2026-06-01T09:00:00+00:00",
+      "domain": "youtube.com",
+      "transition": "link",
+      "dwellSeconds": null,
+      "source": "import"
+    },
+    {
+      "eventId": "evt-001",
+      "occurredAt": "2026-06-01T09:20:00+00:00",
+      "domain": "youtube.com",
+      "transition": "link",
+      "dwellSeconds": null,
+      "source": "import"
+    },
+    {
+      "eventId": "evt-002",
+      "occurredAt": "2026-06-01T09:50:00+00:00",
+      "domain": "google.com",
+      "transition": "link",
+      "dwellSeconds": null,
+      "source": "import"
+    },
+    {
+      "eventId": "evt-003",
+      "occurredAt": "2026-06-01T10:20:01+00:00",
+      "domain": "github.com",
+      "transition": "link",
+      "dwellSeconds": null,
+      "source": "import"
+    },
+    {
+      "eventId": "evt-004",
+      "occurredAt": "2026-06-01T10:25:00+00:00",
+      "domain": "someministry.gov.in",
+      "transition": "link",
+      "dwellSeconds": null,
+      "source": "import"
+    },
+    {
+      "eventId": "evt-005",
+      "occurredAt": "2026-06-01T10:30:00+00:00",
+      "domain": "nothing-here.example",
+      "transition": "link",
+      "dwellSeconds": null,
+      "source": "import"
+    },
+    {
+      "eventId": "evt-006",
+      "occurredAt": "2026-06-01T10:35:00+00:00",
+      "domain": "personal-site.example",
+      "transition": "link",
+      "dwellSeconds": null,
+      "source": "import"
+    },
+    {
+      "eventId": "evt-007",
+      "occurredAt": "2026-06-02T09:00:00+00:00",
+      "domain": "youtube.com",
+      "transition": "link",
+      "dwellSeconds": null,
+      "source": "import"
+    },
+    {
+      "eventId": "evt-008",
+      "occurredAt": "2026-06-02T09:05:00+00:00",
+      "domain": "google.com",
+      "transition": "link",
+      "dwellSeconds": null,
+      "source": "import"
+    },
+    {
+      "eventId": "evt-009",
+      "occurredAt": "2026-06-03T12:00:00+00:00",
+      "domain": "github.com",
+      "transition": "link",
+      "dwellSeconds": null,
+      "source": "import"
+    }
+  ]
+}

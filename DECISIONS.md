@@ -538,3 +538,101 @@ category at all. Coverage there went from 53.5% to 87.8% once they were added.
 
 Worth noting as method: the taxonomy was not designed and then validated. It was drafted,
 measured, found wanting, and corrected — which is the only reason `wellness` exists.
+
+---
+
+## 2026-08-26 — T3: resolver, sessioniser, labels, parity fixture. D25, D26, D27.
+
+Files: `research/tise_research/features/{events,sessions,labels,resolver}.py`,
+`research/fixtures/parity_{events,expected}.json`. 211 tests, Ruff clean.
+
+### Label counts validated against T1's estimate
+
+T1 projected label volume from a *proxy* taxonomy (top-N domains). T3 produces labels from
+the real one. The acceptance criterion was ±20%:
+
+| Corpus | T1 proxy @30m | T3 actual | Delta |
+|---|---:|---:|---:|
+| Chrome | 297 | 313 | +5.4% |
+| Edge | 542 | 503 | −7.2% |
+| Firefox | 204 | 173 | −15.2% |
+
+All inside tolerance, so the gate decision stands on measured ground rather than on the
+proxy that produced it. Projected to eight weeks: Chrome 314, Edge 314, Firefox 254.
+
+### D25 — The sessioniser's canonical home is `features/`, not `data/`
+
+`sessionise` was written in `data/shape.py` for T1. It is parity-critical, so it moved to
+`features/sessions.py`, which is the package TypeScript mirrors. `shape.py` re-exports it;
+there is one implementation, not two kept in step by hand.
+
+Verified behaviourally neutral: the relocated function produces byte-identical session
+groupings to an inline copy of the pre-move code, on both real corpora, at four timeouts.
+
+`session_id` is derived from the **session start instant**, not a running index. The
+extension assigns ids live and can never renumber earlier sessions, so an index would
+disagree with the research tier the moment history is imported out of order.
+
+### The parity fixture, and proof that it works
+
+`parity_events.json` (input, no categories — resolving is part of what is compared) and
+`parity_expected.json` (Python's answer). Synthetic and hand-designed: the file is
+committed, and real history almost never contains the exact boundaries that matter —
+a gap landing precisely on the timeout, a recurrence landing precisely on the horizon.
+
+10 events → 4 sessions → 9 labels, 2 positive. All four resolution sources exercised.
+
+**The freeze was tested by breaking it.** Flipping the session boundary from `>` to `>=`
+failed three tests, including the fixture freeze. A parity suite that has never failed has
+never been tested, and this one now has.
+
+### D26 — Most categories have too few labels to model, and T4 must say so
+
+Per-category label counts on Edge, the primary corpus:
+
+| Category | Labels | Positive |
+|---|---:|---:|
+| video | 186 | 90.3% |
+| search | 120 | 76.7% |
+| news | 73 | 69.9% |
+| unknown | 57 | 50.9% |
+| work | 17 | 29.4% |
+| dev | 12 | 16.7% |
+| *nine others* | 2–9 each | mostly 0% |
+
+Four categories hold 87% of the labels. Nine have fewer than ten, several have two or
+three, and a category with three labels cannot be modelled, calibrated or honestly
+reported — a reliability curve over three points is a decoration.
+
+*Consequence for T4:* declare a **minimum label count** below which a category is reported
+as *not modelled* rather than given a number. Aggregate metrics must state how many
+categories they cover. "The model achieves X" over a set that quietly excludes nine of
+fifteen categories is the same defect as the original documents' benchmark table.
+
+### D27 — `unknown` is not noise; it is the user's own frequent sites
+
+`unknown` is the **second largest** category on Chrome (77 labels) with an **84.4%**
+positive rate. That is not a failure of the map. It is `holycowstudios.in` and the rest of
+one person's personal domains, collapsed into one bucket — sites visited constantly and
+therefore highly predictable.
+
+Two consequences, and they pull in opposite directions:
+
+- **It inflates headline accuracy.** A model scoring well on `unknown` looks good while
+  predicting a bucket with no meaning.
+- **It is unpresentable.** "You will return to *unknown* within 24 hours" is not a
+  sentence any UI can show.
+
+*Consequence:* `unknown` is reported **separately** from the headline metric, never folded
+into it. And this is the strongest argument yet for the user override (D23): categorising
+your own three most-visited domains converts the largest meaningless bucket in the model
+into three meaningful ones.
+
+### The browser split is visible in the data
+
+Dominant categories differ sharply by browser — Chrome: search, dev, ai. Edge: video,
+search, news. Firefox: ai, search.
+
+That is D18 confirmed quantitatively rather than assumed. These are genuinely different
+behavioural contexts, and merging them would have produced a blend describing no real
+activity.
