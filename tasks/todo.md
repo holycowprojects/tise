@@ -45,12 +45,19 @@ working and committable.
   - **Carry into T4:** nine of fifteen categories have <10 labels (D26); `unknown` is the
     2nd largest category at 84% positive and must be reported separately (D27)
 
-- [ ] **T4 · Baselines and the first honest backtest** · M · deps: T3
-  - 3 baselines, rolling-origin folds, Brier + log loss + base rate, both variants
-  - Verify: `uv run python -m tise_research.eval.backtest --target return_24h`
+- [x] **T4 · Baselines and the first honest backtest** · M · deps: T3
+  - 5 baselines (majority-class mandatory, D24), rolling-origin expanding folds
+  - Brier + log loss + skill + base rate, per fold and per category
+  - Verify: `uv run python -m tise_research.eval.backtest --target return_24h` ✓
+    (283 tests, lint clean, byte-identical across runs)
+  - **The bar for T11 is Brier 0.1254 on Edge** (`category_base_rate`, skill +0.328) — D28
+  - `majority_class` is best on `video`/`search`/`news`; "always yes" is what to beat (D29)
+  - `same_as_last` is the first documented failure case — kept, not fixed (D30)
+  - `full` vs `history` identical here by construction; becomes live at T10
 
-- [ ] **CHECKPOINT A** — real numbers from real browsing; gate passed; fixture frozen
-  - **Last cheap exit. Review before continuing.**
+- [x] **CHECKPOINT A** — real numbers from real browsing; gate passed; fixture frozen
+  - **Last cheap exit. Everything after this is product engineering.**
+  - Owed before any number reaches the README: confidence intervals (T16)
 
 ---
 
