@@ -25,6 +25,8 @@ export interface FeatureSession {
   readonly eventIds: readonly string[];
   /** Sorted, so the comparison is order-independent on both sides. */
   readonly categories: readonly string[];
+  /** The members themselves. `context.ts` needs them; the parity fixture ignores them. */
+  readonly events: readonly TiseEvent[];
 }
 
 /**
@@ -90,6 +92,7 @@ export function sessionise(
       durationSeconds: (Date.parse(last.occurredAt) - Date.parse(first.occurredAt)) / 1000,
       eventIds: members.map((event) => event.eventId),
       categories: [...new Set(members.map((event) => event.category))].sort(),
+      events: members,
     });
   }
   return sessions;

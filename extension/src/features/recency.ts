@@ -14,8 +14,8 @@
  */
 import type { TiseEvent } from "../types";
 
-/** Bumped by T10 when the feature set changes. Travels with every feature row. */
-export const FEATURE_SET = "fs_1";
+/* FEATURE_SET moved to vector.ts at T10: it describes the set, not this module. */
+
 
 const MS_PER_HOUR = 3_600_000;
 
@@ -39,4 +39,26 @@ export function hoursSinceLastSeen(
     if (latest === null || at > latest) latest = at;
   }
   return latest === null ? null : (windowEnd - latest) / MS_PER_HOUR;
+}
+
+/**
+ * Hours since the category was **first** seen, strictly before `windowEnd`.
+ *
+ * How long this has been a thing the person does, as against how recently they did it. A
+ * category first seen an hour ago and one first seen a year ago behave differently even
+ * when `hoursSinceLastSeen` is identical.
+ */
+export function hoursSinceFirstSeen(
+  events: readonly TiseEvent[],
+  category: string,
+  windowEnd: number,
+): number | null {
+  let earliest: number | null = null;
+  for (const event of events) {
+    const at = Date.parse(event.occurredAt);
+    if (at >= windowEnd) continue; // leakage guard
+    if (event.category !== category) continue;
+    if (earliest === null || at < earliest) earliest = at;
+  }
+  return earliest === null ? null : (windowEnd - earliest) / MS_PER_HOUR;
 }

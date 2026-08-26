@@ -13,7 +13,8 @@ from pathlib import Path
 
 import pytest
 from tise_research.features.events import Event
-from tise_research.features.recency import FEATURE_SET, hours_since_last_seen
+from tise_research.features.recency import hours_since_last_seen
+from tise_research.features.vector import FEATURE_SET
 
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "parity_expected.json"
 

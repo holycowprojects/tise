@@ -166,11 +166,23 @@ working and committable.
   - `featureSet: "fs_1"`. The fixture gained two sections and **nothing frozen changed** —
     66 insertions, no deletions (D50)
 
-- [ ] **T10 · Port the remaining features** · M · deps: T9
-  - Tag each with its compat class (`history` / `full`); set `featureSet` version
-  - Verify: `uv run pytest -m parity && npm test`
+- [x] **T10 · Port the remaining features** · M · deps: T9
+  - 14 features, `featureSet: "fs_2"`, **all compat class `history`** — D35 left the
+    `full` class empty, and the mechanism stays anyway (D51)
+  - Verify: `uv run pytest -m parity` ✓ (10 parity tests, 361 total) `&& npm test` ✓ (159)
+  - **`priorReturnRate` excludes sessions whose horizon has not elapsed** (D52). Counting
+    them as misses is the tempting shortcut, and it is a leak
+  - **Feature rows now live in their own store at DB v2** (D53). A row 400 days old
+    survives a 30-day retention pass; delete-all still takes it
+  - Fixture extended **append-only** for prior-rate variety — no deletions in any frozen
+    field
+  - Broken deliberately three times, two tests each: the weekday convention, the
+    prior-rate guard, the half-open window
+  - **Found a flaw in my own tests:** two assertions read values out of the fixture
+    instead of computing them, so they could never fail from a TypeScript bug. Both fixed
 
-- [ ] **CHECKPOINT C** — parity green and CI-blocking; leakage test passes both sides
+- [x] **CHECKPOINT C** — parity green; leakage test passes on both sides
+  - CI-blocking is T17's job. The suite exists and bites now.
 
 ---
 

@@ -1317,3 +1317,92 @@ passing suite would prove less than it appears to:
   the event that created it is *at* that instant, so it is not strictly before it.
 - **It contains a non-terminating value** (`0.24972222222222223`). A fixture of round
   numbers proves very little about two floating-point implementations.
+
+---
+
+## T10 — the full feature set, in both languages
+
+### D51 — Fourteen features, `featureSet: "fs_2"`, and every one of them `history`
+
+| Feature | What it is for |
+|---|---|
+| `hoursSinceLastSeen`, `hoursSinceFirstSeen` | how recently, and how long this has been a thing they do |
+| `eventCount7d`, `eventCount30d` | volume at two horizons |
+| `daysSeen7d` | separates a habit from a binge — thirty events on one afternoon and thirty over a fortnight have the same count |
+| `sessionCount7d` | volume in sessions rather than clicks |
+| `categoryShare30d` | share of attention, not absolute amount |
+| `priorReturnRate`, `priorSessionCount` | the person's own measured return rate, and how much it rests on |
+| `sessionEventCount`, `sessionCategoryCount`, `categoryEventsInSession` | the shape of the session that produced the label |
+| `hourOfDay`, `dayOfWeek` | rhythm |
+
+**Every feature is compat class `history`, and the `full` class is empty.** That is D35
+arriving at its conclusion: because Tise never measures dwell in either direction, no
+shipped feature can depend on it, and the `full`/`history` split that T1 introduced now
+only matters for research-only exploration. The mechanism stays — the distinction is real,
+and the day it stops being empty must not be the day it gets invented.
+
+**Absence is `null`, never a sentinel.** A stand-in like 9999 hours, or a prior of 0.5, is
+a number a model will fit a coefficient to as though it had been measured. Several of the
+fourteen can be null, and the parity suite asserts TypeScript reproduces the nulls rather
+than filling them in.
+
+**Time is UTC, and it costs signal.** Local days would be the more behavioural unit —
+people have mornings, not 00:00 UTC — but the browser's timezone and the research
+machine's are not the same, and a feature that depends on which computer ran it cannot be
+in a parity suite. Recorded as a known limitation rather than smoothed over.
+
+### D52 — `priorReturnRate` excludes sessions whose horizon has not elapsed
+
+The strongest feature in the set, and the one that leaks if written the obvious way.
+
+Deciding whether a past session was returned to means looking at the 24 hours after it —
+and for a recent session, some of those hours are still in the future at `window_end`.
+Counting it as a miss says "no return" when the return may be an hour away. Counting it as
+a hit reads the future outright. **Both are wrong, and the miss is the tempting one**,
+because it looks conservative.
+
+So a prior session counts only when `session_end + horizon <= window_end`. Unresolved
+sessions are absent from **both** numerator and denominator, and `priorSessionCount`
+travels alongside so a rate built on two sessions is visibly different from one built on
+forty.
+
+The parity fixture was extended to make this testable: it now carries a run of `dev`
+sessions with deliberately mixed outcomes, so `priorReturnRate` takes values of 0, 0.25,
+0.286, 0.333 and 0.5 rather than being null almost everywhere. **The extension is
+append-only** — every added event falls more than 24 hours after the last previously
+frozen session closed, so no existing session or label changed, and the diff has no
+deletions in any frozen field.
+
+### D53 — Feature rows live in their own store, at database version 2
+
+D11 said derived features outlive raw events. This is where that becomes true rather than
+intended: a third IndexedDB store, keyed on `(featureSet, subject, windowEnd)` so
+recomputation replaces rather than duplicates — which matters because training is chunked
+and resumable and will recompute a window it has already seen.
+
+`enforceRetention` touches `events` and nothing else, and a test now asserts that a
+feature row whose window is 400 days old survives a 30-day retention pass.
+
+**Deletion is not retention.** `deleteEverything` clears the feature store too. Retention
+is a promise about how long raw browsing is kept; "delete everything" is a promise about
+everything.
+
+### T10 findings — three deliberate breaks, and one weak test of my own
+
+Each break failed exactly two tests, then was reverted:
+
+| Break | Why it matters |
+|---|---|
+| `dayOfWeek` without the Sunday-to-Monday conversion | Python's `weekday()` is Monday=0, JavaScript's `getUTCDay()` is Sunday=0. Every day-of-week coefficient shifted by one, and nothing outside parity would notice |
+| `priorReturnRate` counting unresolved sessions | the leak D52 exists to prevent |
+| the frequency window closed rather than half-open | an event exactly at `window_end` counted, on the wrong side of the boundary |
+
+**And a flaw in my own test.** The first break should have failed the "Monday=0" test as
+well as the vector comparison. It did not, and the reason was that the test read the value
+out of the fixture rather than computing it — it was asserting that Python had written what
+Python wrote, and could never have failed from a TypeScript bug. A second test,
+"reproduces repeating decimals", had the same shape. Both now assert against the
+implementation.
+
+Worth recording because it is the failure mode a parity suite is *most* prone to: a test
+that reads the oracle and calls it verification.

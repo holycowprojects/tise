@@ -15,6 +15,7 @@ import { openTiseDb } from "./db";
 export interface DeletionOutcome {
   readonly eventsDeleted: number;
   readonly metaKeysDeleted: number;
+  readonly featureRowsDeleted: number;
 }
 
 export async function deleteEverything(): Promise<DeletionOutcome> {
@@ -22,19 +23,27 @@ export async function deleteEverything(): Promise<DeletionOutcome> {
 
   const eventsDeleted = await db.count("events");
   const metaKeysDeleted = await db.count("meta");
+  const featureRowsDeleted = await db.count("features");
 
-  const tx = db.transaction(["events", "meta"], "readwrite");
+  // Features survive *retention* (D11) and not deletion. Retention is a promise about
+  // how long raw browsing is kept; "delete everything" is a promise about everything.
+  const tx = db.transaction(["events", "meta", "features"], "readwrite");
   await Promise.all([
     tx.objectStore("events").clear(),
     tx.objectStore("meta").clear(),
+    tx.objectStore("features").clear(),
     tx.done,
   ]);
 
-  return { eventsDeleted, metaKeysDeleted };
+  return { eventsDeleted, metaKeysDeleted, featureRowsDeleted };
 }
 
-/** Both stores hold nothing. The assertion behind the delete-all claim. */
+/** Every store holds nothing. The assertion behind the delete-all claim. */
 export async function isEmpty(): Promise<boolean> {
   const db = await openTiseDb();
-  return (await db.count("events")) === 0 && (await db.count("meta")) === 0;
+  return (
+    (await db.count("events")) === 0 &&
+    (await db.count("meta")) === 0 &&
+    (await db.count("features")) === 0
+  );
 }

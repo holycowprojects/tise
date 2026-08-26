@@ -32,9 +32,9 @@ from pathlib import Path
 from tise_research.categories import load_category_map
 from tise_research.features.events import Event
 from tise_research.features.labels import return_24h_labels
-from tise_research.features.recency import FEATURE_SET, hours_since_last_seen
 from tise_research.features.resolver import resolve
 from tise_research.features.sessions import sessionise
+from tise_research.features.vector import FEATURE_NAMES, FEATURE_SET, compute_features
 
 #: research/tise_research/parity_fixture.py -> repo root is three parents up.
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -67,6 +67,18 @@ RAW_EVENTS: list[tuple[datetime, str]] = [
     (_at(2, 9, 5), "google.com"),
     # --- session 4: two days later, OUTSIDE the horizon of session 2 ----------------
     (_at(3, 12, 0), "github.com"),
+    # --- T10 extension: a run of `dev` sessions, so `priorReturnRate` has something to
+    # average over. Everything below is strictly more than 24 hours after session 4
+    # closed, so **no existing session or label changes** — the freeze holds and the diff
+    # is additive. Mixed outcomes on purpose: a rate of 0 or 1 would not distinguish a
+    # correct implementation from one that returns a constant.
+    (_at(4, 13, 0), "github.com"),   # no return inside 24h of session 4 -> a miss
+    (_at(5, 9, 0), "github.com"),    # inside 24h of the above -> a hit
+    (_at(6, 20, 0), "github.com"),   # outside 24h of the above -> a miss
+    (_at(7, 8, 0), "github.com"),    # inside 24h of the above -> a hit
+    (_at(9, 15, 0), "github.com"),   # a gap, so the last session's horizon is unresolved
+    (_at(10, 16, 0), "youtube.com"),
+    (_at(10, 16, 5), "github.com"),
 ]
 
 
@@ -163,18 +175,25 @@ def build_expected_document() -> dict:
     label_objects = return_24h_labels(
         events, timeout_seconds=TIMEOUT_SECONDS, horizon_hours=HORIZON_HOURS
     )
-    features = [
-        {
-            "subject": label.subject,
-            "windowEnd": label.window_end.isoformat(),
-            "values": {
-                "hoursSinceLastSeen": hours_since_last_seen(
-                    events, label.subject, window_end=label.window_end
-                ),
-            },
-        }
-        for label in label_objects
-    ]
+    features = []
+    for label in label_objects:
+        row = compute_features(
+            events,
+            label.subject,
+            window_end=label.window_end,
+            timeout_seconds=TIMEOUT_SECONDS,
+            horizon_hours=HORIZON_HOURS,
+        )
+        features.append(
+            {
+                "subject": row.subject,
+                "windowEnd": row.window_end.isoformat(),
+                "compat": row.compat,
+                # Written in FEATURE_NAMES order. The order is part of the contract: it
+                # is the column order of any matrix built from these rows.
+                "values": {name: row.values[name] for name in FEATURE_NAMES},
+            }
+        )
 
     unknown_count = sum(1 for event in events if event.category == "unknown")
 
@@ -188,6 +207,7 @@ def build_expected_document() -> dict:
         "timeoutSeconds": TIMEOUT_SECONDS,
         "horizonHours": HORIZON_HOURS,
         "featureSet": FEATURE_SET,
+        "featureNames": list(FEATURE_NAMES),
         "resolutions": resolutions,
         "sessions": sessions,
         "labels": labels,

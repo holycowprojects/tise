@@ -19,8 +19,15 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { advanceSession, type SessionCursor } from "../src/collect/session";
 import { resolve } from "../src/collect/resolver";
-import { FEATURE_SET, hoursSinceLastSeen } from "../src/features/recency";
+import { hoursSinceLastSeen } from "../src/features/recency";
 import { sessionise } from "../src/features/sessions";
+import { dayOfWeek } from "../src/features/context";
+import {
+  computeFeatures,
+  FEATURE_NAMES,
+  FEATURE_SET,
+  type FeatureName,
+} from "../src/features/vector";
 import type { TiseEvent } from "../src/types";
 
 const TOLERANCE = 1e-9;
@@ -44,6 +51,7 @@ interface FixtureExpected {
   categoryMapVersion: number;
   timeoutSeconds: number;
   featureSet: string;
+  featureNames: string[];
   resolutions: Array<{ domain: string; category: string; source: string }>;
   sessions: Array<{
     sessionId: string;
@@ -57,6 +65,7 @@ interface FixtureExpected {
   features: Array<{
     subject: string;
     windowEnd: string;
+    compat: string;
     values: Record<string, number | null>;
   }>;
   summary: Record<string, number>;
@@ -105,6 +114,7 @@ describe("the fixture itself", () => {
     // than letting an unchecked section look verified. `labels` is checked at T10.
     expect(Object.keys(EXPECTED).sort()).toEqual([
       "categoryMapVersion",
+      "featureNames",
       "featureSet",
       "features",
       "horizonHours",
@@ -203,45 +213,112 @@ describe("the two TypeScript sessionisers agree with each other", () => {
 });
 
 describe("feature parity", () => {
-  it("computes every feature row to within 1e-9", () => {
+  const OPTIONS = {
+    timeoutSeconds: INPUT.timeoutSeconds,
+    horizonHours: INPUT.horizonHours,
+  };
+
+  it("agrees on the feature set and the column order", () => {
+    expect(EXPECTED.featureSet).toBe(FEATURE_SET);
+    expect([...FEATURE_NAMES]).toEqual(EXPECTED.featureNames);
+  });
+
+  it("computes every value of every row to within 1e-9", () => {
     expect(EXPECTED.features.length).toBeGreaterThan(0);
 
     EXPECTED.features.forEach((expected, index) => {
       const windowEnd = Date.parse(expected.windowEnd);
-      const actual = hoursSinceLastSeen(EVENTS, expected.subject, windowEnd);
-      closeEnough(
-        actual,
-        expected.values["hoursSinceLastSeen"] ?? null,
-        `row ${index} (${expected.subject} @ ${expected.windowEnd})`,
-      );
+      const actual = computeFeatures(EVENTS, expected.subject, windowEnd, OPTIONS);
+
+      expect(actual.compat, `row ${index} compat`).toBe(expected.compat);
+      expect(Object.keys(actual.values).sort()).toEqual(Object.keys(expected.values).sort());
+
+      for (const name of FEATURE_NAMES) {
+        closeEnough(
+          actual.values[name],
+          expected.values[name] ?? null,
+          `row ${index} (${expected.subject} @ ${expected.windowEnd}) ${name}`,
+        );
+      }
     });
   });
 
-  it("reproduces null rather than substituting a sentinel", () => {
-    const nulls = EXPECTED.features.filter((f) => f.values["hoursSinceLastSeen"] === null);
-    expect(nulls.length, "the fixture must contain a never-seen case").toBeGreaterThan(0);
+  it("tags every feature `history`, because D35 left the `full` class empty", () => {
+    for (const row of EXPECTED.features) expect(row.compat).toBe("history");
+  });
 
-    for (const row of nulls) {
-      expect(hoursSinceLastSeen(EVENTS, row.subject, Date.parse(row.windowEnd))).toBeNull();
+  it("reproduces null rather than substituting a sentinel", () => {
+    const nulled = new Set<string>();
+    for (const row of EXPECTED.features) {
+      for (const name of FEATURE_NAMES) {
+        if (row.values[name] === null) {
+          nulled.add(name);
+          const actual = computeFeatures(
+            EVENTS,
+            row.subject,
+            Date.parse(row.windowEnd),
+            OPTIONS,
+          );
+          expect(actual.values[name], `${name} must be null, not a stand-in`).toBeNull();
+        }
+      }
+    }
+    expect(nulled.size, "the fixture must exercise absence").toBeGreaterThan(0);
+  });
+
+  it("exercises priorReturnRate with real variety, not just null and zero", () => {
+    // The strongest feature and the one that leaks if written the obvious way, so a
+    // fixture where it is null everywhere would be worth very little.
+    const rates = EXPECTED.features
+      .map((row) => row.values["priorReturnRate"])
+      .filter((value): value is number => value !== null && value !== undefined);
+
+    expect(rates.length).toBeGreaterThanOrEqual(4);
+    expect(new Set(rates).size).toBeGreaterThanOrEqual(3);
+    expect(rates.some((rate) => rate > 0 && rate < 1)).toBe(true);
+  });
+
+  it("reproduces repeating decimals, where a float bug would show", () => {
+    // Carry the subject along. Two rows share a windowEnd — `search` and `video` both
+    // close at 09:50 on day one — so looking the subject up by window afterwards finds
+    // the wrong row. That mistake made this test fail against correct code once.
+    const repeating: Array<{ subject: string; windowEnd: string; name: FeatureName; value: number }> =
+      [];
+    for (const row of EXPECTED.features) {
+      for (const name of FEATURE_NAMES) {
+        const value = row.values[name];
+        if (typeof value === "number" && String(value).length > 12) {
+          repeating.push({ subject: row.subject, windowEnd: row.windowEnd, name, value });
+        }
+      }
+    }
+    expect(repeating.length, "a fixture of round numbers proves little").toBeGreaterThan(0);
+
+    // Recompute them, rather than only asserting the fixture contains them.
+    for (const { subject, windowEnd, name, value } of repeating) {
+      const actual = computeFeatures(EVENTS, subject, Date.parse(windowEnd), OPTIONS);
+      closeEnough(actual.values[name], value, `${subject} ${name} @ ${windowEnd}`);
     }
   });
 
-  it("reproduces a repeating decimal, where a float bug would show", () => {
-    const repeating = EXPECTED.features.find(
-      (f) => String(f.values["hoursSinceLastSeen"]).length > 8,
-    );
-    expect(repeating, "the fixture must contain a non-terminating value").toBeDefined();
-    closeEnough(
-      hoursSinceLastSeen(EVENTS, repeating!.subject, Date.parse(repeating!.windowEnd)),
-      repeating!.values["hoursSinceLastSeen"] ?? null,
-      "repeating decimal",
-    );
+  it("gets Monday=0 right — JavaScript counts weekdays from Sunday", () => {
+    // 2026-06-01 is a Monday. Python's weekday() says 0; getUTCDay() says 1. Without the
+    // conversion in context.ts every day-of-week coefficient would be shifted by one.
+    //
+    // This asserts against the *implementation*. An earlier version of this test read
+    // the value out of the fixture instead, which meant it could never fail from a
+    // TypeScript bug — it was checking that Python had written what Python wrote.
+    expect(dayOfWeek(Date.parse("2026-06-01T09:50:00+00:00"))).toBe(0);
+    expect(dayOfWeek(Date.parse("2026-06-07T09:00:00+00:00"))).toBe(6); // Sunday
+
+    const monday = EXPECTED.features.find((row) => row.windowEnd.startsWith("2026-06-01"));
+    expect(monday?.values["dayOfWeek"]).toBe(0);
   });
 
-  it("filters strictly before windowEnd — the leakage guard", () => {
+  it("filters strictly before windowEnd — the leakage guard, on the whole vector", () => {
     const future: TiseEvent = {
       eventId: "leak",
-      occurredAt: "2026-06-09T00:00:00+00:00",
+      occurredAt: "2026-07-01T00:00:00+00:00",
       source: "import",
       domain: "youtube.com",
       category: "video",
@@ -252,9 +329,43 @@ describe("feature parity", () => {
 
     for (const row of EXPECTED.features) {
       const windowEnd = Date.parse(row.windowEnd);
-      const before = hoursSinceLastSeen(EVENTS, row.subject, windowEnd);
-      const after = hoursSinceLastSeen([...EVENTS, future], row.subject, windowEnd);
-      expect(after, `${row.subject} moved when a future event was appended`).toBe(before);
+      const before = computeFeatures(EVENTS, row.subject, windowEnd, OPTIONS);
+      const after = computeFeatures([...EVENTS, future], row.subject, windowEnd, OPTIONS);
+      expect(after.values, `${row.subject} @ ${row.windowEnd} moved`).toEqual(before.values);
+    }
+  });
+
+  it("does not let a near-future event extend the session it describes", () => {
+    // The subtlest leak in the set. An event inside the timeout after windowEnd would
+    // merge into the label's own session if context.ts re-derived it from the whole
+    // corpus, and sessionEventCount would change retroactively.
+    const row = EXPECTED.features[0] as (typeof EXPECTED.features)[number];
+    const windowEnd = Date.parse(row.windowEnd);
+
+    const soon: TiseEvent = {
+      eventId: "soon",
+      occurredAt: new Date(windowEnd + 10 * 60_000).toISOString(),
+      source: "import",
+      domain: "github.com",
+      category: "dev",
+      transition: "link",
+      dwellSeconds: null,
+      sessionId: "",
+    };
+
+    const before = computeFeatures(EVENTS, row.subject, windowEnd, OPTIONS);
+    const after = computeFeatures([...EVENTS, soon], row.subject, windowEnd, OPTIONS);
+    expect(after.values["sessionEventCount"]).toBe(before.values["sessionEventCount"]);
+    expect(after.values).toEqual(before.values);
+  });
+
+  it("still agrees on the single feature T9 pinned", () => {
+    for (const row of EXPECTED.features) {
+      closeEnough(
+        hoursSinceLastSeen(EVENTS, row.subject, Date.parse(row.windowEnd)),
+        row.values["hoursSinceLastSeen"] ?? null,
+        `${row.subject} hoursSinceLastSeen`,
+      );
     }
   });
 });

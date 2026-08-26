@@ -14,6 +14,8 @@ import {
   saveSettings,
   type Settings,
 } from "../src/storage/settings";
+import { allFeatureRows, countFeatureRows, putFeatureRows } from "../src/storage/features";
+import type { FeatureRow } from "../src/features/vector";
 import type { TiseEvent } from "../src/types";
 
 const NOW = Date.parse("2026-08-26T12:00:00.000Z");
@@ -119,5 +121,46 @@ describe("delete everything", () => {
     await deleteEverything();
 
     expect(await readMeta("importProgress")).toBeUndefined();
+  });
+});
+
+describe("feature rows outlive raw events (D11)", () => {
+  const row = {
+    subject: "video",
+    windowEnd: new Date(NOW - 400 * DAY).toISOString(),
+    featureSet: "fs_2",
+    compat: "history" as const,
+    values: { hoursSinceLastSeen: 1.5 },
+  } as unknown as FeatureRow;
+
+  it("retention deletes raw events and leaves the derived rows alone", async () => {
+    await putFeatureRows([row]);
+    expect(await countFeatureRows()).toBe(1);
+
+    const outcome = await enforceRetention(settings({ rawRetentionDays: 30 }), NOW);
+
+    expect(outcome.deleted).toBe(2);
+    // The row's own window is 400 days old — far outside retention — and it survives.
+    // That is the whole privacy design: keep what was learned, not the browsing.
+    expect(await countFeatureRows()).toBe(1);
+  });
+
+  it("but delete-all takes them too", async () => {
+    await putFeatureRows([row]);
+    const outcome = await deleteEverything();
+
+    expect(outcome.featureRowsDeleted).toBe(1);
+    expect(await countFeatureRows()).toBe(0);
+    expect(await isEmpty()).toBe(true);
+  });
+
+  it("recomputing a window replaces the row rather than duplicating it", async () => {
+    await putFeatureRows([row]);
+    await putFeatureRows([
+      { ...row, values: { ...row.values, hoursSinceLastSeen: 99 } } as FeatureRow,
+    ]);
+
+    expect(await countFeatureRows()).toBe(1);
+    expect((await allFeatureRows())[0]?.values["hoursSinceLastSeen"]).toBe(99);
   });
 });

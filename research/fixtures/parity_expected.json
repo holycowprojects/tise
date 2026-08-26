@@ -7,7 +7,23 @@
   "categoryMapVersion": 1,
   "timeoutSeconds": 1800.0,
   "horizonHours": 24.0,
-  "featureSet": "fs_1",
+  "featureSet": "fs_2",
+  "featureNames": [
+    "hoursSinceLastSeen",
+    "hoursSinceFirstSeen",
+    "eventCount7d",
+    "eventCount30d",
+    "daysSeen7d",
+    "sessionCount7d",
+    "categoryShare30d",
+    "priorReturnRate",
+    "priorSessionCount",
+    "sessionEventCount",
+    "sessionCategoryCount",
+    "categoryEventsInSession",
+    "hourOfDay",
+    "dayOfWeek"
+  ],
   "resolutions": [
     {
       "domain": "youtube.com",
@@ -99,6 +115,80 @@
       "categories": [
         "dev"
       ]
+    },
+    {
+      "sessionId": "2026-06-04T13:00:00+00:00",
+      "startedAt": "2026-06-04T13:00:00+00:00",
+      "endedAt": "2026-06-04T13:00:00+00:00",
+      "durationSeconds": 0.0,
+      "eventIds": [
+        "evt-010"
+      ],
+      "categories": [
+        "dev"
+      ]
+    },
+    {
+      "sessionId": "2026-06-05T09:00:00+00:00",
+      "startedAt": "2026-06-05T09:00:00+00:00",
+      "endedAt": "2026-06-05T09:00:00+00:00",
+      "durationSeconds": 0.0,
+      "eventIds": [
+        "evt-011"
+      ],
+      "categories": [
+        "dev"
+      ]
+    },
+    {
+      "sessionId": "2026-06-06T20:00:00+00:00",
+      "startedAt": "2026-06-06T20:00:00+00:00",
+      "endedAt": "2026-06-06T20:00:00+00:00",
+      "durationSeconds": 0.0,
+      "eventIds": [
+        "evt-012"
+      ],
+      "categories": [
+        "dev"
+      ]
+    },
+    {
+      "sessionId": "2026-06-07T08:00:00+00:00",
+      "startedAt": "2026-06-07T08:00:00+00:00",
+      "endedAt": "2026-06-07T08:00:00+00:00",
+      "durationSeconds": 0.0,
+      "eventIds": [
+        "evt-013"
+      ],
+      "categories": [
+        "dev"
+      ]
+    },
+    {
+      "sessionId": "2026-06-09T15:00:00+00:00",
+      "startedAt": "2026-06-09T15:00:00+00:00",
+      "endedAt": "2026-06-09T15:00:00+00:00",
+      "durationSeconds": 0.0,
+      "eventIds": [
+        "evt-014"
+      ],
+      "categories": [
+        "dev"
+      ]
+    },
+    {
+      "sessionId": "2026-06-10T16:00:00+00:00",
+      "startedAt": "2026-06-10T16:00:00+00:00",
+      "endedAt": "2026-06-10T16:05:00+00:00",
+      "durationSeconds": 300.0,
+      "eventIds": [
+        "evt-015",
+        "evt-016"
+      ],
+      "categories": [
+        "dev",
+        "video"
+      ]
     }
   ],
   "labels": [
@@ -173,78 +263,407 @@
       "outcome": false,
       "horizonHours": 24.0,
       "sessionId": "2026-06-03T12:00:00+00:00"
+    },
+    {
+      "target": "return_24h",
+      "subject": "dev",
+      "windowEnd": "2026-06-04T13:00:00+00:00",
+      "outcome": true,
+      "horizonHours": 24.0,
+      "sessionId": "2026-06-04T13:00:00+00:00"
+    },
+    {
+      "target": "return_24h",
+      "subject": "dev",
+      "windowEnd": "2026-06-05T09:00:00+00:00",
+      "outcome": false,
+      "horizonHours": 24.0,
+      "sessionId": "2026-06-05T09:00:00+00:00"
+    },
+    {
+      "target": "return_24h",
+      "subject": "dev",
+      "windowEnd": "2026-06-06T20:00:00+00:00",
+      "outcome": true,
+      "horizonHours": 24.0,
+      "sessionId": "2026-06-06T20:00:00+00:00"
+    },
+    {
+      "target": "return_24h",
+      "subject": "dev",
+      "windowEnd": "2026-06-07T08:00:00+00:00",
+      "outcome": false,
+      "horizonHours": 24.0,
+      "sessionId": "2026-06-07T08:00:00+00:00"
+    },
+    {
+      "target": "return_24h",
+      "subject": "dev",
+      "windowEnd": "2026-06-09T15:00:00+00:00",
+      "outcome": false,
+      "horizonHours": 24.0,
+      "sessionId": "2026-06-09T15:00:00+00:00"
+    },
+    {
+      "target": "return_24h",
+      "subject": "dev",
+      "windowEnd": "2026-06-10T16:05:00+00:00",
+      "outcome": false,
+      "horizonHours": 24.0,
+      "sessionId": "2026-06-10T16:00:00+00:00"
+    },
+    {
+      "target": "return_24h",
+      "subject": "video",
+      "windowEnd": "2026-06-10T16:05:00+00:00",
+      "outcome": false,
+      "horizonHours": 24.0,
+      "sessionId": "2026-06-10T16:00:00+00:00"
     }
   ],
   "features": [
     {
       "subject": "search",
       "windowEnd": "2026-06-01T09:50:00+00:00",
+      "compat": "history",
       "values": {
-        "hoursSinceLastSeen": null
+        "hoursSinceLastSeen": null,
+        "hoursSinceFirstSeen": null,
+        "eventCount7d": 0.0,
+        "eventCount30d": 0.0,
+        "daysSeen7d": 0.0,
+        "sessionCount7d": 0.0,
+        "categoryShare30d": 0.0,
+        "priorReturnRate": null,
+        "priorSessionCount": 0.0,
+        "sessionEventCount": 3.0,
+        "sessionCategoryCount": 2.0,
+        "categoryEventsInSession": 1.0,
+        "hourOfDay": 9.0,
+        "dayOfWeek": 0.0
       }
     },
     {
       "subject": "video",
       "windowEnd": "2026-06-01T09:50:00+00:00",
+      "compat": "history",
       "values": {
-        "hoursSinceLastSeen": 0.5
+        "hoursSinceLastSeen": 0.5,
+        "hoursSinceFirstSeen": 0.8333333333333334,
+        "eventCount7d": 2.0,
+        "eventCount30d": 2.0,
+        "daysSeen7d": 1.0,
+        "sessionCount7d": 1.0,
+        "categoryShare30d": 1.0,
+        "priorReturnRate": null,
+        "priorSessionCount": 0.0,
+        "sessionEventCount": 3.0,
+        "sessionCategoryCount": 2.0,
+        "categoryEventsInSession": 2.0,
+        "hourOfDay": 9.0,
+        "dayOfWeek": 0.0
       }
     },
     {
       "subject": "dev",
       "windowEnd": "2026-06-01T10:35:00+00:00",
+      "compat": "history",
       "values": {
-        "hoursSinceLastSeen": 0.24972222222222223
+        "hoursSinceLastSeen": 0.24972222222222223,
+        "hoursSinceFirstSeen": 0.24972222222222223,
+        "eventCount7d": 1.0,
+        "eventCount30d": 1.0,
+        "daysSeen7d": 1.0,
+        "sessionCount7d": 1.0,
+        "categoryShare30d": 0.16666666666666666,
+        "priorReturnRate": null,
+        "priorSessionCount": 0.0,
+        "sessionEventCount": 4.0,
+        "sessionCategoryCount": 4.0,
+        "categoryEventsInSession": 1.0,
+        "hourOfDay": 10.0,
+        "dayOfWeek": 0.0
       }
     },
     {
       "subject": "government",
       "windowEnd": "2026-06-01T10:35:00+00:00",
+      "compat": "history",
       "values": {
-        "hoursSinceLastSeen": 0.16666666666666666
+        "hoursSinceLastSeen": 0.16666666666666666,
+        "hoursSinceFirstSeen": 0.16666666666666666,
+        "eventCount7d": 1.0,
+        "eventCount30d": 1.0,
+        "daysSeen7d": 1.0,
+        "sessionCount7d": 1.0,
+        "categoryShare30d": 0.16666666666666666,
+        "priorReturnRate": null,
+        "priorSessionCount": 0.0,
+        "sessionEventCount": 4.0,
+        "sessionCategoryCount": 4.0,
+        "categoryEventsInSession": 1.0,
+        "hourOfDay": 10.0,
+        "dayOfWeek": 0.0
       }
     },
     {
       "subject": "unknown",
       "windowEnd": "2026-06-01T10:35:00+00:00",
+      "compat": "history",
       "values": {
-        "hoursSinceLastSeen": null
+        "hoursSinceLastSeen": null,
+        "hoursSinceFirstSeen": null,
+        "eventCount7d": 0.0,
+        "eventCount30d": 0.0,
+        "daysSeen7d": 0.0,
+        "sessionCount7d": 0.0,
+        "categoryShare30d": 0.0,
+        "priorReturnRate": null,
+        "priorSessionCount": 0.0,
+        "sessionEventCount": 4.0,
+        "sessionCategoryCount": 4.0,
+        "categoryEventsInSession": 1.0,
+        "hourOfDay": 10.0,
+        "dayOfWeek": 0.0
       }
     },
     {
       "subject": "work",
       "windowEnd": "2026-06-01T10:35:00+00:00",
+      "compat": "history",
       "values": {
-        "hoursSinceLastSeen": 0.08333333333333333
+        "hoursSinceLastSeen": 0.08333333333333333,
+        "hoursSinceFirstSeen": 0.08333333333333333,
+        "eventCount7d": 1.0,
+        "eventCount30d": 1.0,
+        "daysSeen7d": 1.0,
+        "sessionCount7d": 1.0,
+        "categoryShare30d": 0.16666666666666666,
+        "priorReturnRate": null,
+        "priorSessionCount": 0.0,
+        "sessionEventCount": 4.0,
+        "sessionCategoryCount": 4.0,
+        "categoryEventsInSession": 1.0,
+        "hourOfDay": 10.0,
+        "dayOfWeek": 0.0
       }
     },
     {
       "subject": "search",
       "windowEnd": "2026-06-02T09:05:00+00:00",
+      "compat": "history",
       "values": {
-        "hoursSinceLastSeen": 23.25
+        "hoursSinceLastSeen": 23.25,
+        "hoursSinceFirstSeen": 23.25,
+        "eventCount7d": 1.0,
+        "eventCount30d": 1.0,
+        "daysSeen7d": 1.0,
+        "sessionCount7d": 1.0,
+        "categoryShare30d": 0.125,
+        "priorReturnRate": null,
+        "priorSessionCount": 0.0,
+        "sessionEventCount": 2.0,
+        "sessionCategoryCount": 2.0,
+        "categoryEventsInSession": 1.0,
+        "hourOfDay": 9.0,
+        "dayOfWeek": 1.0
       }
     },
     {
       "subject": "video",
       "windowEnd": "2026-06-02T09:05:00+00:00",
+      "compat": "history",
       "values": {
-        "hoursSinceLastSeen": 0.08333333333333333
+        "hoursSinceLastSeen": 0.08333333333333333,
+        "hoursSinceFirstSeen": 24.083333333333332,
+        "eventCount7d": 3.0,
+        "eventCount30d": 3.0,
+        "daysSeen7d": 2.0,
+        "sessionCount7d": 2.0,
+        "categoryShare30d": 0.375,
+        "priorReturnRate": null,
+        "priorSessionCount": 0.0,
+        "sessionEventCount": 2.0,
+        "sessionCategoryCount": 2.0,
+        "categoryEventsInSession": 1.0,
+        "hourOfDay": 9.0,
+        "dayOfWeek": 1.0
       }
     },
     {
       "subject": "dev",
       "windowEnd": "2026-06-03T12:00:00+00:00",
+      "compat": "history",
       "values": {
-        "hoursSinceLastSeen": 49.66638888888889
+        "hoursSinceLastSeen": 49.66638888888889,
+        "hoursSinceFirstSeen": 49.66638888888889,
+        "eventCount7d": 1.0,
+        "eventCount30d": 1.0,
+        "daysSeen7d": 1.0,
+        "sessionCount7d": 1.0,
+        "categoryShare30d": 0.1111111111111111,
+        "priorReturnRate": 0.0,
+        "priorSessionCount": 1.0,
+        "sessionEventCount": 1.0,
+        "sessionCategoryCount": 1.0,
+        "categoryEventsInSession": 1.0,
+        "hourOfDay": 12.0,
+        "dayOfWeek": 2.0
+      }
+    },
+    {
+      "subject": "dev",
+      "windowEnd": "2026-06-04T13:00:00+00:00",
+      "compat": "history",
+      "values": {
+        "hoursSinceLastSeen": 25.0,
+        "hoursSinceFirstSeen": 74.66638888888889,
+        "eventCount7d": 2.0,
+        "eventCount30d": 2.0,
+        "daysSeen7d": 2.0,
+        "sessionCount7d": 2.0,
+        "categoryShare30d": 0.2,
+        "priorReturnRate": 0.0,
+        "priorSessionCount": 2.0,
+        "sessionEventCount": 1.0,
+        "sessionCategoryCount": 1.0,
+        "categoryEventsInSession": 1.0,
+        "hourOfDay": 13.0,
+        "dayOfWeek": 3.0
+      }
+    },
+    {
+      "subject": "dev",
+      "windowEnd": "2026-06-05T09:00:00+00:00",
+      "compat": "history",
+      "values": {
+        "hoursSinceLastSeen": 20.0,
+        "hoursSinceFirstSeen": 94.66638888888889,
+        "eventCount7d": 3.0,
+        "eventCount30d": 3.0,
+        "daysSeen7d": 3.0,
+        "sessionCount7d": 3.0,
+        "categoryShare30d": 0.2727272727272727,
+        "priorReturnRate": 0.0,
+        "priorSessionCount": 2.0,
+        "sessionEventCount": 1.0,
+        "sessionCategoryCount": 1.0,
+        "categoryEventsInSession": 1.0,
+        "hourOfDay": 9.0,
+        "dayOfWeek": 4.0
+      }
+    },
+    {
+      "subject": "dev",
+      "windowEnd": "2026-06-06T20:00:00+00:00",
+      "compat": "history",
+      "values": {
+        "hoursSinceLastSeen": 35.0,
+        "hoursSinceFirstSeen": 129.6663888888889,
+        "eventCount7d": 4.0,
+        "eventCount30d": 4.0,
+        "daysSeen7d": 4.0,
+        "sessionCount7d": 4.0,
+        "categoryShare30d": 0.3333333333333333,
+        "priorReturnRate": 0.25,
+        "priorSessionCount": 4.0,
+        "sessionEventCount": 1.0,
+        "sessionCategoryCount": 1.0,
+        "categoryEventsInSession": 1.0,
+        "hourOfDay": 20.0,
+        "dayOfWeek": 5.0
+      }
+    },
+    {
+      "subject": "dev",
+      "windowEnd": "2026-06-07T08:00:00+00:00",
+      "compat": "history",
+      "values": {
+        "hoursSinceLastSeen": 12.0,
+        "hoursSinceFirstSeen": 141.6663888888889,
+        "eventCount7d": 5.0,
+        "eventCount30d": 5.0,
+        "daysSeen7d": 5.0,
+        "sessionCount7d": 5.0,
+        "categoryShare30d": 0.38461538461538464,
+        "priorReturnRate": 0.25,
+        "priorSessionCount": 4.0,
+        "sessionEventCount": 1.0,
+        "sessionCategoryCount": 1.0,
+        "categoryEventsInSession": 1.0,
+        "hourOfDay": 8.0,
+        "dayOfWeek": 6.0
+      }
+    },
+    {
+      "subject": "dev",
+      "windowEnd": "2026-06-09T15:00:00+00:00",
+      "compat": "history",
+      "values": {
+        "hoursSinceLastSeen": 55.0,
+        "hoursSinceFirstSeen": 196.6663888888889,
+        "eventCount7d": 5.0,
+        "eventCount30d": 6.0,
+        "daysSeen7d": 5.0,
+        "sessionCount7d": 5.0,
+        "categoryShare30d": 0.42857142857142855,
+        "priorReturnRate": 0.3333333333333333,
+        "priorSessionCount": 6.0,
+        "sessionEventCount": 1.0,
+        "sessionCategoryCount": 1.0,
+        "categoryEventsInSession": 1.0,
+        "hourOfDay": 15.0,
+        "dayOfWeek": 1.0
+      }
+    },
+    {
+      "subject": "dev",
+      "windowEnd": "2026-06-10T16:05:00+00:00",
+      "compat": "history",
+      "values": {
+        "hoursSinceLastSeen": 25.083333333333332,
+        "hoursSinceFirstSeen": 221.74972222222223,
+        "eventCount7d": 5.0,
+        "eventCount30d": 7.0,
+        "daysSeen7d": 5.0,
+        "sessionCount7d": 5.0,
+        "categoryShare30d": 0.4375,
+        "priorReturnRate": 0.2857142857142857,
+        "priorSessionCount": 7.0,
+        "sessionEventCount": 2.0,
+        "sessionCategoryCount": 2.0,
+        "categoryEventsInSession": 1.0,
+        "hourOfDay": 16.0,
+        "dayOfWeek": 2.0
+      }
+    },
+    {
+      "subject": "video",
+      "windowEnd": "2026-06-10T16:05:00+00:00",
+      "compat": "history",
+      "values": {
+        "hoursSinceLastSeen": 0.08333333333333333,
+        "hoursSinceFirstSeen": 223.08333333333334,
+        "eventCount7d": 1.0,
+        "eventCount30d": 4.0,
+        "daysSeen7d": 1.0,
+        "sessionCount7d": 1.0,
+        "categoryShare30d": 0.25,
+        "priorReturnRate": 0.5,
+        "priorSessionCount": 2.0,
+        "sessionEventCount": 2.0,
+        "sessionCategoryCount": 2.0,
+        "categoryEventsInSession": 1.0,
+        "hourOfDay": 16.0,
+        "dayOfWeek": 2.0
       }
     }
   ],
   "summary": {
-    "eventCount": 10,
-    "sessionCount": 4,
-    "labelCount": 9,
-    "positiveCount": 2,
+    "eventCount": 17,
+    "sessionCount": 10,
+    "labelCount": 16,
+    "positiveCount": 4,
     "unknownEventCount": 1
   }
 }
