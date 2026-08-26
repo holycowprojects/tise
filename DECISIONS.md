@@ -1218,3 +1218,29 @@ reasoning trail goes stale. Appended rather than edited, per the append-only rul
 **Still open: Q7** — a Tise user running four browsers sees predictions from one. Silently
 partial, or stated in the UI? Blocks T15, and it is a product question rather than a
 technical one.
+
+### D47 — Copyright, and where the privacy policy lives
+
+**Copyright: Akash Navet and Holy Cow Studios Private Limited**, both named. Tise is a
+company showcase written by a director of that company, and a licence naming only one of
+them would misstate which.
+
+**The privacy policy is a section of the Holy Cow Studios privacy policy page**, not a
+document of its own. That is the right shape for the same reason the extension is open
+source: a policy hosted on the company's own page, next to everything else the company
+publishes, is a claim the company has made — not a file that could quietly move.
+
+Drafted at `docs/privacy-policy.md`, with two conditions written into the file itself:
+
+1. **Every claim is re-checked against the shipped build before it goes live.** The draft
+   describes V1 as specified. Anything unimplemented at submission gets cut, not softened
+   — a policy describing an intention is false on the day it is published.
+2. **The contact address is a suggestion until confirmed.** `privacy@holycowstudios.in` is
+   proposed, and a personal address is not substituted without a decision to publish it.
+
+The draft states what is stored as a five-row table and what is never stored as a list,
+and it explains the reduction with a worked example rather than a promise: a URL with a
+path and a query becomes a domain, and the rest no longer exists to be stored.
+
+Still outstanding for T18: the live URL once the section is published, and the Web Store
+developer account under the company identity (D13).

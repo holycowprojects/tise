@@ -214,6 +214,13 @@ working and committable.
 
 ## Blocked on you, not on code
 
-- [ ] Copyright holder for `LICENSE` (currently "Akash") — blocks T18
-- [ ] Where the privacy policy is hosted — presumed `holycowstudios.in` — blocks T18
-- [ ] Chrome Web Store developer account registered under the company identity (D13)
+- [x] **Copyright holder** — Akash Navet and Holy Cow Studios Private Limited (D47)
+- [x] **Privacy policy hosting** — a Tise section on the Holy Cow Studios privacy policy
+      page (D47). Text drafted at `docs/privacy-policy.md`, ready to paste
+- [ ] **Publish that section and give me the exact URL** — the Web Store needs it before
+      submission, and it goes in the listing
+- [ ] **Confirm `privacy@holycowstudios.in` exists**, or name a different address. It is a
+      suggestion in the draft, not a fact
+- [ ] Chrome Web Store developer account registered under the company identity (D13) —
+      one-time fee, you register and pay it
+- [ ] Icons: 16/32/48/128px. HCS artwork, or a plain mark I generate and you replace
