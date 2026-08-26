@@ -2,10 +2,9 @@
 
 Every permission Tise requests, why it is needed, and the evidence that it is needed.
 
-> **Status: awaiting empirical verification.**
-> The rows below marked *observed: pending* have not been run yet. The spike that settles
-> them is `spike/permissions/README.md`. Nothing here becomes a store-listing claim until
-> its evidence column says **observed**.
+> **Status: spike run 2026-08-26. Five variants loaded, all observed.**
+> One outstanding item: the backfill probe (variant E, "Read my whole history") has not
+> been run. Everything else below is now **observed**, and one prior claim was wrong.
 
 ## Evidence classes
 
@@ -45,16 +44,88 @@ more to this project than any feature.
 
 ## Claims and their evidence
 
-| # | Claim | Evidence |
+Observed 2026-08-26 on Chrome, five variants, throwaway profile.
+
+| # | Claim | Verdict |
 |---|---|---|
-| 1 | `chrome.history.getVisits` returns `VisitItem` with fields `id`, `isLocal`, `referringVisitId`, `transition`, `visitId`, `visitTime` | **documented** — [history API reference](https://developer.chrome.com/docs/extensions/reference/api/history) |
-| 2 | **No dwell-time or duration field exists** on `VisitItem` or `HistoryItem` | **documented** — same reference. This is the duration trap, confirmed at source |
-| 3 | `chrome.history.onVisited` passes a `HistoryItem` including `url` | **documented** — same reference |
-| 4 | The `history` permission alone is sufficient; no host permissions required | **documented** · *observed: pending* (variant A) |
-| 5 | `chrome.webNavigation` **cannot** collect a usable URL without host permissions | *observed: pending* (variant B) — this is audit finding 7 |
-| 6 | `alarms` and `offscreen` produce no install-time warning | **documented** — [permissions list](https://developer.chrome.com/docs/extensions/reference/permissions-list) · *observed: pending* |
-| 7 | IndexedDB works with no `storage` permission | *observed: pending* (any variant) |
-| 8 | Removing any requested permission demonstrably breaks collection | *observed: pending* (A vs B) |
+| 1 | `VisitItem` is `id, isLocal, referringVisitId, transition, visitId, visitTime` | **observed** — exactly as documented |
+| 2 | **No dwell-time field exists** anywhere in the history API | **observed** — the duration trap, now proven rather than believed |
+| 3 | `history.onVisited` yields a URL with **no host permissions** | **observed** — 36 events, variants A and D |
+| 4 | `HistoryItem` is `id, lastVisitTime, title, typedCount, url, visitCount` — **no transition** | **observed** — see finding 2 below |
+| 5 | ~~`webNavigation` cannot collect a URL without host permissions~~ | **FALSE** — see correction below |
+| 6 | `webNavigation.onCommitted` yields a URL with **no host permissions** | **observed** — 26 events, variant B |
+| 7 | `<all_urls>` adds nothing to `webNavigation` | **observed** — B and C identical, 26 events each |
+| 8 | IndexedDB works with no `storage` permission | **observed** — all five variants |
+| 9 | `alarms` and `offscreen` appear only when requested, silently | **observed** — variants D and E |
+| 10 | `history` works as an **optional** permission, granted at runtime | **observed** — variant E |
+| 11 | `permissions.onAdded` fires and listeners re-attach **without reloading** | **observed** — variant E |
+| 12 | Removing a permission breaks collection | **observed** — A has no webNavigation and saw 0 nav events; B has no history and saw 0 history events |
+| 13 | Backfill: what it takes to read the whole history | *pending* — variant E button not yet clicked |
+
+## Correction: audit finding 7 was half right
+
+The original documents' manifest could not have collected anything. That stands — it
+declared neither `webNavigation` nor `history`, and had no service worker.
+
+But the **reason** recorded for it was wrong. This document previously asserted, from a
+web search, that `webNavigation` needs host permissions to see URLs. **It does not.**
+Variant B requested `webNavigation` and nothing else, and received 26 navigation events
+with full URLs. Variant C added `<all_urls>` and received exactly the same 26 events.
+
+The host permission buys nothing here, and would have cost the broadest warning Chrome
+shows. This is precisely why T5 exists as an empirical task rather than a reading task.
+
+## Finding 1: `webNavigation` is the better collector, and its warning is milder
+
+| | `history` | `webNavigation` |
+|---|---|---|
+| Install warning | *"Read and change your browsing history on all signed-in devices"* | *"Read your browsing history"* |
+| Host permissions | none | none |
+| Gives transition inline | **no** | **yes** — `transitionType` + `transitionQualifiers` |
+| Frame id (subframe filter) | no | **yes** |
+| Can read existing history | **yes** | no |
+
+`webNavigation.onCommitted` delivers `documentId, documentLifecycle, frameId, frameType,
+parentFrameId, processId, tabId, timeStamp, transitionQualifiers, transitionType, url`.
+
+That is everything the research pipeline needs — the redirect and subframe filters built
+at T1 map straight onto `transitionQualifiers` and `frameId` — with **no extra API call
+per visit**.
+
+## Finding 2: the two routes are not interchangeable
+
+`history.onVisited` passes a `HistoryItem`, which has **no transition field**. Filtering
+redirects and subframes live would need a `getVisits()` call per visit purely to recover
+what `webNavigation` hands over for free.
+
+But `webNavigation` only sees the future. Only `history.search()` can read what the user
+already browsed, which D10's first-run import depends on.
+
+**So they do different jobs**, and the proposed manifest below reflects that.
+
+## Revised proposal
+
+```jsonc
+{
+  "manifest_version": 3,
+  "permissions": ["webNavigation", "alarms", "offscreen"],
+  "optional_permissions": ["history"],
+  // No host_permissions. Deliberately absent, and proven unnecessary.
+}
+```
+
+- **`webNavigation`** — required. Live collection, milder warning, richer data.
+- **`history`** — optional, requested at runtime from a button click, for the one-time
+  backfill only. Declining it costs the user their history import and nothing else.
+- **No host permissions.** Observed to be unnecessary for both routes.
+
+Variant E proved the consent flow end to end: the extension installed holding only
+`alarms` and `offscreen`, `chrome.history` was genuinely absent, and after one click the
+permission was granted, `permissions.onAdded` fired, and the listeners re-attached with
+no reload.
+
+That is the strongest version of the argument: at install, Tise **cannot read anything**.
+Not by policy — by capability.
 
 ## Justifications for the store listing
 

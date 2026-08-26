@@ -29,6 +29,13 @@ async function readAll() {
   return rows;
 }
 
+// `<all_urls>` inserted via innerHTML is parsed as an unknown HTML tag and vanishes,
+// which made variant C report its host permission as an empty string. Cosmetic, but a
+// spike that misreports its own configuration is worse than useless.
+function escapeHtml(text) {
+  return text.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+}
+
 function verdict(label, state, detail) {
   const cls = state === true ? "yes" : state === false ? "no" : "none";
   const mark = state === true ? "YES" : state === false ? "NO" : "—";
@@ -146,7 +153,9 @@ async function render() {
     `<table>
       <tr><td class="k">permissions</td><td>${JSON.stringify(live.permissions ?? [])}</td></tr>
       <tr><td class="k">optional</td><td>${JSON.stringify(live.optional_permissions ?? [])}</td></tr>
-      <tr><td class="k">hosts</td><td>${JSON.stringify(live.host_permissions ?? [])}</td></tr>
+      <tr><td class="k">hosts</td><td>${escapeHtml(
+        JSON.stringify(live.host_permissions ?? []),
+      )}</td></tr>
       <tr><td class="k">granted now</td><td>${JSON.stringify(granted.permissions ?? [])}</td></tr>
       <tr><td class="k">observations</td><td>${rows.length}</td></tr>
       <tr><td class="k">APIs</td><td>${JSON.stringify(manifest?.apisPresent ?? {})}</td></tr>
