@@ -97,9 +97,28 @@ working and committable.
     coverage measurement — fixing the map against them would be tuning on the test.
     Carried to T10 (D39)
 
-- [ ] **T7 · First-run history import** · M · deps: T6
+- [x] **T7 · First-run history import** · M · deps: T6
   - Explicit consent, idempotent, `dwellSeconds: null`, non-blocking
-  - Verify: `npm test -- import`; run twice, row count unchanged
+  - Verify: `npm test -- import` ✓ (111 TS tests, ESLint clean). Idempotency broken
+    deliberately once — both duplicate tests failed, then reverted
+  - **Redirects: the API hides the qualifiers, so they are inferred** from a 50 ms
+    referrer gap — below human reaction time, argued before it was measured. Scored
+    against the history file's real transition bits: precision 0.947 Edge / 0.931 Chrome
+    (D40, `analysis/redirect_heuristic.py`)
+  - Runs in the service worker, so closing the popup does not cancel it. Two consents,
+    not merged: app-level first, Chrome's dialog second (D41)
+  - Every `search` bound explicit, so T5's unmeasured 24h/100-row default never applies
+  - **Still owed — your hands:** grant `history` from the popup and import your real
+    corpus, then compare the event count against T1's measured visit count
+
+- [ ] **T10b · Discovered categories** · M · deps: T10 — **new, from D42**
+  - Cluster domains by session co-occurrence and time-of-day. No text, no titles, no
+    server, no model API. Clusters named by their most frequent member
+  - **Must be versioned as its own taxonomy and benchmarked separately.** Categories are
+    the prediction's subject; swapping them silently makes D28's Brier 0.1254 describe a
+    different target
+  - Cheaper wins first: surface the user override in T14; spike titles → keyword rules
+  - Verify: `uv run pytest -m parity`; tournament reports both taxonomies side by side
 
 - [ ] **T8 · Retention, deletion, export** · M · deps: T6
   - `raw_retention_days` default 30, `0` = forever; delete-all leaves zero rows

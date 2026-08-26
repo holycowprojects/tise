@@ -965,3 +965,105 @@ The popup is taller than Chrome's popup viewport and scrolls; the "Filtered out"
 sit below the fold and were not visible in the verification screenshots. Harmless in a
 developer surface, and a fixed constraint for T14: the dashboard has a height budget,
 and the popup is not where the scorecard goes.
+
+---
+
+## T7 — first-run history import
+
+### D40 — An import infers redirects from reaction time, because Chrome will not tell it
+
+**The asymmetry.** Live collection reads `transitionQualifiers` from `webNavigation` and
+drops redirect hops outright. `chrome.history` exposes `VisitItem.transition` as a *core
+type only* — there are no qualifiers, observed at T5. So the import cannot make the same
+call the same way.
+
+This matters for the reason D35 matters. If live drops redirects and import does not,
+imported and observed events have different distributions, and every session-derived
+feature computed across that boundary drifts as the import ages out under retention. T1
+already measured what redirects do to the shape: median inter-visit gap down to about a
+second, domain count inflated from 133 to 236.
+
+**The rule.** Drop a visit whose `referringVisitId` resolves to a visit at most **50 ms**
+earlier.
+
+**The threshold is argued, not fitted.** A person cannot follow a link 50 ms after the
+page they are on commits; that is below human reaction time, so a navigation that close
+was not a decision. The reasoning came first and would stand without a table.
+
+**Then it was measured**, against the redirect bits in the history *file*, which the API
+hides but the database keeps — `analysis/redirect_heuristic.py`, reports in
+`docs/benchmarks/redirect-heuristic-{edge,chrome}.md`:
+
+| | Edge | Chrome |
+|---|---|---|
+| Visits | 6,074 | 5,740 |
+| Actual redirect hops | 233 (3.8%) | 702 (12.2%) |
+| Precision at 50 ms | **0.947** | **0.931** |
+| Recall at 50 ms | 0.773 | 0.657 |
+| Referrer resolvable | 100% | 99.4% |
+
+Precision matters more than recall here and the rule is asymmetric on purpose: a false
+positive deletes a navigation the person really made, a false negative leaves one hop in.
+For the same reason, a visit whose referrer was never fetched is **kept** — it cannot be
+judged, and the safe direction is to keep it.
+
+The threshold sweep is in the reports, and it is worth reading: precision holds above
+0.9 up to 250 ms and then collapses — 0.47 by 500 ms on Chrome. There is a real cliff
+there, and 50 ms sits well clear of it rather than balanced on the edge.
+
+**What this does not do.** It leaves 0.9% (Edge) to 4.2% (Chrome) of imported visits as
+undetected redirect hops, against 3.8% and 12.2% untreated. The mismatch is reduced, not
+eliminated, and that is stated rather than rounded away.
+
+### D41 — The import runs in the service worker and needs two separate consents
+
+The popup asks; the worker does the work. Closing the popup mid-import does not cancel
+it, and progress is written to storage as it goes, so reopening picks the state back up.
+T5 measured the whole pass at ~3.5 s for 5,000 pages, so there is nothing to chunk.
+
+Two consents, deliberately not merged:
+
+1. **Tise may store anything at all** — the app-level decision from D37. Until this
+   exists, the import block is not even shown. Offering to read someone's entire history
+   before they have agreed to the small thing is asking for the large thing first.
+2. **Chrome's own permission dialog** for `history`, from a click. It focuses *Deny*
+   (D33), so the copy above the button does the persuading, and declining is written as a
+   valid outcome in the UI rather than a nag: *"That is a valid answer. Tise collects
+   from here on and never asks again."*
+
+Every bound on `search` is passed explicitly — `text`, `startTime`, `endTime`,
+`maxResults`. The 24-hour/100-row default T5 could not measure therefore never applies,
+and never needs to be confirmed.
+
+### D42 — `unknown` is not a defect to be minimised, and learned categories are a separate target
+
+Raised after T6 showed `unknown` at 46% on a ten-site sample: can Tise learn its own
+categories?
+
+**First, what `unknown` actually is.** D27 measured it as the second largest category and
+**84% positive** for `return_24h` — the most predictable thing in the corpus. It is the
+person's own frequent sites, which no shipped map could contain. Minimising it buys no
+accuracy. It buys **legibility**: "you will return to `unknown` within 24 hours, 84%
+confident" is true and useless.
+
+**Second, the constraint that decides the design.** A category is the *subject* of the
+prediction — one label per (category, session). Change the category definition and the
+label set changes with it, so Brier 0.1254 (D28) stops describing the same target. A
+learned taxonomy must be versioned and benchmarked as its own target, never swapped in
+silently, or every published number quietly starts describing something else.
+
+Three layers, and they are not alternatives:
+
+1. **Surface the override that already exists.** The resolver's layer 1 already beats
+   every other layer and is already tested; it has no UI. Most of the win, no ML, T14.
+2. **Titles into keyword induction.** `HistoryItem` carries `title` (observed at T5) and
+   `history` is already optional, so this needs **no new permission**. Needs a T5-style
+   spike first: `onVisited` often fires before the title exists.
+3. **Behavioural clustering — the actual answer.** Cluster domains by session
+   co-occurrence and time-of-day. No text, no titles, no server, no model API: a
+   co-occurrence matrix over ~130 domains. Clusters are named by their most frequent
+   member — *"sites like zomato.com"* — because without an LLM you cannot name a cluster,
+   and that phrasing is honest rather than a workaround.
+
+Layer 3 is a feature computation and therefore parity-critical, so it lands after T10 as
+**T10b**, benchmarked as its own taxonomy version against the fixed one.

@@ -14,6 +14,21 @@ export async function putEvent(event: TiseEvent): Promise<void> {
   await db.put("events", event);
 }
 
+/**
+ * Write many events in one transaction. The import's path.
+ *
+ * Every event is validated *before* the transaction opens, so a bad row aborts the batch
+ * instead of leaving half of it committed.
+ */
+export async function putEvents(events: readonly TiseEvent[]): Promise<void> {
+  for (const event of events) assertStorable(event);
+  if (events.length === 0) return;
+
+  const db = await openTiseDb();
+  const tx = db.transaction("events", "readwrite");
+  await Promise.all([...events.map((event) => tx.store.put(event)), tx.done]);
+}
+
 export async function countEvents(): Promise<number> {
   const db = await openTiseDb();
   return db.count("events");

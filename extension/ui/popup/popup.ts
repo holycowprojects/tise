@@ -9,6 +9,7 @@
  * rendered `<all_urls>` as an HTML tag and reported its own configuration wrongly.
  */
 import { rejectionCounts } from "../../src/collect/collector";
+import { DEFAULT_IMPORT_DAYS, importProgress } from "../../src/collect/import";
 import { clearEvents, countsByCategory, countEvents, recentEvents } from "../../src/storage/events";
 import { isCollecting, loadSettings, saveSettings } from "../../src/storage/settings";
 
@@ -47,7 +48,71 @@ function clockTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+let pollTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * The import block.
+ *
+ * Hidden until the user has agreed to Tise storing anything at all — offering to read
+ * their whole history before that would be asking for the larger thing first.
+ */
+async function renderImport(consented: boolean): Promise<void> {
+  const block = element("import-block");
+  block.hidden = !consented;
+  if (!consented) return;
+
+  const granted = await chrome.permissions.contains({ permissions: ["history"] });
+  const progress = await importProgress();
+  const status = element("import-status");
+  const detail = element("import-detail");
+  const button = element("import") as HTMLButtonElement;
+
+  button.disabled = false;
+  button.hidden = false;
+
+  if (progress?.state === "running") {
+    status.textContent = "Importing…";
+    detail.textContent = progress.pagesTotal
+      ? `${progress.pagesDone.toLocaleString()} of ${progress.pagesTotal.toLocaleString()} pages read, ${progress.eventsWritten.toLocaleString()} events written.`
+      : "Reading your history…";
+    button.disabled = true;
+    button.textContent = "Importing…";
+    // The worker owns the import; the popup only watches, and may be closed meanwhile.
+    pollTimer = setTimeout(() => void render(), 500);
+    return;
+  }
+
+  if (progress?.state === "failed") {
+    status.textContent = "Import failed";
+    detail.textContent = progress.error ?? "Unknown error.";
+    button.textContent = "Try again";
+    return;
+  }
+
+  if (progress?.state === "done") {
+    const skipped = Object.entries(progress.skipped)
+      .map(([reason, count]) => `${count.toLocaleString()} ${reason}`)
+      .join(", ");
+    status.textContent = "History imported";
+    detail.textContent =
+      `${progress.eventsWritten.toLocaleString()} events from the last ${progress.windowDays} days` +
+      (skipped ? `, ${skipped} filtered out.` : ".");
+    button.textContent = "Import again";
+    return;
+  }
+
+  status.textContent = granted ? "History import" : "History import — needs permission";
+  detail.textContent = granted
+    ? `Reads the last ${DEFAULT_IMPORT_DAYS} days from this browser, once. Nothing leaves the device.`
+    : `Chrome will ask first. Declining costs you the import and nothing else — Tise keeps working, collecting from here on.`;
+  button.textContent = "Import my history";
+}
+
 async function render(): Promise<void> {
+  if (pollTimer !== null) {
+    clearTimeout(pollTimer);
+    pollTimer = null;
+  }
   const settings = await loadSettings();
   const collecting = isCollecting(settings);
   const total = await countEvents();
@@ -72,6 +137,8 @@ async function render(): Promise<void> {
   }
   toggle.disabled = false;
   toggle.dataset["collecting"] = String(collecting);
+
+  await renderImport(settings.consentGrantedAt !== null);
 
   const categories = [...(await countsByCategory())].sort((a, b) => b[1] - a[1]);
   replace(
@@ -108,6 +175,25 @@ element("toggle").addEventListener("click", async () => {
     await saveSettings({ paused: !settings.paused });
   }
   await render();
+});
+
+element("import").addEventListener("click", async () => {
+  // Must be inside the click handler: Chrome requires a user gesture for this, and it
+  // focuses Deny (D33), so the text above the button has to have done the persuading.
+  const granted = await chrome.permissions.request({ permissions: ["history"] });
+  if (!granted) {
+    element("import-status").textContent = "Not imported";
+    element("import-detail").textContent =
+      "That is a valid answer. Tise collects from here on and never asks again.";
+    return;
+  }
+  void chrome.runtime.sendMessage({ type: "tise:import" });
+
+  // The worker publishes "running" before it calls `search`, but not before this line
+  // returns. Give it a moment rather than rendering an idle state over a live import.
+  element("import-status").textContent = "Importing…";
+  (element("import") as HTMLButtonElement).disabled = true;
+  setTimeout(() => void render(), 300);
 });
 
 element("clear").addEventListener("click", async () => {
