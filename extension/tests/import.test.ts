@@ -17,8 +17,10 @@ import {
   type HistoryApi,
   type HistoryVisit,
 } from "../src/collect/import";
+import { collect } from "../src/collect/collector";
 import { readMeta, closeTiseDb } from "../src/storage/db";
 import { allEvents, countEvents } from "../src/storage/events";
+import { saveSettings } from "../src/storage/settings";
 import { EVENT_FIELDS } from "../src/types";
 
 const NOW = Date.parse("2026-08-26T12:00:00.000Z");
@@ -151,6 +153,85 @@ describe("importing twice creates no duplicates", () => {
       { startTime: NOW - 90 * DAY, endTime: NOW, sessionTimeoutSeconds: TIMEOUT },
     );
     expect(events[0]?.eventId).toBe("imp_77");
+  });
+});
+
+describe("the import stops where live collection starts (D43)", () => {
+  /**
+   * The defect this covers was found by looking at a real popup, not by a test: a visit
+   * that both routes saw is stored twice, once with a uuid and once as `imp_<visitId>`,
+   * and no id check can catch it because the two ids are legitimately different.
+   */
+  async function browse(url: string, at: number): Promise<void> {
+    await saveSettings({ consentGrantedAt: new Date(at).toISOString(), paused: false });
+    await collect({
+      url,
+      frameId: 0,
+      timeStamp: at,
+      transitionType: "link",
+      transitionQualifiers: [],
+    });
+  }
+
+  it("does not re-import a visit the collector already saw", async () => {
+    const watched = NOW - 60_000;
+    await browse("https://www.youtube.com/watch?v=abc", watched);
+    expect(await countEvents()).toBe(1);
+
+    // The same visit, as the history API would report it.
+    const api = fakeApi([
+      {
+        url: "https://www.youtube.com/watch?v=abc",
+        visits: [visit({ visitId: "dup", visitTime: watched })],
+      },
+    ]);
+    await runImport({ api, now: NOW, sessionTimeoutSeconds: TIMEOUT });
+
+    const events = await allEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0]?.source).toBe("live");
+  });
+
+  it("still imports everything from before collection began", async () => {
+    const watched = NOW - 60_000;
+    await browse("https://www.youtube.com/watch?v=abc", watched);
+
+    const api = fakeApi([
+      {
+        url: "https://news.ycombinator.com/",
+        visits: [visit({ visitId: "old", visitTime: NOW - 10 * DAY })],
+      },
+      {
+        url: "https://www.youtube.com/watch?v=abc",
+        visits: [visit({ visitId: "dup", visitTime: watched })],
+      },
+    ]);
+    const progress = await runImport({ api, now: NOW, sessionTimeoutSeconds: TIMEOUT });
+
+    expect(progress.eventsWritten).toBe(1);
+    expect((await allEvents()).map((e) => e.source)).toEqual(["import", "live"]);
+  });
+
+  it("records where it stopped, so the UI can say so rather than look truncated", async () => {
+    const watched = NOW - 60_000;
+    await browse("https://www.youtube.com/watch?v=abc", watched);
+
+    const progress = await runImport({
+      api: fakeApi([]),
+      now: NOW,
+      sessionTimeoutSeconds: TIMEOUT,
+    });
+    expect(progress.stoppedAt).toBe(new Date(watched).toISOString());
+  });
+
+  it("runs to the present when nothing has been collected live", async () => {
+    const progress = await runImport({
+      api: fakeApi(CORPUS),
+      now: NOW,
+      sessionTimeoutSeconds: TIMEOUT,
+    });
+    expect(progress.stoppedAt).toBeNull();
+    expect(progress.eventsWritten).toBe(4);
   });
 });
 

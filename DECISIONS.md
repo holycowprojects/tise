@@ -1067,3 +1067,31 @@ Three layers, and they are not alternatives:
 
 Layer 3 is a feature computation and therefore parity-critical, so it lands after T10 as
 **T10b**, benchmarked as its own taxonomy version against the fixed one.
+
+### D43 — The import stops where live collection starts
+
+**Found by looking at a running extension, not by a test.** T7 shipped with an
+idempotency check that was real but incomplete: importing twice creates no duplicates,
+because an imported event's id is `imp_<visitId>` and Chrome's visit ids are stable.
+
+That says nothing about a visit seen by **both** routes. A page browsed while Tise was
+collecting is stored once as a live event with a uuid, and again by a later import as
+`imp_<visitId>`. The two ids are legitimately different, so no id-based check can catch
+it. The corpus would silently double-count exactly the period the user browsed the most.
+
+**The fix is not to overlap.** The import window ends at the earliest live event, or at
+the present if there are none. An import fills in what came *before* Tise was watching,
+which is what a backfill is for.
+
+The alternative — fuzzy-matching on domain and a timestamp tolerance — was rejected. It
+needs a tolerance constant nobody can defend, it is wrong in both directions (two real
+visits to the same domain a second apart are not a duplicate), and it would have to run
+on every imported row.
+
+`ImportProgress.stoppedAt` records the cut, and the popup says *"Stopped at <date>, where
+Tise's own collection begins"* rather than letting a short import look like a failure.
+
+**The T7 verification did not expose this**, because the events collected at T6 had been
+deleted before the import ran. It was visible only in the arithmetic of a screenshot:
+total events equalled imported events exactly, which is true when nothing was collected
+live and would have been false the moment it was.

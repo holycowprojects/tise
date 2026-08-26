@@ -17,7 +17,7 @@
  *    unconditional: `startTime`, `endTime` and `maxResults` are always passed explicitly,
  *    so the default never applies and never needs to be confirmed.
  */
-import { putEvents } from "../storage/events";
+import { earliestLiveEventAt, putEvents } from "../storage/events";
 import { readMeta, writeMeta } from "../storage/db";
 import type { TiseEvent } from "../types";
 import { registrableDomain } from "./domain";
@@ -87,6 +87,11 @@ export interface ImportProgress {
   readonly windowDays: number;
   readonly startedAt: string;
   readonly finishedAt: string | null;
+  /**
+   * Where the window was cut short because live collection takes over there (D43), or
+   * `null` when the import ran to the present.
+   */
+  readonly stoppedAt: string | null;
   readonly error?: string;
 }
 
@@ -218,11 +223,23 @@ const BATCH_SIZE = 500;
  * a half seconds in one pass. There is no chunking across alarms here because there is
  * nothing to chunk — but progress is written to storage as it goes, so the popup can
  * close mid-import and still show where it got to.
+ *
+ * The window ends where live collection begins (D43). Importing a period the collector
+ * already watched would store every visit in it twice, and deduplicating by id cannot
+ * help: a live event's id is a uuid and an imported one is `imp_<visitId>`, so the two
+ * rows for one visit are legitimately distinct. Not overlapping is the only fix that
+ * works without inventing a fuzzy match on domain and timestamp.
  */
 export async function runImport(options: ImportOptions): Promise<ImportProgress> {
   const windowDays = options.days ?? DEFAULT_IMPORT_DAYS;
-  const endTime = options.now;
-  const startTime = endTime - windowDays * 24 * 60 * 60 * 1000;
+  const startTime = options.now - windowDays * 24 * 60 * 60 * 1000;
+
+  // D43: the import stops where live collection starts. A visit that both routes saw
+  // would otherwise be stored twice — once with a random id, once as `imp_<visitId>` —
+  // and no id-based check can catch that, because the two ids are legitimately different.
+  const firstLive = await earliestLiveEventAt();
+  const stoppedAt = firstLive === null ? null : firstLive;
+  const endTime = firstLive === null ? options.now : Math.min(options.now, Date.parse(firstLive) - 1);
 
   let progress: ImportProgress = {
     state: "running",
@@ -231,8 +248,9 @@ export async function runImport(options: ImportOptions): Promise<ImportProgress>
     eventsWritten: 0,
     skipped: {},
     windowDays,
-    startedAt: new Date(endTime).toISOString(),
+    startedAt: new Date(options.now).toISOString(),
     finishedAt: null,
+    stoppedAt,
   };
 
   const publish = async (next: ImportProgress): Promise<void> => {

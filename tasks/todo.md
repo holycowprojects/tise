@@ -108,8 +108,12 @@ working and committable.
   - Runs in the service worker, so closing the popup does not cancel it. Two consents,
     not merged: app-level first, Chrome's dialog second (D41)
   - Every `search` bound explicit, so T5's unmeasured 24h/100-row default never applies
-  - **Still owed — your hands:** grant `history` from the popup and import your real
-    corpus, then compare the event count against T1's measured visit count
+  - **Verified in Chrome 2026-08-26**, in a fresh profile: permission dialog focuses
+    Deny (D33 again), import ran, 66 events from a near-empty profile, categories
+    resolving. The ~5,000-event check is still owed on a profile with real history
+  - **Defect found by looking at the running extension** (D43): a visit seen by both live
+    collection and a later import was stored twice. Import now stops at the earliest live
+    event. Broken deliberately, two tests failed, reverted
 
 - [ ] **T10b · Discovered categories** · M · deps: T10 — **new, from D42**
   - Cluster domains by session co-occurrence and time-of-day. No text, no titles, no

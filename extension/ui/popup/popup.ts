@@ -93,10 +93,14 @@ async function renderImport(consented: boolean): Promise<void> {
     const skipped = Object.entries(progress.skipped)
       .map(([reason, count]) => `${count.toLocaleString()} ${reason}`)
       .join(", ");
+    const stopped = progress.stoppedAt
+      ? ` Stopped at ${new Date(progress.stoppedAt).toLocaleDateString()}, where Tise's own collection begins.`
+      : "";
     status.textContent = "History imported";
     detail.textContent =
       `${progress.eventsWritten.toLocaleString()} events from the last ${progress.windowDays} days` +
-      (skipped ? `, ${skipped} filtered out.` : ".");
+      (skipped ? `, ${skipped} filtered out.` : ".") +
+      stopped;
     button.textContent = "Import again";
     return;
   }

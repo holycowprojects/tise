@@ -55,6 +55,23 @@ export async function recentEvents(limit: number): Promise<TiseEvent[]> {
   return out;
 }
 
+/**
+ * When live collection first observed something, or `null` if it never has.
+ *
+ * The import uses this to stop where live collection starts. Walks the `occurredAt`
+ * index in order and returns at the first live row, so it costs a scan of the imported
+ * prefix once per import and nothing at all afterwards.
+ */
+export async function earliestLiveEventAt(): Promise<string | null> {
+  const db = await openTiseDb();
+  let cursor = await db.transaction("events").store.index("occurredAt").openCursor();
+  while (cursor) {
+    if (cursor.value.source === "live") return cursor.value.occurredAt;
+    cursor = await cursor.continue();
+  }
+  return null;
+}
+
 /** Counts by category, for the popup. Aggregate only — no domains leave storage. */
 export async function countsByCategory(): Promise<Map<string, number>> {
   const counts = new Map<string, number>();
