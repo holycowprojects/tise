@@ -1717,3 +1717,152 @@ domains the file's redirect-filtered view lacks, and Chrome's permission dialog 
 "on all your signed-in devices", so synced history from another device merging into one
 profile — a D18 violation — was the leading hypothesis for a while. It is not that. Every
 one of those domains is present in the local file as redirect hops. No sync, no merge.
+
+---
+
+## T12 — calibration and abstention
+
+### D66 — Platt, not isotonic, and it reuses the model's own optimiser
+
+Isotonic regression is the more flexible calibrator and the wrong one at this scale. It
+fits a free-form monotone step function, which needs a lot of data; on the few hundred
+labels a real profile produces it would fit the calibration set's noise and report it as
+confidence. Platt fits **two parameters**, which is about the most this data supports.
+Isotonic becomes the right answer at roughly ten times the labels — a reason to revisit it
+then, not a reason to reach for it now.
+
+Platt scaling *is* a one-feature logistic regression, so it reuses `logreg`. That took one
+small generalisation: targets became `bool | float`, since the gradient `p - y` is
+identical for a soft target and the `1.0 if outcome else 0.0` conversion was the only thing
+rounding them away. The result is **one optimiser in this project to keep in parity rather
+than two** — and it is the one already measured agreeing across languages to 2e-16.
+
+The input is the **logit** of the raw probability, not the probability, which makes
+`a = 1, b = 0` exactly the identity. A calibrator that has learned "you were already right"
+is then visibly the identity rather than some arbitrary pair.
+
+**Soft targets, from Platt's original paper.** Fitting to hard 0/1 on a small calibration
+set drives the coefficients toward separating it perfectly, which is exactly the
+overconfidence calibration exists to remove. The ends are pulled in by one pseudo-count
+each — the same shape of fix as the smoothing in `baselines.py` and the transition table.
+
+An identity calibrator is returned when there is nothing to learn from: no data, or one
+class only. It is deliberately not a silent no-op — a prediction carrying the identity is
+*visibly uncalibrated*, which is a different claim from a calibrated one, and the popup
+says which.
+
+**Measured on real browsing, calibration works.** ECE falls on every corpus:
+Edge 0.1664 → 0.0541, Chrome 0.1845 → 0.1113, Firefox 0.2439 → 0.1254.
+
+### D67 — The three-way split, and what it costs
+
+Each fold's training window is cut chronologically: 70% to fit the model, 30% to fit the
+calibrator and choose the threshold. The test window is untouched by both.
+
+Fitting the calibrator on the model's own training rows is the standard way to get this
+wrong, and **it does not look wrong**. The model is over-confident on data it memorised, so
+a calibrator fitted there learns to undo memorisation rather than error, and the
+probabilities come out confidently mis-stated on everything new. There is no error
+message; the reliability curve simply looks better than the model deserves.
+
+The split is chronological, never random. A random split would put a label from Tuesday in
+the fit part and its neighbour from the same session in the calibration part, and the
+calibrator would be measuring the model on data it effectively already saw.
+
+**The cost is real and is reported rather than absorbed.** The model in `calibration.md`
+trains on 70% of what the model in `model.md` trains on, so its raw Brier is worse. The raw
+and calibrated columns are the same weakened model, so that comparison is like-for-like —
+and neither column is comparable to T11's numbers. The extension makes the same trade with
+the same fraction, so the benchmarks describe the thing that ships.
+
+### D68 — MCE got worse while ECE got better, and both are reported
+
+On Edge, calibration improved expected calibration error from 0.1664 to 0.0541 and made
+the **worst bin worse**: maximum calibration error went 0.5120 → 0.9991. Five predictions
+were pushed to about 0.001 and all five turned out positive.
+
+This is exactly what MCE exists to reveal and precisely why it is reported next to ECE. An
+average over bins can improve while the model becomes catastrophically wrong in one narrow
+range — and that range is where a user would act most confidently on the answer. A report
+quoting only ECE here would be true and misleading.
+
+The mechanism is fold 0, whose model is poor (raw Brier 0.3350) and whose calibrator slope
+is 0.313 — a hard squash that drives some predictions to the floor. Nothing is done about
+it at T12. It is a T16 problem, and it is written down rather than smoothed.
+
+### D69 — The abstention threshold rests on a lower confidence bound, not the observed accuracy
+
+The rule as first written was "the lowest threshold whose accuracy on the calibration slice
+clears the target". It is **optimistically biased twice over**, and the measurement showed
+it plainly: on Edge that rule qualified on **4 of 5 folds and kept its promise on 1 of
+them**.
+
+Two mechanisms, neither of which needs these numbers to establish:
+
+1. **Argmin over noise.** Fifty candidate thresholds are tried and the first one clearing
+   the bar is taken. A model with *no skill at all* was accepted by that rule on 3% of
+   simulated 100-row slices — a threshold that clears by luck.
+2. **Sampling error, which dominates.** On ~100 answered rows the standard error of an
+   accuracy near 90% is about 3 points, so a threshold measured at exactly the target sits
+   below it roughly half the time.
+
+The fix is to require the **Wilson lower bound** of the answered accuracy to clear the
+target, not the point estimate. `z = 0` recovers the old rule exactly, so the two differ by
+one parameter and are reported side by side in `calibration.md` rather than one quietly
+replacing the other. The simulation that accepted a skill-free model 3% of the time under
+the old rule accepts it **0 times in 200** under the new one.
+
+**Honest about the order of events:** the failure was observed first, then the correction
+applied. The correction is justified by an argument that does not depend on these numbers —
+argmin over noisy estimates is biased whatever the data says — but it was not foreseen, and
+recording that is the point of this entry.
+
+### D70 — On this data Tise abstains from everything, and that is the result
+
+Under the shipped rule, **no threshold qualified on any fold of any corpus**. The extension
+predicts nothing.
+
+That is not a bug and it is not a failure of the abstention machinery — it is the
+machinery working. The declared target is 90% (D-style declared hyperparameter, stated in
+advance like the 30-minute session timeout so that reachability is a *finding* rather than
+a knob). Pooled on Edge, threshold 0.85 answers 59% of cases at 90.0% accuracy — above
+target as a point estimate. Certifying a margin that thin at 95% confidence would need
+**more than 12,800 answered rows**; the calibration slices hold 61–133.
+
+So the shortfall is **the width of the margin, not the model**. The arithmetic is
+instructive: an observed 95% certifies against a 90% target on about 100 rows, an observed
+93% needs about 400, an observed 91% needs about 3,200. Tise is at roughly 90–91%.
+
+Three ways out, none taken at T12 because each would be tuning against the numbers above:
+lower the target, gather more history, or improve the model so its accuracy at high
+confidence has room to spare. The third is the interesting one and it is T16's job.
+
+The popup says so in words rather than showing a prediction anyway: *"predicts nothing — no
+confidence threshold reached the 90% target on held-out data."* Abstained predictions are
+**absent from the UI, not greyed out** — a greyed-out prediction is still a prediction, and
+people read it.
+
+### D71 — Two more fixture gaps found the same way, and closed the same way
+
+The reliability curve had a real binning bug: `int(0.3 / 0.1)` is 2, because `0.3 / 0.1` is
+2.9999999999999996. Every prediction landing exactly on a decile edge fell one bin left.
+Predictions cluster on round numbers, so this was not rare — it tilted whole populations.
+Bin membership is now decided by comparing against `(index + 1) / bins`, which is exact
+against the same double the edge is reported as. Found by a test written to assert the
+half-open convention, not by inspection.
+
+And the parity fixture did not exercise the logit clamp: a fitted model never emits a raw 0
+or 1, so removing the clamp broke exactly **one** TypeScript unit test and **no** parity
+test. That is the D61 shape again — a boundary the fixture claimed no coverage of and
+therefore could not defend. Fixed the same way, by putting the boundary in the fixture:
+`logitCases` now carries 0.0, 1e-15, 0.5, 1-1e-15 and 1.0, and the same break now fails
+two tests.
+
+The `model` section of the oracle also gained its own key-set guard. The top-level guard
+introduced at T9 would not have noticed `calibration` being added *inside* `model` — the
+same failure it exists to prevent, one level down.
+
+Six deliberate breaks, each reverted: hard targets instead of soft, the logit clamp, the
+Wilson bound reduced to a point estimate, threshold selection taking the highest instead of
+the lowest, abstention ignoring an unmet target, and training no longer holding out a
+calibration slice.

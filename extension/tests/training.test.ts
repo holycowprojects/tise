@@ -23,6 +23,7 @@ import { joinStored } from "../src/model/dataset";
 import { DEFAULT_SPEC, train } from "../src/model/logreg";
 import { buildMatrix, DESIGN_COLUMNS, fitPreprocessor } from "../src/model/prep";
 import {
+  CALIBRATION_FRACTION,
   cancelTraining,
   readJob,
   readModel,
@@ -62,13 +63,23 @@ function corpus(days = 30): TiseEvent[] {
   return events;
 }
 
-/** What an uninterrupted fit over the same stored data would produce. */
+/**
+ * What an uninterrupted fit over the same stored data would produce.
+ *
+ * Applies the same chronological split the trainer does: the model is fitted on the first
+ * `1 - CALIBRATION_FRACTION` of the rows and the rest is held back to calibrate on, so
+ * this stays a like-for-like reference rather than a stronger model the trainer could
+ * never match.
+ */
 async function referenceModel() {
   const [rows, labels] = await Promise.all([allFeatureRows(), allLabels()]);
   const joined = joinStored(rows, labels);
-  const preprocessor = fitPreprocessor(joined.rows);
-  const matrix = buildMatrix(preprocessor, joined.rows);
-  return train(matrix, joined.outcomes, DEFAULT_SPEC, DESIGN_COLUMNS.length);
+  const nFit = Math.floor(joined.rows.length * (1 - CALIBRATION_FRACTION));
+  const fitRows = nFit > 0 ? joined.rows.slice(0, nFit) : joined.rows;
+  const fitOutcomes = nFit > 0 ? joined.outcomes.slice(0, nFit) : joined.outcomes;
+  const preprocessor = fitPreprocessor(fitRows);
+  const matrix = buildMatrix(preprocessor, fitRows);
+  return train(matrix, fitOutcomes, DEFAULT_SPEC, DESIGN_COLUMNS.length);
 }
 
 beforeEach(async () => {

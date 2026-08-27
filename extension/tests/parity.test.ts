@@ -46,8 +46,31 @@ import {
   fitTransitionTable,
   primaryCategory,
 } from "../src/model/transition";
+import {
+  applyCalibration,
+  CALIBRATION_METHOD,
+  CALIBRATION_VERSION,
+  fitPlatt,
+  logit,
+} from "../src/model/calibrate";
+import {
+  accuracyCoverageCurve,
+  selectThreshold,
+  wilsonLowerBound,
+} from "../src/model/abstain";
 
 const TOLERANCE = 1e-9;
+
+interface PolicyFixture {
+  threshold: number;
+  targetAccuracy: number;
+  accuracy: number;
+  accuracyLowerBound: number;
+  coverage: number;
+  nValidation: number;
+  confidenceZ: number;
+  targetMet: boolean;
+}
 
 interface FixtureInput {
   categoryMapVersion: number;
@@ -106,6 +129,33 @@ interface FixtureExpected {
       gradientNorm: number;
     };
     predictions: number[];
+    calibration: {
+      method: string;
+      version: string;
+      spec: { iterations: number; l2: number; chunkIterations: number; stepScale: number };
+      logits: number[];
+      logitCases: Array<{ probability: number; logit: number }>;
+      calibrator: {
+        a: number;
+        b: number;
+        nCalibration: number;
+        nPositive: number;
+        gradientNorm: number;
+      };
+      calibrated: number[];
+      targetAccuracy: number;
+      policy: PolicyFixture;
+      lenientPolicy: PolicyFixture;
+      lenientNaivePolicy: PolicyFixture;
+      coverageCurve: Array<{
+        threshold: number;
+        coverage: number;
+        answered: number;
+        accuracy: number | null;
+        abstainedAccuracy: number | null;
+      }>;
+      wilsonCases: Array<{ successes: number; total: number; z: number; bound: number }>;
+    };
     transition: {
       primaries: string[];
       vocabulary: string[];
@@ -587,5 +637,174 @@ describe("model parity — the T11 half of the oracle", () => {
     for (const [to, value] of Object.entries(EXPECTED.model.transition.unseenDistribution)) {
       closeEnough(unseen[to] ?? null, value, `P(${to} | unseen)`);
     }
+  });
+});
+
+describe("calibration parity — the T12 half of the oracle", () => {
+  const OPTIONS = {
+    timeoutSeconds: INPUT.timeoutSeconds,
+    horizonHours: INPUT.horizonHours,
+  };
+  const ROWS = EXPECTED.features.map((row) =>
+    computeFeatures(EVENTS, row.subject, Date.parse(row.windowEnd), OPTIONS),
+  );
+  const SPEC: LogRegSpec = {
+    iterations: EXPECTED.model.spec.iterations,
+    l2: EXPECTED.model.spec.l2,
+    chunkIterations: EXPECTED.model.spec.chunkIterations,
+    stepScale: EXPECTED.model.spec.stepScale,
+  };
+  const CAL = EXPECTED.model.calibration;
+  const CAL_SPEC: LogRegSpec = {
+    iterations: CAL.spec.iterations,
+    l2: CAL.spec.l2,
+    chunkIterations: CAL.spec.chunkIterations,
+    stepScale: CAL.spec.stepScale,
+  };
+
+  /** Raw scores rebuilt by TypeScript, never read out of the fixture. */
+  function rawScores(): number[] {
+    const preprocessor = fitPreprocessor(ROWS);
+    const matrix = buildMatrix(preprocessor, ROWS);
+    const state = train(matrix, EXPECTED.model.outcomes, SPEC, DESIGN_COLUMNS.length);
+    return matrix.map((row) => predictProba(state, row));
+  }
+
+  it("has no model subsection TypeScript silently ignores", () => {
+    // The top-level guard did not cover this: `calibration` is nested inside `model`, so
+    // adding it there could have looked verified without a single assertion touching it.
+    // The same failure the outer guard exists to prevent, one level down.
+    expect(Object.keys(EXPECTED.model).sort()).toEqual([
+      "calibration",
+      "designColumns",
+      "logreg",
+      "matrix",
+      "note",
+      "outcomes",
+      "predictions",
+      "preprocessor",
+      "spec",
+      "stepSize",
+      "transition",
+    ]);
+  });
+
+  it("agrees on the method and version that produced the probabilities", () => {
+    expect(CALIBRATION_METHOD).toBe(CAL.method);
+    expect(CALIBRATION_VERSION).toBe(CAL.version);
+  });
+
+  it("agrees on every logit", () => {
+    // Compared before the calibrator, so a logit bug and an optimiser bug stay
+    // distinguishable rather than arriving together as one wrong slope.
+    rawScores().forEach((probability, index) => {
+      closeEnough(logit(probability), CAL.logits[index] ?? null, `logit ${index}`);
+    });
+  });
+
+  it("agrees on the logit at the clamped extremes", () => {
+    // A fitted model never emits a raw 0 or 1, so the clamp is invisible through the
+    // logits above. D61 found the same shape of gap at the horizon boundary; it is closed
+    // the same way, by putting the boundary in the fixture rather than trusting it.
+    for (const testCase of CAL.logitCases) {
+      closeEnough(
+        logit(testCase.probability),
+        testCase.logit,
+        `logit(${testCase.probability})`,
+      );
+    }
+  });
+
+  it("agrees on the fitted Platt coefficients", () => {
+    const calibrator = fitPlatt(rawScores(), EXPECTED.model.outcomes, CAL_SPEC);
+    closeEnough(calibrator.a, CAL.calibrator.a, "platt a");
+    closeEnough(calibrator.b, CAL.calibrator.b, "platt b");
+    expect(calibrator.nCalibration).toBe(CAL.calibrator.nCalibration);
+    expect(calibrator.nPositive).toBe(CAL.calibrator.nPositive);
+  });
+
+  it("agrees on every calibrated probability", () => {
+    const raw = rawScores();
+    const calibrator = fitPlatt(raw, EXPECTED.model.outcomes, CAL_SPEC);
+    raw.forEach((probability, index) => {
+      closeEnough(
+        applyCalibration(calibrator, probability),
+        CAL.calibrated[index] ?? null,
+        `calibrated ${index}`,
+      );
+    });
+  });
+
+  it("agrees on the Wilson lower bound, including its edge cases", () => {
+    for (const testCase of CAL.wilsonCases) {
+      closeEnough(
+        wilsonLowerBound(testCase.successes, testCase.total, testCase.z),
+        testCase.bound,
+        `wilson ${testCase.successes}/${testCase.total} z=${testCase.z}`,
+      );
+    }
+  });
+
+  it("agrees on the whole accuracy-coverage curve", () => {
+    const curve = accuracyCoverageCurve(EXPECTED.model.outcomes, CAL.calibrated);
+    expect(curve).toHaveLength(CAL.coverageCurve.length);
+    curve.forEach((point, index) => {
+      const expected = CAL.coverageCurve[index];
+      closeEnough(point.threshold, expected?.threshold ?? null, `threshold ${index}`);
+      closeEnough(point.coverage, expected?.coverage ?? null, `coverage ${index}`);
+      expect(point.answered, `answered ${index}`).toBe(expected?.answered);
+      closeEnough(point.accuracy, expected?.accuracy ?? null, `accuracy ${index}`);
+      closeEnough(
+        point.abstainedAccuracy,
+        expected?.abstainedAccuracy ?? null,
+        `abstained ${index}`,
+      );
+    });
+  });
+
+  it("reaches the same policy on the path that answers nothing", () => {
+    // The default target cannot be certified on eighteen labels, and that is the branch
+    // real browsing takes too. Asserted rather than assumed.
+    const policy = selectThreshold(EXPECTED.model.outcomes, CAL.calibrated, {
+      targetAccuracy: CAL.targetAccuracy,
+    });
+    expect(policy).not.toBeNull();
+    expect(policy?.targetMet).toBe(CAL.policy.targetMet);
+    expect(CAL.policy.targetMet).toBe(false);
+    closeEnough(policy?.threshold ?? null, CAL.policy.threshold, "policy threshold");
+  });
+
+  it("reaches the same policy on the path that answers something", () => {
+    const policy = selectThreshold(EXPECTED.model.outcomes, CAL.calibrated, {
+      targetAccuracy: CAL.lenientPolicy.targetAccuracy,
+      minAnswered: 5,
+    });
+    expect(policy?.targetMet).toBe(true);
+    closeEnough(
+      policy?.threshold ?? null,
+      CAL.lenientPolicy.threshold,
+      "lenient threshold",
+    );
+    closeEnough(policy?.accuracy ?? null, CAL.lenientPolicy.accuracy, "lenient accuracy");
+    closeEnough(
+      policy?.accuracyLowerBound ?? null,
+      CAL.lenientPolicy.accuracyLowerBound,
+      "lenient bound",
+    );
+    closeEnough(policy?.coverage ?? null, CAL.lenientPolicy.coverage, "lenient coverage");
+  });
+
+  it("agrees that z=0 recovers the naive rule exactly", () => {
+    const naive = selectThreshold(EXPECTED.model.outcomes, CAL.calibrated, {
+      targetAccuracy: CAL.lenientNaivePolicy.targetAccuracy,
+      minAnswered: 5,
+      confidenceZ: 0,
+    });
+    expect(naive?.targetMet).toBe(CAL.lenientNaivePolicy.targetMet);
+    closeEnough(
+      naive?.threshold ?? null,
+      CAL.lenientNaivePolicy.threshold,
+      "naive threshold",
+    );
   });
 });

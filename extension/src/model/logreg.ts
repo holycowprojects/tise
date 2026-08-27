@@ -64,6 +64,17 @@ export const DEFAULT_SPEC: LogRegSpec = {
   stepScale: 1,
 };
 
+/**
+ * A label. `boolean` for a real outcome; a number in [0, 1] for a *soft* target, which is
+ * what Platt scaling needs — see `model/calibrate.ts`. The gradient `p - y` is identical
+ * either way, so one optimiser serves both and there is only one thing to keep in parity.
+ */
+export type Target = boolean | number;
+
+function targetValue(target: Target): number {
+  return typeof target === "boolean" ? (target ? 1 : 0) : target;
+}
+
 /** A model mid-training or finished. Small enough to persist after every chunk. */
 export interface LogRegState {
   readonly weights: readonly number[];
@@ -148,7 +159,7 @@ export function gradientNorm(weightGradient: readonly number[], biasGradient: nu
 function gradient(
   state: LogRegState,
   matrix: readonly (readonly number[])[],
-  outcomes: readonly boolean[],
+  outcomes: readonly Target[],
   spec: LogRegSpec,
 ): { weightGradient: number[]; biasGradient: number } {
   const n = matrix.length;
@@ -157,7 +168,7 @@ function gradient(
 
   for (let rowIndex = 0; rowIndex < n; rowIndex += 1) {
     const row = matrix[rowIndex] as readonly number[];
-    const error = predictProba(state, row) - (outcomes[rowIndex] ? 1 : 0);
+    const error = predictProba(state, row) - targetValue(outcomes[rowIndex] as Target);
     biasGradient += error;
     for (let index = 0; index < row.length; index += 1) {
       weightGradient[index] = (weightGradient[index] as number) + error * (row[index] as number);
@@ -181,7 +192,7 @@ function gradient(
 export function trainChunk(
   state: LogRegState,
   matrix: readonly (readonly number[])[],
-  outcomes: readonly boolean[],
+  outcomes: readonly Target[],
   spec: LogRegSpec = DEFAULT_SPEC,
 ): LogRegState {
   if (matrix.length === 0) {
@@ -234,7 +245,7 @@ export function trainChunk(
 /** Run every chunk back to back. Identical to chunked training, by construction. */
 export function train(
   matrix: readonly (readonly number[])[],
-  outcomes: readonly boolean[],
+  outcomes: readonly Target[],
   spec: LogRegSpec = DEFAULT_SPEC,
   nColumns?: number,
 ): LogRegState {

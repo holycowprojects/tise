@@ -223,9 +223,27 @@ working and committable.
     **7.7%**. The extension is arguably the more correct view. Nothing changed on it —
     it is a T16 problem because it invalidates corpus-level comparability, not code parity
 
-- [ ] **T12 · Calibration and abstention** · M · deps: T11
-  - Threshold from the accuracy-vs-coverage curve, not intuition
-  - Verify: `uv run python -m tise_research.eval.calibrate --model logreg`
+- [x] **T12 · Calibration and abstention** · M · deps: T11
+  - Platt (`cal_1`), not isotonic — two parameters is what a few hundred labels support
+    (D66). It reuses the model's own optimiser, so there is still **one** to keep in parity
+  - Verify: `uv run python -m tise_research.eval.calibrate --model logreg` ✓
+    `&& npm test -- calibration` ✓ — 474 Python, 273 TypeScript, both linters clean
+  - **Calibration works:** ECE Edge 0.1664 → **0.0541**, Chrome 0.1845 → 0.1113,
+    Firefox 0.2439 → 0.1254
+  - **And MCE got worse on Edge, 0.5120 → 0.9991** (D68). The average improved while one
+    narrow range became catastrophic. Reported next to ECE, which is why MCE exists
+  - **Tise abstains from everything on this data** (D70), and that is the machinery
+    working. No threshold certified the declared 90% target on any fold. Pooled, 0.85
+    answers 59% at 90.0% — but certifying a margin that thin needs **>12,800** answered
+    rows and the calibration slices hold 61–133. The shortfall is the margin, not the model
+  - **The first threshold rule was broken and the data said so** (D69): it qualified on
+    4 of 5 folds and kept its promise on 1. Now selected on a **Wilson lower bound**;
+    `z=0` recovers the old rule and both are reported side by side. A skill-free model
+    passed the old rule 3% of the time and the new one 0 times in 200
+  - The three-way split is chronological: 70% fit / 30% calibrate / test untouched (D67).
+    The extension makes the same trade, so the benchmarks describe what ships
+  - **Two more fixture gaps, found by breaking things** (D71): a real decile-binning bug
+    (`int(0.3/0.1) == 2`), and a logit clamp no parity test touched. Both closed
 
 - [ ] **T13 · Prediction registry and automatic outcome resolution** · M · deps: T12
   - `hit` / `miss` / `expired` resolved with no user confirmation anywhere

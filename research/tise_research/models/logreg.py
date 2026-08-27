@@ -40,8 +40,14 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+#: A label. `bool` for a real outcome; a float in [0, 1] for a *soft* target, which is
+#: what Platt scaling needs — see `models/calibrate.py`. The gradient `p - y` is identical
+#: either way, so one optimiser serves both and there is only one thing to keep in parity.
+Target = bool | float
+
 __all__ = [
     "DEFAULT_SPEC",
+    "Target",
     "LogRegSpec",
     "LogRegState",
     "gradient_norm",
@@ -142,7 +148,7 @@ def predict_proba(state: LogRegState, row: Sequence[float]) -> float:
 def _gradient(
     state: LogRegState,
     matrix: Sequence[Sequence[float]],
-    outcomes: Sequence[bool],
+    outcomes: Sequence[Target],
     spec: LogRegSpec,
 ) -> tuple[list[float], float]:
     """Mean-log-loss gradient with the L2 term. Row order is part of the contract.
@@ -155,7 +161,9 @@ def _gradient(
     bias_gradient = 0.0
 
     for row, outcome in zip(matrix, outcomes, strict=True):
-        error = predict_proba(state, row) - (1.0 if outcome else 0.0)
+        # `float(outcome)` rather than `1.0 if outcome else 0.0`: a bool converts the same
+        # way, and a soft target in [0, 1] survives instead of being rounded up to 1.
+        error = predict_proba(state, row) - float(outcome)
         bias_gradient += error
         for index, value in enumerate(row):
             weight_gradient[index] += error * value
@@ -206,7 +214,7 @@ def gradient_norm(weight_gradient: Sequence[float], bias_gradient: float) -> flo
 def train_chunk(
     state: LogRegState,
     matrix: Sequence[Sequence[float]],
-    outcomes: Sequence[bool],
+    outcomes: Sequence[Target],
     *,
     spec: LogRegSpec = DEFAULT_SPEC,
 ) -> LogRegState:
@@ -267,7 +275,7 @@ def train_chunk(
 
 def train(
     matrix: Sequence[Sequence[float]],
-    outcomes: Sequence[bool],
+    outcomes: Sequence[Target],
     *,
     spec: LogRegSpec = DEFAULT_SPEC,
     n_columns: int | None = None,

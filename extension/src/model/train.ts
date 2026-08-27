@@ -30,12 +30,20 @@ import { joinStored } from "./dataset";
 import {
   DEFAULT_SPEC,
   initialState,
+  predictProba,
   trainChunk,
   type LogRegSpec,
   type LogRegState,
 } from "./logreg";
 import { fitPreprocessor, DESIGN_COLUMNS, buildMatrix, type Preprocessor } from "./prep";
 import { fitTransitionTable, type TransitionTable } from "./transition";
+import {
+  applyCalibration,
+  fitPlatt,
+  identityCalibrator,
+  type Calibrator,
+} from "./calibrate";
+import { selectThreshold, type AbstentionPolicy } from "./abstain";
 import { sessionise } from "../features/sessions";
 
 export const TRAINING_ALARM = "tise:train";
@@ -46,6 +54,17 @@ export const TRAINING_ALARM = "tise:train";
  * battery-powered machine is a cost with no matching benefit.
  */
 export const TRAINING_PERIOD_MINUTES = 6 * 60;
+
+/**
+ * Share of the training set held back to calibrate on. Declared, not tuned: too small and
+ * the two Platt parameters are fitted on noise, too large and the model itself is starved.
+ * The research tier uses the same figure, so the extension and the benchmarks are making
+ * the same trade.
+ */
+export const CALIBRATION_FRACTION = 0.3;
+
+/** Below this many rows, calibrating does more harm than leaving the raw numbers alone. */
+const MIN_CALIBRATION_ROWS = 30;
 
 const JOB_KEY = "training:return_24h";
 const MODEL_KEY = "model:return_24h";
@@ -59,6 +78,11 @@ export interface TrainingJob {
   readonly cutoff: string;
   /** Rows inside the cutoff when the job started. A change means the set moved. */
   readonly rowCount: number;
+  /**
+   * How many of those rows the model is fitted on. The rest are the calibration slice.
+   * Pinned with the job so a resumed chunk cannot train on a different split.
+   */
+  readonly nFit: number;
   readonly preprocessor: Preprocessor;
   readonly state: LogRegState;
 }
@@ -74,6 +98,18 @@ export interface TrainedModel {
   readonly preprocessor: Preprocessor;
   readonly state: LogRegState;
   readonly transition: TransitionTable;
+  /**
+   * Fitted on rows the model never saw. An identity calibrator means there was not enough
+   * held-out data to calibrate on, which is a visible claim rather than a silent default.
+   */
+  readonly calibrator: Calibrator;
+  /**
+   * `null`, or a policy with `targetMet: false`, means answer nothing. On the author's own
+   * browsing that is the outcome: no threshold could certify the declared target at these
+   * sample sizes. Shipping a promise that cannot be kept would be worse than silence.
+   */
+  readonly policy: AbstentionPolicy | null;
+  readonly nCalibration: number;
 }
 
 export interface ChunkOutcome {
@@ -153,13 +189,24 @@ async function startJob(spec: LogRegSpec): Promise<TrainingJob | null> {
     if (Date.parse(row.windowEnd) > Date.parse(cutoff)) cutoff = row.windowEnd;
   }
 
+  // The calibration slice is the *most recent* rows, so the split is chronological like
+  // the backtest's. A random split would put a label from Tuesday in the fit part and its
+  // neighbour from the same session in the calibration part, and the calibrator would be
+  // measuring the model on data it effectively already saw.
+  const nFit = Math.floor(rows.length * (1 - CALIBRATION_FRACTION));
+  const fitRows = nFit > 0 ? rows.slice(0, nFit) : rows;
+
   return {
     featureSet: FEATURE_SET,
     spec,
     startedAt: new Date().toISOString(),
     cutoff,
     rowCount: rows.length,
-    preprocessor: fitPreprocessor(rows),
+    nFit,
+    // Fitted on the training part only. Fitting it over the calibration slice too would
+    // leak the held-out data's scale into the model, which is the same class of mistake
+    // as fitting a scaler on the test set.
+    preprocessor: fitPreprocessor(fitRows),
     state: initialState(DESIGN_COLUMNS.length),
   };
 }
@@ -220,8 +267,12 @@ export async function runTrainingChunk(options: TrainingOptions): Promise<ChunkO
     set = await readTrainingSet(job.cutoff);
   }
 
-  const matrix = buildMatrix(job.preprocessor, set.rows);
-  const advanced = trainChunk(job.state, matrix, set.outcomes, job.spec);
+  // Train on the fit slice only; the rest is held back to calibrate on.
+  const nFit = job.nFit > 0 ? job.nFit : set.rows.length;
+  const fitRows = set.rows.slice(0, nFit);
+  const fitOutcomes = set.outcomes.slice(0, nFit);
+  const matrix = buildMatrix(job.preprocessor, fitRows);
+  const advanced = trainChunk(job.state, matrix, fitOutcomes, job.spec);
 
   if (advanced.iterationsDone < job.spec.iterations) {
     await writeMeta(JOB_KEY, { ...job, state: advanced } satisfies TrainingJob);
@@ -234,8 +285,23 @@ export async function runTrainingChunk(options: TrainingOptions): Promise<ChunkO
     };
   }
 
-  // Finished. The transition table is fitted here rather than incrementally because it is
-  // counting, not optimising — it costs one pass and cannot be interrupted usefully.
+  // Finished. Calibrate on the held-out slice, then choose a threshold from the
+  // *calibrated* probabilities — thresholding raw scores and applying it to calibrated
+  // ones would be thresholding a different quantity from the one that was measured.
+  const calibrationRows = set.rows.slice(nFit);
+  const calibrationOutcomes = set.outcomes.slice(nFit);
+  const calibrationMatrix = buildMatrix(job.preprocessor, calibrationRows);
+  const calibrationRaw = calibrationMatrix.map((row) => predictProba(advanced, row));
+
+  const calibrator =
+    calibrationRows.length >= MIN_CALIBRATION_ROWS
+      ? fitPlatt(calibrationRaw, calibrationOutcomes)
+      : identityCalibrator();
+  const calibrated = calibrationRaw.map((p) => applyCalibration(calibrator, p));
+  const policy = selectThreshold(calibrationOutcomes, calibrated);
+
+  // The transition table is fitted here rather than incrementally because it is counting,
+  // not optimising — it costs one pass and cannot be interrupted usefully.
   const events = await allEvents();
   const model: TrainedModel = {
     target: "return_24h",
@@ -247,6 +313,9 @@ export async function runTrainingChunk(options: TrainingOptions): Promise<ChunkO
     preprocessor: job.preprocessor,
     state: advanced,
     transition: fitTransitionTable(sessionise(events, options.timeoutSeconds)),
+    calibrator,
+    policy,
+    nCalibration: calibrationRows.length,
   };
   await writeMeta(MODEL_KEY, model);
   await deleteMeta(JOB_KEY);

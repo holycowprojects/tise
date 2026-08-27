@@ -16,6 +16,7 @@ import { countsByCategory, countEvents, recentEvents } from "../../src/storage/e
 import { isCollecting, loadSettings, saveSettings } from "../../src/storage/settings";
 import { countLabels } from "../../src/storage/labels";
 import { readJob, readModel } from "../../src/model/train";
+import { isIdentity } from "../../src/model/calibrate";
 
 function element(id: string): HTMLElement {
   const found = document.getElementById(id);
@@ -155,12 +156,42 @@ async function renderTraining(consented: boolean): Promise<void> {
 
   const positives = model.positiveCount / model.rowCount;
   status.textContent = "Trained";
+
   // The gradient norm is here rather than hidden because an unconverged fit is not wrong
   // in any way a score reveals — it is just quietly worse.
-  detail.textContent =
-    `${model.rowCount.toLocaleString()} labels, ${(positives * 100).toFixed(0)}% positive, ` +
-    `feature set ${model.featureSet}, final gradient ${model.state.gradientNorm.toExponential(1)}. ` +
-    `Trained ${new Date(model.trainedAt).toLocaleString()}.`;
+  const facts = [
+    `${model.rowCount.toLocaleString()} labels, ${(positives * 100).toFixed(0)}% positive`,
+    `feature set ${model.featureSet}`,
+    `final gradient ${model.state.gradientNorm.toExponential(1)}`,
+  ];
+
+  // Calibration is reported as its own claim. An identity calibrator means the raw
+  // numbers were left alone because there was too little held-out data to do better,
+  // which is a different statement from "calibrated".
+  facts.push(
+    isIdentity(model.calibrator)
+      ? `uncalibrated (only ${model.nCalibration} held-out rows)`
+      : `${model.calibrator.method} ${model.calibrator.version}, slope ` +
+        `${model.calibrator.a.toFixed(2)} on ${model.nCalibration} held-out rows`,
+  );
+
+  const policy = model.policy;
+  if (policy !== null && policy.targetMet) {
+    facts.push(
+      `answers above ${policy.threshold.toFixed(2)} confidence — ` +
+        `${(policy.coverage * 100).toFixed(0)}% of cases at ` +
+        `${(policy.accuracy * 100).toFixed(0)}% on validation`,
+    );
+  } else {
+    // The branch the author's own browsing takes. Saying so plainly is the point: a
+    // prediction shown anyway would be a promise the measurement did not support.
+    facts.push(
+      `predicts nothing — no confidence threshold reached the ` +
+        `${((policy?.targetAccuracy ?? 0.9) * 100).toFixed(0)}% target on held-out data`,
+    );
+  }
+
+  detail.textContent = `${facts.join(". ")}. Trained ${new Date(model.trainedAt).toLocaleString()}.`;
 }
 
 async function render(): Promise<void> {

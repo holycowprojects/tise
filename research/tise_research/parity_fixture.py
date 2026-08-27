@@ -30,11 +30,25 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from tise_research.categories import load_category_map
+from tise_research.eval.abstain import (
+    DEFAULT_TARGET_ACCURACY,
+    accuracy_coverage_curve,
+    select_threshold,
+    wilson_lower_bound,
+)
 from tise_research.features.events import Event
 from tise_research.features.labels import return_24h_labels
 from tise_research.features.resolver import resolve
 from tise_research.features.sessions import sessionise
 from tise_research.features.vector import FEATURE_NAMES, FEATURE_SET, compute_features
+from tise_research.models.calibrate import (
+    CALIBRATION_METHOD,
+    CALIBRATION_SPEC,
+    CALIBRATION_VERSION,
+    apply_calibration,
+    fit_platt,
+    logit,
+)
 from tise_research.models.logreg import (
     DEFAULT_SPEC,
     predict_proba,
@@ -246,6 +260,103 @@ def build_expected_document() -> dict:
     }
 
 
+def _calibration_section(raw: list[float], outcomes: list[bool]) -> dict:
+    """The T12 oracle: Platt scaling and the abstention threshold.
+
+    Fitted on the same rows the model was fitted on, which would be indefensible as a
+    benchmark and is exactly right here: this section compares arithmetic between two
+    languages, not the quality of a calibrator. The real split lives in
+    `eval/calibrate.py` and in the extension's trainer.
+
+    Both branches of the threshold rule are exercised. At the default `min_answered` the
+    eighteen fixture labels cannot qualify, so `policy` carries `targetMet: false` — the
+    "answer nothing" path, which is the one the author's own browsing actually takes. A
+    second policy with a lower floor exercises the qualifying path so neither is left
+    untested.
+    """
+    calibrator = fit_platt(raw, outcomes)
+    calibrated = [apply_calibration(calibrator, p) for p in raw]
+
+    strict = select_threshold(outcomes, calibrated)
+    lenient = select_threshold(
+        outcomes, calibrated, target_accuracy=0.60, min_answered=5
+    )
+    naive = select_threshold(
+        outcomes, calibrated, target_accuracy=0.60, min_answered=5, confidence_z=0.0
+    )
+
+    def as_dict(policy) -> dict | None:
+        if policy is None:
+            return None
+        return {
+            "threshold": policy.threshold,
+            "targetAccuracy": policy.target_accuracy,
+            "accuracy": policy.accuracy,
+            "accuracyLowerBound": policy.accuracy_lower_bound,
+            "coverage": policy.coverage,
+            "nValidation": policy.n_validation,
+            "confidenceZ": policy.confidence_z,
+            "targetMet": policy.target_met,
+        }
+
+    return {
+        "method": CALIBRATION_METHOD,
+        "version": CALIBRATION_VERSION,
+        "spec": {
+            "iterations": CALIBRATION_SPEC.iterations,
+            "l2": CALIBRATION_SPEC.l2,
+            "chunkIterations": CALIBRATION_SPEC.chunk_iterations,
+            "stepScale": CALIBRATION_SPEC.step_scale,
+        },
+        # Written out so a logit bug and an optimiser bug stay distinguishable.
+        "logits": [logit(p) for p in raw],
+        # The clamp is unobservable through `logits` alone: a fitted model never emits a
+        # raw 0 or 1, so removing the clamp broke exactly one TypeScript unit test and no
+        # parity test at all. The same gap D61 found at the horizon boundary, so it is
+        # closed the same way — by putting the boundary in the fixture.
+        "logitCases": [
+            {"probability": p, "logit": logit(p)}
+            for p in (0.0, 1e-15, 0.5, 1.0 - 1e-15, 1.0)
+        ],
+        "calibrator": {
+            "a": calibrator.a,
+            "b": calibrator.b,
+            "nCalibration": calibrator.n_calibration,
+            "nPositive": calibrator.n_positive,
+            "gradientNorm": calibrator.gradient_norm,
+        },
+        "calibrated": calibrated,
+        "targetAccuracy": DEFAULT_TARGET_ACCURACY,
+        "policy": as_dict(strict),
+        "lenientPolicy": as_dict(lenient),
+        "lenientNaivePolicy": as_dict(naive),
+        "coverageCurve": [
+            {
+                "threshold": point.threshold,
+                "coverage": point.coverage,
+                "answered": point.answered,
+                "accuracy": point.accuracy,
+                "abstainedAccuracy": point.abstained_accuracy,
+            }
+            for point in accuracy_coverage_curve(outcomes, calibrated)
+        ],
+        # A handful of bounds, so the Wilson arithmetic is compared directly rather than
+        # only through whichever thresholds happen to be selected.
+        "wilsonCases": [
+            {"successes": s, "total": n, "z": z, "bound": wilson_lower_bound(s, n, z=z)}
+            for s, n, z in (
+                (90, 100, 1.645),
+                (18, 20, 1.645),
+                (450, 500, 1.645),
+                (20, 20, 1.645),
+                (0, 20, 1.645),
+                (90, 100, 0.0),
+                (0, 0, 1.645),
+            )
+        ],
+    }
+
+
 def build_model_section(events: list[Event], feature_rows: list, outcomes: list[bool]) -> dict:
     """The T11 oracle: preprocessing, coefficients, probabilities and the transition table.
 
@@ -296,6 +407,9 @@ def build_model_section(events: list[Event], feature_rows: list, outcomes: list[
             "gradientNorm": state.gradient_norm,
         },
         "predictions": [predict_proba(state, row) for row in matrix],
+        "calibration": _calibration_section(
+            [predict_proba(state, row) for row in matrix], outcomes
+        ),
         "transition": {
             "primaries": [primary_category(session) for session in sessions],
             "vocabulary": list(table.vocabulary),
