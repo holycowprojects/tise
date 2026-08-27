@@ -211,8 +211,17 @@ working and committable.
   - **Found by breaking it: the fixture never touched the horizon boundary** (D61). `<=`
     to `<` failed 0 of 227 tests. Two events appended, purely additive, verified against
     `git show HEAD`; the same break now fails 3
-  - Still owed: **train on a real profile in a browser** and time a chunk — the last
-    acceptance criterion no test can stand in for
+  - **Verified in Chrome 2026-08-27 (D64).** 5,105 events imported, **334 labels, 72%
+    positive**, final gradient **4.2e-6**, under a minute. Label yield and base rate match
+    the research corpora; D62's budget holds on a real profile
+  - **The 90-day import returned 57 days and that is correct** — the history file holds
+    zero visits before 2026-07-01. The T5 truncation question is closed, measured
+  - The Python loader read the real export unchanged. **Both owed verifications done**
+  - **New finding (D65): the redirect heuristic fires on 0.95%, not the 12.2% D40
+    scored.** The research view keeps `google.com/url` and drops the landing page; the
+    extension keeps the landing page. Totals agree to 63 events, composition differs by
+    **7.7%**. The extension is arguably the more correct view. Nothing changed on it —
+    it is a T16 problem because it invalidates corpus-level comparability, not code parity
 
 - [ ] **T12 · Calibration and abstention** · M · deps: T11
   - Threshold from the accuracy-vs-coverage curve, not intuition
@@ -244,6 +253,15 @@ working and committable.
 - [ ] **T16 · Model tournament and benchmark report** · M · deps: T13
   - Identical folds for every model; report the XGBoost-vs-shipped gap; one documented failure
   - Verify: `uv run pytest research/tests/test_baseline_gate.py`
+  - **Confidence intervals are the gate on every T11 claim.** "Wins 2 of 5 folds" on ~55
+    test labels a fold may be indistinguishable from noise, and until intervals exist that
+    sentence is the honest summary rather than the Brier score (D60)
+  - **Cumulative features extrapolate** — 77.5% of Edge test rows sit outside the fitted
+    range of `hoursSinceFirstSeen`. Any transform must be chosen without looking at the
+    current scores, or it is fitted to the test set (D60)
+  - **Corpus comparability is broken and the benchmarks depend on it** (D65). The research
+    view and the extension disagree on 7.7% of events — matching totals hid it. Decide
+    one view, re-run every number in `docs/benchmarks/`, do not argue it
 
 - [ ] **T17 · CI** · S · deps: T10
   - Both suites on push/PR; parity failure blocks; secret scanning + dependency audit

@@ -14,10 +14,23 @@ CLAUDE.local.md
 *.local.md
 .claude/settings.local.json
 
-# T6/T7 verification screenshots. Kept local by decision: they show browsing domains,
-# and DECISIONS.md cites them by name, so the claims stay traceable without publishing
-# the evidence. The T5 spike screenshots ran on a throwaway profile and are published.
-# Path-independent: these get moved between folders.
+# Verification screenshots and exports from real profiles. Kept local by decision: they
+# show browsing domains, and DECISIONS.md cites them by name, so the claims stay traceable
+# without publishing the evidence. The T5 spike screenshots ran on a throwaway profile and
+# are published; those are listed explicitly below.
+#
+# The default is DENY. Everything under Screenshots/ is ignored and the published files
+# are re-admitted one by one — the earlier rules named files to exclude, which meant every
+# new screenshot was published unless someone remembered to add a pattern. A T11 export of
+# 5,105 real domains sat untracked-but-publishable under that scheme.
+/Screenshots/**
+!/Screenshots/chrome screenshots/
+!/Screenshots/chrome screenshots/ss_chrome*.png
+!/Screenshots/chrome screenshots/ss_again*.png
+!/Screenshots/chrome screenshots/ss_check*.png
+
+# Belt and braces, path-independent: an export is a profile of a person wherever it lands.
+**/tise-export-*.json
 **/ss_tt*.png
 **/ss_ta*.png
 

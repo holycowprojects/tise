@@ -1629,3 +1629,91 @@ assertion from the permission-set equality: one says "the set is what we expect"
 other says "this specific capability is not requested". The T5 justification text survives
 struck through in `docs/permissions.md` rather than deleted, because that file's value is
 the record of what was justified and why, including the parts that stopped being true.
+
+### D64 — T11 verified on a real profile, and the truncation question is closed
+
+Akash ran the built extension on his signed-in Chrome on 2026-08-27
+(`Screenshots/t11-1.png` … `t11_6.png`, gitignored). Observed, not argued:
+
+| | |
+|---|---|
+| Imported | **5,105 events**, 22 not-web and 49 redirect rejected |
+| Trained | **334 labels, 72% positive**, `fs_2` |
+| Final gradient | **4.2e-6** |
+| Elapsed | under a minute, popup to popup |
+
+Three things this settles.
+
+**The T5 truncation worry was unfounded, and it is now measured rather than mitigated.**
+T5 could not test the default 24h/100-row truncation on a 20-page profile and left it
+open, mitigated unconditionally by always passing explicit `startTime`, `endTime` and
+`maxResults`. The import asked for 90 days and returned 57. That looked exactly like
+truncation. It is not: the history *file* for the same browser holds **zero visits before
+2026-07-01**, so 57 days is all the history that exists. The import is complete.
+
+**D62's iteration budget holds on a real profile.** The worst fold gradient in the
+research backtest was 2.4e-5; a real 334-label fit reached **4.2e-6**, comfortably inside.
+The 4,000-step budget is not something that only works on the author's research corpora.
+
+**The label yield matches the research corpora.** 334 labels at 72% positive against
+Chrome's 313 at 70.3% and Edge's 503 at 69.8%. Nothing about the extension's own pipeline
+produces a different-shaped dataset from the one the benchmarks were computed on — which
+was not guaranteed and is the reason to check.
+
+The Python loader also read the real export unchanged, which closes the second
+verification owed since T8. Both owed verifications are now done.
+
+### D65 — The redirect asymmetry is real, and it runs the opposite way to D40's assumption
+
+D40 built a referrer-gap heuristic so that imports would not carry redirect hops that live
+collection drops, and scored it against the history file's redirect bits: on Chrome, 702
+hops (12.2%), precision 0.931, recall 0.657.
+
+**In production it fires on 0.95% of visits, not 12.2%.** 49 of ~5,176. It is recovering
+roughly one in fourteen of what the file's bits identify.
+
+Tracing one case end to end — a Google result click on 18 August — shows why, and shows
+that the framing was wrong:
+
+```
+google.com/url?url=...zivasuites...   core=LINK, no redirect bit
+www.zivasuites.com/                   CLIENT_REDIRECT
+www.zivasuites.com/  (https)          SERVER_REDIRECT
+www.zivasuites.com/#banner            CLIENT_REDIRECT
+```
+
+The research pipeline excludes redirect hops, so it keeps **`google.com`** and throws the
+hotel away. The extension has no qualifier bits to filter on (the T7 qualifier trap:
+`VisitItem.transition` is core-only), the four hops land inside the same minute but not
+inside the 50 ms window, and it keeps **`zivasuites.com`**.
+
+So the two views of the same browsing disagree — and **the extension is arguably the more
+correct one.** The person clicked a search result and read a hotel page. The hotel is the
+navigation they chose; `google.com/url` is plumbing. D40 assumed the file was the ground
+truth the product should be made to match. On this evidence the product's view is the
+better description of behaviour, and the research corpus is the one losing information.
+
+Quantified over the overlapping window, 5,057 export events against 4,994 file visits:
+
+- Totals differ by **63** — near enough to look like agreement.
+- Per-domain they disagree on **391 events, 7.7% of the corpus**.
+- 95 domains appear only in the export (109 events); `google.com` is 115 higher in the
+  file, which is the same mechanism seen from the other end.
+
+**Matching totals concealed a composition difference of 7.7%**, and an earlier reading of
+these numbers in-session took the totals as agreement. That is the mistake this entry
+exists to record: two counts that agree are not two datasets that agree.
+
+Nothing is changed on the strength of this. It affects **T16**, because every published
+benchmark is computed on the research view while the extension ships the other one — the
+parity suite guarantees the two *implementations* agree and says nothing about the two
+*event streams* agreeing. Options, none chosen yet: teach `load_visits` to follow a
+redirect chain to its landing page, widen the gap window, or drop the heuristic and accept
+landing pages on both sides. Each changes the corpus, so each invalidates the numbers in
+`docs/benchmarks/` and has to be re-run rather than argued.
+
+A thing that was *not* found, recorded because it was chased: the export contains 95
+domains the file's redirect-filtered view lacks, and Chrome's permission dialog says
+"on all your signed-in devices", so synced history from another device merging into one
+profile — a D18 violation — was the leading hypothesis for a while. It is not that. Every
+one of those domains is present in the local file as redirect hops. No sync, no merge.
