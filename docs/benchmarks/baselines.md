@@ -39,7 +39,9 @@ these baselines uses dwell time — they see only the category and `window_end` 
 `full` and `history` variants are **identical by construction**. Every number here is
 achievable by the shipped extension.
 
-The distinction becomes live at T10, when features that *can* use duration arrive.
+It stayed that way at T10. D35 stopped Tise measuring dwell in either direction, so every
+feature in `fs_2` is compat class `history` and the `full` class is empty (D51). The
+distinction is kept because it is real, not because anything currently uses it.
 
 ### history-chrome
 
@@ -50,6 +52,7 @@ The distinction becomes live at T10, when features that *can* use duration arriv
 | Model | Brier | Log loss | Skill vs base rate | Test labels |
 |---|---:|---:|---:|---:|
 | `category_base_rate` | 0.1868 | 0.5641 | 0.152 | 136 |
+| `logreg_fs2` | 0.2195 | 0.7989 | 0.004 | 136 |
 | `global_base_rate` | 0.2204 | 0.6345 | reference | 136 |
 | `time_of_day` | 0.2271 | 0.6483 | -0.031 | 136 |
 | `same_as_last` | 0.2914 | 0.9932 | -0.322 | 136 |
@@ -60,20 +63,20 @@ The distinction becomes live at T10, when features that *can* use duration arriv
 
 **Per fold** (Brier, lower is better):
 
-| Fold | Train | Test | Test ends | Base rate | `majority_class` | `global_base_rate` | `category_base_rate` | `same_as_last` | `time_of_day` |
-|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 0 | 125 | 37 | 2026-08-04 | 81.1% | 0.189 | 0.191 | 0.140 | 0.173 | 0.218 |
-| 1 | 162 | 37 | 2026-08-06 | 94.6% | 0.054 | 0.133 | 0.088 | 0.003 | 0.138 |
-| 2 | 199 | 37 | 2026-08-16 | 67.6% | 0.324 | 0.221 | 0.231 | 0.270 | 0.232 |
-| 3 | 236 | 37 | 2026-08-19 | 78.4% | 0.216 | 0.175 | 0.112 | 0.440 | 0.173 |
-| 4 | 273 | 40 | 2026-08-26 | 60.0% | 0.400 | 0.254 | 0.238 | 0.265 | 0.252 |
+| Fold | Train | Test | Test ends | Base rate | `majority_class` | `global_base_rate` | `category_base_rate` | `same_as_last` | `time_of_day` | `logreg_fs2` |
+|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 125 | 37 | 2026-08-04 | 81.1% | 0.189 | 0.191 | 0.140 | 0.173 | 0.218 | 0.161 |
+| 1 | 162 | 37 | 2026-08-06 | 94.6% | 0.054 | 0.133 | 0.088 | 0.003 | 0.138 | 0.066 |
+| 2 | 199 | 37 | 2026-08-16 | 67.6% | 0.324 | 0.221 | 0.231 | 0.270 | 0.232 | 0.260 |
+| 3 | 236 | 37 | 2026-08-19 | 78.4% | 0.216 | 0.175 | 0.112 | 0.440 | 0.173 | 0.185 |
+| 4 | 273 | 40 | 2026-08-26 | 60.0% | 0.400 | 0.254 | 0.238 | 0.265 | 0.252 | 0.261 |
 
 **Per category.** 4 of 13 categories cleared the floor of
 20 test labels; the rest are counted but not scored (D26).
 
 | Category | Test labels | Base rate | Best Brier | Best model |
 |---|---:|---:|---:|---|
-| search | 51 | 86.3% | 0.1328 | `category_base_rate` |
+| search | 51 | 86.3% | 0.1305 | `logreg_fs2` |
 | dev | 39 | 76.9% | 0.1852 | `category_base_rate` |
 | ai | 22 | 72.7% | 0.2086 | `time_of_day` |
 | social | 6 | 16.7% | **not modelled** | — |
@@ -97,6 +100,7 @@ The distinction becomes live at T10, when features that *can* use duration arriv
 
 | Model | Brier | Log loss | Skill vs base rate | Test labels |
 |---|---:|---:|---:|---:|
+| `logreg_fs2` | 0.1119 | 0.4047 | 0.400 | 270 |
 | `category_base_rate` | 0.1254 | 0.4138 | 0.328 | 270 |
 | `majority_class` * | 0.1593 | 2.2002 | 0.146 | 270 |
 | `time_of_day` | 0.1834 | 0.5552 | 0.017 | 270 |
@@ -108,13 +112,13 @@ The distinction becomes live at T10, when features that *can* use duration arriv
 
 **Per fold** (Brier, lower is better):
 
-| Fold | Train | Test | Test ends | Base rate | `majority_class` | `global_base_rate` | `category_base_rate` | `same_as_last` | `time_of_day` |
-|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 0 | 201 | 60 | 2026-07-28 | 88.3% | 0.117 | 0.230 | 0.162 | 0.092 | 0.230 |
-| 1 | 261 | 60 | 2026-08-03 | 81.7% | 0.183 | 0.193 | 0.135 | 0.122 | 0.187 |
-| 2 | 321 | 60 | 2026-08-11 | 75.0% | 0.250 | 0.198 | 0.137 | 0.251 | 0.193 |
-| 3 | 381 | 60 | 2026-08-18 | 83.3% | 0.167 | 0.168 | 0.105 | 0.782 | 0.171 |
-| 4 | 441 | 62 | 2026-08-26 | 77.4% | 0.226 | 0.182 | 0.154 | 0.206 | 0.176 |
+| Fold | Train | Test | Test ends | Base rate | `majority_class` | `global_base_rate` | `category_base_rate` | `same_as_last` | `time_of_day` | `logreg_fs2` |
+|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 201 | 60 | 2026-07-28 | 88.3% | 0.117 | 0.230 | 0.162 | 0.092 | 0.230 | 0.091 |
+| 1 | 261 | 60 | 2026-08-03 | 81.7% | 0.183 | 0.193 | 0.135 | 0.122 | 0.187 | 0.094 |
+| 2 | 321 | 60 | 2026-08-11 | 75.0% | 0.250 | 0.198 | 0.137 | 0.251 | 0.193 | 0.160 |
+| 3 | 381 | 60 | 2026-08-18 | 83.3% | 0.167 | 0.168 | 0.105 | 0.782 | 0.171 | 0.144 |
+| 4 | 441 | 62 | 2026-08-26 | 77.4% | 0.226 | 0.182 | 0.154 | 0.206 | 0.176 | 0.163 |
 
 **Per category.** 4 of 12 categories cleared the floor of
 20 test labels; the rest are counted but not scored (D26).
@@ -122,7 +126,7 @@ The distinction becomes live at T10, when features that *can* use duration arriv
 | Category | Test labels | Base rate | Best Brier | Best model |
 |---|---:|---:|---:|---|
 | video | 126 | 95.2% | 0.0476 | `majority_class` |
-| search | 71 | 87.3% | 0.1268 | `majority_class` |
+| search | 71 | 87.3% | 0.1157 | `logreg_fs2` |
 | news | 48 | 83.3% | 0.1667 | `majority_class` |
 | dev | 10 | 20.0% | **not modelled** | — |
 | work | 5 | 20.0% | **not modelled** | — |
@@ -144,6 +148,7 @@ The distinction becomes live at T10, when features that *can* use duration arriv
 
 | Model | Brier | Log loss | Skill vs base rate | Test labels |
 |---|---:|---:|---:|---:|
+| `logreg_fs2` | 0.2263 | 0.7059 | 0.106 | 83 |
 | `category_base_rate` | 0.2458 | 0.6942 | 0.029 | 83 |
 | `global_base_rate` | 0.2531 | 0.7024 | reference | 83 |
 | `time_of_day` | 0.2540 | 0.7080 | -0.004 | 83 |
@@ -155,13 +160,13 @@ The distinction becomes live at T10, when features that *can* use duration arriv
 
 **Per fold** (Brier, lower is better):
 
-| Fold | Train | Test | Test ends | Base rate | `majority_class` | `global_base_rate` | `category_base_rate` | `same_as_last` | `time_of_day` |
-|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|
-| 0 | 69 | 20 | 2026-08-03 | 55.0% | 0.450 | 0.283 | 0.272 | 0.552 | 0.276 |
-| 1 | 89 | 20 | 2026-08-06 | 70.0% | 0.300 | 0.210 | 0.187 | 0.190 | 0.186 |
-| 2 | 109 | 20 | 2026-08-11 | 60.0% | 0.400 | 0.249 | 0.243 | 0.362 | 0.264 |
-| 3 | 129 | 20 | 2026-08-20 | 50.0% | 0.500 | 0.283 | 0.298 | 0.408 | 0.262 |
-| 4 | 149 | 24 | 2026-08-25 | 58.3% | 0.417 | 0.249 | 0.236 | 0.340 | 0.303 |
+| Fold | Train | Test | Test ends | Base rate | `majority_class` | `global_base_rate` | `category_base_rate` | `same_as_last` | `time_of_day` | `logreg_fs2` |
+|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 69 | 20 | 2026-08-03 | 55.0% | 0.450 | 0.283 | 0.272 | 0.552 | 0.276 | 0.170 |
+| 1 | 89 | 20 | 2026-08-06 | 70.0% | 0.300 | 0.210 | 0.187 | 0.190 | 0.186 | 0.187 |
+| 2 | 109 | 20 | 2026-08-11 | 60.0% | 0.400 | 0.249 | 0.243 | 0.362 | 0.264 | 0.242 |
+| 3 | 129 | 20 | 2026-08-20 | 50.0% | 0.500 | 0.283 | 0.298 | 0.408 | 0.262 | 0.274 |
+| 4 | 149 | 24 | 2026-08-25 | 58.3% | 0.417 | 0.249 | 0.236 | 0.340 | 0.303 | 0.287 |
 
 **Per category.** 3 of 11 categories cleared the floor of
 20 test labels; the rest are counted but not scored (D26).
@@ -169,7 +174,7 @@ The distinction becomes live at T10, when features that *can* use duration arriv
 | Category | Test labels | Base rate | Best Brier | Best model |
 |---|---:|---:|---:|---|
 | ai | 35 | 68.6% | 0.2125 | `global_base_rate` |
-| search | 32 | 71.9% | 0.2028 | `global_base_rate` |
+| search | 32 | 71.9% | 0.1692 | `logreg_fs2` |
 | dev | 6 | 16.7% | **not modelled** | — |
 | government | 3 | 33.3% | **not modelled** | — |
 | work | 2 | 0.0% | **not modelled** | — |
@@ -190,5 +195,7 @@ The distinction becomes live at T10, when features that *can* use duration arriv
 - **Small tails.** Most categories never clear the label floor. That is a fact about the
   data, not a tuning choice, and it will not improve much with more history because the
   distribution is dominated by a handful of domains.
-- **No model yet.** Everything here is a baseline. The first real model arrives at T11,
-  and it will be reported on exactly these folds.
+- **`logreg_fs2` is not a baseline.** It appears in these tables because D24 requires the
+  baselines beside it on identical folds, and this is where those folds are defined. What
+  it means — where it clears the D28 bar, where it does not, and the per-fold picture the
+  pooled score hides — is in `model.md`, and that is the file to read about it.

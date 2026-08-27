@@ -188,9 +188,31 @@ working and committable.
 
 ## Phase 3 — Predict
 
-- [ ] **T11 · In-browser training** · M · deps: T10
-  - Transition table + logreg in an offscreen document; chunked, resumable, alarm-driven
-  - Verify: `npm test -- model`; train on 90 days without being killed
+- [x] **T11 · In-browser training** · M · deps: T10
+  - Transition table + logreg, chunked, resumable, alarm-driven. **No offscreen document**
+    — chunking removed the premise (D59); the permission stays until a real profile is
+    timed, and removing it is Akash's call
+  - Verify: `uv run pytest -q` ✓ (422) `&& npm test` ✓ (227), both linters clean, builds
+  - **The bar is cleared, and the result is weaker than that number** (D60). Edge Brier
+    **0.1119** vs the 0.1254 bar, skill +0.400 — while winning only **2 of 5 folds**.
+    Chrome **loses outright** (0.2195 vs 0.1868). Firefox clears it, 4 of 5. 8 of 15 folds
+    across everything. `docs/benchmarks/model.md`, generated not typed
+  - **The model wins early folds and loses late ones, everywhere.** Measured lead, not a
+    conclusion: 77.5% of Edge test rows have `hoursSinceFirstSeen` outside the range it
+    was fitted on. Cumulative counters act as a calendar index. Fixing it is T16, and the
+    fix must be chosen without looking at these numbers
+  - **The optimiser is hand-written in both languages** (D54) — LBFGS is not reproducible
+    in a browser. Parity holds to **2.2e-16** after 4,000 steps, seven orders below
+    tolerance
+  - **The step size is derived from the matrix, not declared** (D55). A hand-picked rate
+    passed every test and would have diverged on someone else's browsing
+  - Labels now persist in their own store at DB v3 (D58) — provisional until the horizon
+    elapses, so they cannot live inside an immutable feature row
+  - **Found by breaking it: the fixture never touched the horizon boundary** (D61). `<=`
+    to `<` failed 0 of 227 tests. Two events appended, purely additive, verified against
+    `git show HEAD`; the same break now fails 3
+  - Still owed: **train on a real profile in a browser** and time a chunk — the last
+    acceptance criterion no test can stand in for
 
 - [ ] **T12 · Calibration and abstention** · M · deps: T11
   - Threshold from the accuracy-vs-coverage curve, not intuition

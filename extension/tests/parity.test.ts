@@ -21,6 +21,7 @@ import { advanceSession, type SessionCursor } from "../src/collect/session";
 import { resolve } from "../src/collect/resolver";
 import { hoursSinceLastSeen } from "../src/features/recency";
 import { sessionise } from "../src/features/sessions";
+import { return24hLabels } from "../src/features/labels";
 import { dayOfWeek } from "../src/features/context";
 import {
   computeFeatures,
@@ -29,6 +30,22 @@ import {
   type FeatureName,
 } from "../src/features/vector";
 import type { TiseEvent } from "../src/types";
+import {
+  buildMatrix,
+  DESIGN_COLUMNS,
+  fitPreprocessor,
+} from "../src/model/prep";
+import {
+  type LogRegSpec,
+  predictProba,
+  stepSize,
+  train,
+} from "../src/model/logreg";
+import {
+  distribution,
+  fitTransitionTable,
+  primaryCategory,
+} from "../src/model/transition";
 
 const TOLERANCE = 1e-9;
 
@@ -61,13 +78,44 @@ interface FixtureExpected {
     eventIds: string[];
     categories: string[];
   }>;
-  labels: unknown[];
+  labels: Array<{
+    target: string;
+    subject: string;
+    windowEnd: string;
+    outcome: boolean;
+    horizonHours: number;
+    sessionId: string;
+  }>;
   features: Array<{
     subject: string;
     windowEnd: string;
     compat: string;
     values: Record<string, number | null>;
   }>;
+  model: {
+    designColumns: string[];
+    preprocessor: { fills: number[]; means: number[]; scales: number[] };
+    matrix: number[][];
+    outcomes: boolean[];
+    spec: { iterations: number; l2: number; chunkIterations: number; stepScale: number };
+    stepSize: number;
+    logreg: {
+      weights: number[];
+      bias: number;
+      iterationsDone: number;
+      gradientNorm: number;
+    };
+    predictions: number[];
+    transition: {
+      primaries: string[];
+      vocabulary: string[];
+      counts: Record<string, Record<string, number>>;
+      marginal: Record<string, number>;
+      smoothing: number;
+      distributions: Record<string, Record<string, number>>;
+      unseenDistribution: Record<string, number>;
+    };
+  };
   summary: Record<string, number>;
 }
 
@@ -111,7 +159,8 @@ describe("the fixture itself", () => {
 
   it("has no section TypeScript silently ignores", () => {
     // If Python adds a section to the oracle, this fails and forces a decision rather
-    // than letting an unchecked section look verified. `labels` is checked at T10.
+    // than letting an unchecked section look verified. `labels` went unchecked here
+    // until T11, which is exactly the gap this guard existed to keep visible.
     expect(Object.keys(EXPECTED).sort()).toEqual([
       "categoryMapVersion",
       "featureNames",
@@ -119,6 +168,7 @@ describe("the fixture itself", () => {
       "features",
       "horizonHours",
       "labels",
+      "model",
       "note",
       "resolutions",
       "sessions",
@@ -366,6 +416,176 @@ describe("feature parity", () => {
         row.values["hoursSinceLastSeen"] ?? null,
         `${row.subject} hoursSinceLastSeen`,
       );
+    }
+  });
+});
+
+describe("label parity — the section TypeScript used to skip", () => {
+  // Until T11 the oracle's `labels` section was unchecked on this side, and the key-set
+  // guard above existed so that gap could not quietly look verified. This closes it.
+  const ACTUAL = return24hLabels(EVENTS, INPUT.timeoutSeconds, INPUT.horizonHours);
+
+  it("produces the same number of labels, in the same order", () => {
+    expect(ACTUAL).toHaveLength(EXPECTED.labels.length);
+    expect(ACTUAL).toHaveLength(EXPECTED.summary["labelCount"] as number);
+    expect(ACTUAL.map((label) => label.subject)).toEqual(
+      EXPECTED.labels.map((label) => label.subject),
+    );
+  });
+
+  it("agrees on every subject, instant and outcome", () => {
+    EXPECTED.labels.forEach((expected, index) => {
+      const actual = ACTUAL[index];
+      const where = `${expected.subject} @ ${expected.windowEnd}`;
+      expect(actual?.target, where).toBe(expected.target);
+      expect(actual?.subject, where).toBe(expected.subject);
+      expect(Date.parse(actual?.windowEnd ?? ""), where).toBe(Date.parse(expected.windowEnd));
+      expect(actual?.outcome, where).toBe(expected.outcome);
+      closeEnough(actual?.horizonHours ?? null, expected.horizonHours, `${where} horizon`);
+    });
+  });
+
+  it("agrees on how many are positive — a fixture of one class proves nothing", () => {
+    const positives = ACTUAL.filter((label) => label.outcome).length;
+    expect(positives).toBe(EXPECTED.summary["positiveCount"] as number);
+    expect(positives).toBeGreaterThan(0);
+    expect(positives).toBeLessThan(ACTUAL.length);
+  });
+
+  it("decides an outcome only from events strictly after the window", () => {
+    // A recurrence exactly on the horizon counts; one a millisecond later does not.
+    // Python reaches that boundary through `bisect_right`, TypeScript through the same
+    // binary search, and this is the assertion that they land on the same side of it.
+    for (const label of ACTUAL) {
+      const windowEnd = Date.parse(label.windowEnd);
+      const inHorizon = EVENTS.some((event) => {
+        const at = Date.parse(event.occurredAt);
+        return (
+          event.category === label.subject &&
+          at > windowEnd &&
+          at <= windowEnd + label.horizonHours * 3_600_000
+        );
+      });
+      expect(label.outcome, `${label.subject} @ ${label.windowEnd}`).toBe(inHorizon);
+    }
+  });
+});
+
+describe("model parity — the T11 half of the oracle", () => {
+  /**
+   * Feature rows rebuilt by TypeScript, not read out of the fixture. Everything below
+   * starts from these, so a preprocessing or optimiser bug is caught on top of features
+   * TypeScript computed itself rather than on top of Python's answers.
+   */
+  const OPTIONS = {
+    timeoutSeconds: INPUT.timeoutSeconds,
+    horizonHours: INPUT.horizonHours,
+  };
+  const ROWS = EXPECTED.features.map((row) =>
+    computeFeatures(EVENTS, row.subject, Date.parse(row.windowEnd), OPTIONS),
+  );
+  const SPEC: LogRegSpec = {
+    iterations: EXPECTED.model.spec.iterations,
+    l2: EXPECTED.model.spec.l2,
+    chunkIterations: EXPECTED.model.spec.chunkIterations,
+    stepScale: EXPECTED.model.spec.stepScale,
+  };
+
+  it("agrees on the column order, which is the contract", () => {
+    expect(DESIGN_COLUMNS).toEqual(EXPECTED.model.designColumns);
+  });
+
+  it("agrees on every fill, mean and deviation", () => {
+    const fitted = fitPreprocessor(ROWS);
+    const expected = EXPECTED.model.preprocessor;
+    expected.fills.forEach((value, index) =>
+      closeEnough(fitted.fills[index] ?? null, value, `fill ${FEATURE_NAMES[index]}`),
+    );
+    expected.means.forEach((value, index) =>
+      closeEnough(fitted.means[index] ?? null, value, `mean ${DESIGN_COLUMNS[index]}`),
+    );
+    expected.scales.forEach((value, index) =>
+      closeEnough(fitted.scales[index] ?? null, value, `scale ${DESIGN_COLUMNS[index]}`),
+    );
+  });
+
+  it("agrees on every cell of the design matrix", () => {
+    // Compared before the weights, because a preprocessing bug and an optimiser bug are
+    // indistinguishable from the weights alone — and four thousand gradient steps is a
+    // long way to bisect by hand.
+    const matrix = buildMatrix(fitPreprocessor(ROWS), ROWS);
+    expect(matrix.length).toBe(EXPECTED.model.matrix.length);
+    matrix.forEach((row, rowIndex) => {
+      row.forEach((value, index) => {
+        closeEnough(
+          value,
+          EXPECTED.model.matrix[rowIndex]?.[index] ?? null,
+          `matrix[${rowIndex}][${DESIGN_COLUMNS[index]}]`,
+        );
+      });
+    });
+  });
+
+  it("derives the same step size from the same matrix", () => {
+    // A mirror that reproduced the weights while stepping differently would be agreeing
+    // by coincidence, and would stop agreeing on the first profile that differs.
+    const matrix = buildMatrix(fitPreprocessor(ROWS), ROWS);
+    closeEnough(stepSize(matrix, SPEC), EXPECTED.model.stepSize, "stepSize");
+  });
+
+  it("agrees on every coefficient after four thousand gradient steps", () => {
+    const matrix = buildMatrix(fitPreprocessor(ROWS), ROWS);
+    const state = train(matrix, EXPECTED.model.outcomes, SPEC, DESIGN_COLUMNS.length);
+
+    expect(state.iterationsDone).toBe(EXPECTED.model.logreg.iterationsDone);
+    closeEnough(state.bias, EXPECTED.model.logreg.bias, "bias");
+    EXPECTED.model.logreg.weights.forEach((value, index) =>
+      closeEnough(state.weights[index] ?? null, value, `weight ${DESIGN_COLUMNS[index]}`),
+    );
+  });
+
+  it("agrees on every predicted probability", () => {
+    const preprocessor = fitPreprocessor(ROWS);
+    const matrix = buildMatrix(preprocessor, ROWS);
+    const state = train(matrix, EXPECTED.model.outcomes, SPEC, DESIGN_COLUMNS.length);
+    matrix.forEach((row, index) => {
+      closeEnough(
+        predictProba(state, row),
+        EXPECTED.model.predictions[index] ?? null,
+        `prediction ${index}`,
+      );
+    });
+  });
+
+  it("picks the same primary category for every session", () => {
+    const sessions = sessionise(EVENTS, INPUT.timeoutSeconds);
+    expect(sessions.map(primaryCategory)).toEqual(EXPECTED.model.transition.primaries);
+  });
+
+  it("builds the same transition table", () => {
+    const table = fitTransitionTable(
+      sessionise(EVENTS, INPUT.timeoutSeconds),
+      EXPECTED.model.transition.smoothing,
+    );
+    expect(table.vocabulary).toEqual(EXPECTED.model.transition.vocabulary);
+    expect(table.counts).toEqual(EXPECTED.model.transition.counts);
+    expect(table.marginal).toEqual(EXPECTED.model.transition.marginal);
+  });
+
+  it("agrees on every smoothed distribution, including the unseen fallback", () => {
+    const table = fitTransitionTable(
+      sessionise(EVENTS, INPUT.timeoutSeconds),
+      EXPECTED.model.transition.smoothing,
+    );
+    for (const [from, expected] of Object.entries(EXPECTED.model.transition.distributions)) {
+      const actual = distribution(table, from);
+      for (const [to, value] of Object.entries(expected)) {
+        closeEnough(actual[to] ?? null, value, `P(${to} | ${from})`);
+      }
+    }
+    const unseen = distribution(table, "__never-seen__");
+    for (const [to, value] of Object.entries(EXPECTED.model.transition.unseenDistribution)) {
+      closeEnough(unseen[to] ?? null, value, `P(${to} | unseen)`);
     }
   });
 });

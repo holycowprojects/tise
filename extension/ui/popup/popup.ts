@@ -14,6 +14,8 @@ import { deleteEverything } from "../../src/storage/delete";
 import { buildExport, exportFilename, serialiseExport } from "../../src/storage/export";
 import { countsByCategory, countEvents, recentEvents } from "../../src/storage/events";
 import { isCollecting, loadSettings, saveSettings } from "../../src/storage/settings";
+import { countLabels } from "../../src/storage/labels";
+import { readJob, readModel } from "../../src/model/train";
 
 function element(id: string): HTMLElement {
   const found = document.getElementById(id);
@@ -114,6 +116,53 @@ async function renderImport(consented: boolean): Promise<void> {
   button.textContent = "Import my history";
 }
 
+/**
+ * The model panel. A developer surface, like the rest of this popup — T14 replaces it.
+ *
+ * It shows what training has produced and what it was produced from, because a
+ * coefficient vector with no row count beside it is not something anyone can judge. The
+ * button runs the chunks back to back; the alarm does one at a time and needs no button.
+ */
+async function renderTraining(consented: boolean): Promise<void> {
+  const block = element("train-block");
+  block.hidden = !consented;
+  if (!consented) return;
+
+  const status = element("train-status");
+  const detail = element("train-detail");
+  const button = element("train") as HTMLButtonElement;
+  button.disabled = false;
+  button.textContent = "Train now";
+
+  const [job, model] = await Promise.all([readJob(), readModel()]);
+
+  if (job !== undefined) {
+    const done = job.state.iterationsDone;
+    status.textContent = "Training";
+    detail.textContent = `${done.toLocaleString()} of ${job.spec.iterations.toLocaleString()} steps, ${job.rowCount.toLocaleString()} labels.`;
+    return;
+  }
+
+  if (model === undefined) {
+    const labels = await countLabels();
+    status.textContent = "No model yet";
+    detail.textContent =
+      labels === 0
+        ? "Nothing to learn from. Browse or import some history first."
+        : `${labels.toLocaleString()} labels ready. Training runs on a schedule, or press the button.`;
+    return;
+  }
+
+  const positives = model.positiveCount / model.rowCount;
+  status.textContent = "Trained";
+  // The gradient norm is here rather than hidden because an unconverged fit is not wrong
+  // in any way a score reveals — it is just quietly worse.
+  detail.textContent =
+    `${model.rowCount.toLocaleString()} labels, ${(positives * 100).toFixed(0)}% positive, ` +
+    `feature set ${model.featureSet}, final gradient ${model.state.gradientNorm.toExponential(1)}. ` +
+    `Trained ${new Date(model.trainedAt).toLocaleString()}.`;
+}
+
 async function render(): Promise<void> {
   if (pollTimer !== null) {
     clearTimeout(pollTimer);
@@ -145,6 +194,7 @@ async function render(): Promise<void> {
   toggle.dataset["collecting"] = String(collecting);
 
   await renderImport(settings.consentGrantedAt !== null);
+  await renderTraining(settings.consentGrantedAt !== null);
 
   const categories = [...(await countsByCategory())].sort((a, b) => b[1] - a[1]);
   replace(
@@ -200,6 +250,18 @@ element("import").addEventListener("click", async () => {
   element("import-status").textContent = "Importing…";
   (element("import") as HTMLButtonElement).disabled = true;
   setTimeout(() => void render(), 300);
+});
+
+element("train").addEventListener("click", () => {
+  const button = element("train") as HTMLButtonElement;
+  button.disabled = true;
+  button.textContent = "Training…";
+  element("train-status").textContent = "Training";
+  element("train-detail").textContent =
+    "Running every chunk back to back. The scheduled run does one at a time instead.";
+
+  // The worker owns the run, so closing the popup does not stop it.
+  void chrome.runtime.sendMessage({ type: "tise:train" }, () => void render());
 });
 
 element("export").addEventListener("click", async () => {

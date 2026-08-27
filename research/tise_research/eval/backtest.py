@@ -23,14 +23,14 @@ from __future__ import annotations
 
 import argparse
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
 from tise_research.eval.metrics import base_rate, brier_score, log_loss, skill_score
-from tise_research.features.labels import Label
-from tise_research.models.baselines import ALL_BASELINES
+from tise_research.features.labels import DEFAULT_HORIZON_HOURS, Label
+from tise_research.models.baselines import ALL_BASELINES, Baseline
 
 __all__ = [
     "BacktestResult",
@@ -171,8 +171,18 @@ def run_backtest(
     n_folds: int = 5,
     initial_train_fraction: float = DEFAULT_INITIAL_TRAIN_FRACTION,
     min_category_labels: int = DEFAULT_MIN_CATEGORY_LABELS,
+    extra_models: dict[str, Callable[[Sequence[Label]], Baseline]] | None = None,
 ) -> BacktestResult:
-    """Fit every baseline on each fold's training window and score its test window."""
+    """Fit every model on each fold's training window and score its test window.
+
+    `extra_models` is added *alongside* the baselines, never in place of them. D24 makes
+    the baselines mandatory in every report, and a model that appears without them is a
+    number with nothing underneath it.
+    """
+    fitters: dict[str, Callable[[Sequence[Label]], Baseline]] = {
+        **ALL_BASELINES,
+        **(extra_models or {}),
+    }
     folds = rolling_origin_folds(
         labels, n_folds=n_folds, initial_train_fraction=initial_train_fraction
     )
@@ -185,7 +195,7 @@ def run_backtest(
     fold_results: list[FoldResult] = []
 
     for fold in folds:
-        fitted = {name: fit(fold.train) for name, fit in ALL_BASELINES.items()}
+        fitted = {name: fit(fold.train) for name, fit in fitters.items()}
         outcomes = [label.outcome for label in fold.test]
 
         fold_brier: list[tuple[str, float | None]] = []
@@ -222,7 +232,7 @@ def run_backtest(
     )
 
     models: dict[str, ModelResult] = {}
-    for name in ALL_BASELINES:
+    for name in fitters:
         probabilities = pooled_probabilities[name]
         models[name] = ModelResult(
             name=name,
@@ -247,7 +257,7 @@ def run_backtest(
             continue
         scores = {
             name: brier_score(outcomes, bucket["probabilities"][name])
-            for name in ALL_BASELINES
+            for name in fitters
         }
         best = min(scores, key=lambda name: scores[name] if scores[name] else 1.0)
         per_category[subject] = CategoryResult(
@@ -298,6 +308,11 @@ def main() -> int:
     parser.add_argument("--folds", type=int, default=5)
     parser.add_argument("--timeout-seconds", type=float, default=1800.0)
     parser.add_argument("--out", type=Path, default=Path("docs/benchmarks"))
+    parser.add_argument(
+        "--with-model",
+        action="store_true",
+        help="Fit logreg_fs2 alongside the baselines and write model.md as well.",
+    )
     args = parser.parse_args()
 
     copies = [args.corpus] if args.corpus else sorted(Path("data").glob("history-*.copy"))
@@ -306,13 +321,42 @@ def main() -> int:
         return 1
 
     results: dict[str, BacktestResult] = {}
+    evidence = []
     for copy_path in copies:
         labels = load_labels(copy_path, timeout_seconds=args.timeout_seconds)
         if len(labels) < args.folds * 2:
             print(f"Skipping {copy_path.stem}: only {len(labels)} labels")
             continue
-        results[copy_path.stem] = run_backtest(labels, n_folds=args.folds)
+
+        extra = None
+        index = None
+        if args.with_model:
+            from tise_research.data.corpus import load_events
+            from tise_research.models.return_model import (
+                MODEL_NAME,
+                FeatureIndex,
+                make_return_model_fitter,
+            )
+
+            index = FeatureIndex(
+                events=load_events(copy_path),
+                timeout_seconds=args.timeout_seconds,
+                horizon_hours=DEFAULT_HORIZON_HOURS,
+            )
+            extra = {MODEL_NAME: make_return_model_fitter(index)}
+
+        result = run_backtest(labels, n_folds=args.folds, extra_models=extra)
+        results[copy_path.stem] = result
         print(f"{copy_path.stem}: {len(labels):,} labels, {args.folds} folds")
+
+        if args.with_model and index is not None:
+            from tise_research.eval.model_report import collect_evidence
+
+            evidence.append(
+                collect_evidence(
+                    copy_path.stem, result, labels, index, n_folds=args.folds
+                )
+            )
 
     if not results:
         print("No corpus had enough labels to backtest.")
@@ -322,6 +366,14 @@ def main() -> int:
         results, out_dir=args.out, timeout_seconds=args.timeout_seconds
     )
     print(f"Wrote {path}")
+
+    if evidence:
+        from tise_research.eval.model_report import write_model_report
+
+        model_path = write_model_report(
+            evidence, out_dir=args.out, timeout_seconds=args.timeout_seconds
+        )
+        print(f"Wrote {model_path}")
     return 0
 
 

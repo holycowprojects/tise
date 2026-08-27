@@ -18,6 +18,15 @@ import {
   RETENTION_PERIOD_MINUTES,
 } from "./storage/retention";
 import { isCollecting, loadSettings } from "./storage/settings";
+import { DEFAULT_HORIZON_HOURS } from "./features/labels";
+import {
+  readJob,
+  readModel,
+  refreshDataset,
+  runTrainingChunk,
+  TRAINING_ALARM,
+  TRAINING_PERIOD_MINUTES,
+} from "./model/train";
 
 chrome.webNavigation.onCommitted.addListener(
   (details) => {
@@ -36,17 +45,41 @@ chrome.webNavigation.onCommitted.addListener(
  * for every navigation would reset it constantly — the alarm would then never fire, and
  * raw events would never expire. That failure is silent, which is the worst kind.
  */
-function scheduleRetention(): void {
+function scheduleAlarms(): void {
   chrome.alarms.create(RETENTION_ALARM, { periodInMinutes: RETENTION_PERIOD_MINUTES });
+  chrome.alarms.create(TRAINING_ALARM, { periodInMinutes: TRAINING_PERIOD_MINUTES });
 }
 
-chrome.runtime.onInstalled.addListener(scheduleRetention);
-chrome.runtime.onStartup.addListener(scheduleRetention);
+chrome.runtime.onInstalled.addListener(scheduleAlarms);
+chrome.runtime.onStartup.addListener(scheduleAlarms);
 
+/**
+ * Training advances one chunk per alarm, and the alarm keeps firing until the job is
+ * done — so a full run takes several wake-ups rather than one long one. That is the
+ * point: no single call is long enough for MV3 to have an opinion about it, and the state
+ * is on disk before the worker is allowed to die.
+ *
+ * Nothing here retries or backs off. A chunk that fails leaves the job exactly as it was,
+ * and the next alarm picks up from the last state that was written.
+ */
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name !== RETENTION_ALARM) return;
   void (async () => {
-    await enforceRetention(await loadSettings(), Date.now());
+    const settings = await loadSettings();
+    if (alarm.name === RETENTION_ALARM) {
+      await enforceRetention(settings, Date.now());
+      return;
+    }
+    if (alarm.name !== TRAINING_ALARM) return;
+
+    // Nothing was consented to, so there is nothing to learn from. Checked here rather
+    // than inside the trainer so the storage layer is never touched at all.
+    if (settings.consentGrantedAt === null) return;
+
+    await refreshDataset({
+      timeoutSeconds: settings.sessionTimeoutSeconds,
+      horizonHours: DEFAULT_HORIZON_HOURS,
+    });
+    await runTrainingChunk({ timeoutSeconds: settings.sessionTimeoutSeconds });
   })();
 });
 
@@ -92,6 +125,56 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       ...(message.days !== undefined ? { days: message.days } : {}),
     });
     sendResponse({ ok: progress.state === "done", progress });
+  })();
+
+  return true; // keep the message channel open for the async reply
+});
+
+interface TrainMessage {
+  readonly type: "tise:train" | "tise:train-status";
+}
+
+function isTrainMessage(message: unknown): message is TrainMessage {
+  const type = (message as { type?: unknown } | null)?.type;
+  return type === "tise:train" || type === "tise:train-status";
+}
+
+/**
+ * Training on demand, so it can be watched rather than only inferred from an alarm.
+ *
+ * `tise:train` runs chunks back to back until the job finishes, which is what a developer
+ * surface needs and **not** how the alarm path works — the alarm advances one chunk and
+ * lets the worker die. Both go through the same `runTrainingChunk`, so the model this
+ * produces is the model the alarm would have produced, arrived at sooner.
+ */
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (!isTrainMessage(message)) return false;
+
+  void (async () => {
+    const settings = await loadSettings();
+    if (settings.consentGrantedAt === null) {
+      sendResponse({ ok: false, reason: "not-consented" });
+      return;
+    }
+
+    if (message.type === "tise:train-status") {
+      sendResponse({ ok: true, job: await readJob(), model: await readModel() });
+      return;
+    }
+
+    await refreshDataset({
+      timeoutSeconds: settings.sessionTimeoutSeconds,
+      horizonHours: DEFAULT_HORIZON_HOURS,
+    });
+
+    const started = Date.now();
+    let outcome = await runTrainingChunk({
+      timeoutSeconds: settings.sessionTimeoutSeconds,
+    });
+    while (outcome.state === "training") {
+      outcome = await runTrainingChunk({ timeoutSeconds: settings.sessionTimeoutSeconds });
+    }
+    sendResponse({ ok: outcome.state === "done", outcome, elapsedMs: Date.now() - started });
   })();
 
   return true; // keep the message channel open for the async reply

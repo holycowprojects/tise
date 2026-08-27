@@ -35,6 +35,14 @@ from tise_research.features.labels import return_24h_labels
 from tise_research.features.resolver import resolve
 from tise_research.features.sessions import sessionise
 from tise_research.features.vector import FEATURE_NAMES, FEATURE_SET, compute_features
+from tise_research.models.logreg import (
+    DEFAULT_SPEC,
+    predict_proba,
+    step_size,
+    train,
+)
+from tise_research.models.prep import design_columns, fit_preprocessor
+from tise_research.models.transition import fit_transition_table, primary_category
 
 #: research/tise_research/parity_fixture.py -> repo root is three parents up.
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -79,6 +87,17 @@ RAW_EVENTS: list[tuple[datetime, str]] = [
     (_at(9, 15, 0), "github.com"),   # a gap, so the last session's horizon is unresolved
     (_at(10, 16, 0), "youtube.com"),
     (_at(10, 16, 5), "github.com"),
+    # --- T11 extension: a recurrence landing EXACTLY on the horizon -----------------
+    # Found by breaking the label boundary from `<=` to `<` and watching the whole suite
+    # stay green. The header above has always claimed to cover "a recurrence inside the
+    # horizon and one outside it", and it does — but never one *on* it, so the boundary
+    # itself was unobservable and either language could have had it wrong.
+    #
+    # Both events are more than 24 hours after the day-10 session closed, so no existing
+    # label changes: the day-10 `video` and `dev` labels stay negative, and the diff is
+    # additive exactly as the T10 extension was.
+    (_at(12, 10, 0), "youtube.com"),  # a one-event session closing at 10:00
+    (_at(13, 10, 0), "youtube.com"),  # +24h to the second -> positive only if `<=`
 ]
 
 
@@ -175,25 +194,27 @@ def build_expected_document() -> dict:
     label_objects = return_24h_labels(
         events, timeout_seconds=TIMEOUT_SECONDS, horizon_hours=HORIZON_HOURS
     )
-    features = []
-    for label in label_objects:
-        row = compute_features(
+    feature_rows = [
+        compute_features(
             events,
             label.subject,
             window_end=label.window_end,
             timeout_seconds=TIMEOUT_SECONDS,
             horizon_hours=HORIZON_HOURS,
         )
-        features.append(
-            {
-                "subject": row.subject,
-                "windowEnd": row.window_end.isoformat(),
-                "compat": row.compat,
-                # Written in FEATURE_NAMES order. The order is part of the contract: it
-                # is the column order of any matrix built from these rows.
-                "values": {name: row.values[name] for name in FEATURE_NAMES},
-            }
-        )
+        for label in label_objects
+    ]
+    features = [
+        {
+            "subject": row.subject,
+            "windowEnd": row.window_end.isoformat(),
+            "compat": row.compat,
+            # Written in FEATURE_NAMES order. The order is part of the contract: it
+            # is the column order of any matrix built from these rows.
+            "values": {name: row.values[name] for name in FEATURE_NAMES},
+        }
+        for row in feature_rows
+    ]
 
     unknown_count = sum(1 for event in events if event.category == "unknown")
 
@@ -212,12 +233,81 @@ def build_expected_document() -> dict:
         "sessions": sessions,
         "labels": labels,
         "features": features,
+        "model": build_model_section(
+            events, feature_rows, [label.outcome for label in label_objects]
+        ),
         "summary": {
             "eventCount": len(events),
             "sessionCount": len(sessions),
             "labelCount": len(labels),
             "positiveCount": sum(1 for label in labels if label["outcome"]),
             "unknownEventCount": unknown_count,
+        },
+    }
+
+
+def build_model_section(events: list[Event], feature_rows: list, outcomes: list[bool]) -> dict:
+    """The T11 oracle: preprocessing, coefficients, probabilities and the transition table.
+
+    Fitted on all thirteen fixture rows with no train/test split, which would be
+    indefensible as a benchmark and is exactly right as a parity target: the question here
+    is whether two implementations do the same arithmetic, not whether the arithmetic
+    generalises. The real evaluation runs on real browsing through
+    `tise_research.eval.backtest`, where the folds are chronological.
+
+    The intermediate matrix is written out as well as the final weights. If only the
+    weights were compared, a preprocessing bug and an optimiser bug would be
+    indistinguishable — and one thousand gradient steps is a long way to bisect by hand.
+    """
+    preprocessor = fit_preprocessor(feature_rows)
+    matrix = preprocessor.matrix(feature_rows)
+    state = train(matrix, outcomes, spec=DEFAULT_SPEC, n_columns=len(design_columns()))
+
+    sessions = sessionise(events, timeout_seconds=TIMEOUT_SECONDS)
+    table = fit_transition_table(sessions)
+
+    return {
+        "note": [
+            "Fitted on every row, with no split. That is deliberate: this section",
+            "compares arithmetic between two languages, and is not a benchmark.",
+        ],
+        "designColumns": list(design_columns()),
+        "preprocessor": {
+            "fills": list(preprocessor.fills),
+            "means": list(preprocessor.means),
+            "scales": list(preprocessor.scales),
+        },
+        "matrix": matrix,
+        "outcomes": outcomes,
+        "spec": {
+            "iterations": DEFAULT_SPEC.iterations,
+            "l2": DEFAULT_SPEC.l2,
+            "chunkIterations": DEFAULT_SPEC.chunk_iterations,
+            "stepScale": DEFAULT_SPEC.step_scale,
+        },
+        # Derived from the matrix rather than declared, so it is part of what parity
+        # compares: a mirror that reproduced the weights with a different step would be
+        # agreeing by coincidence.
+        "stepSize": step_size(matrix, DEFAULT_SPEC),
+        "logreg": {
+            "weights": list(state.weights),
+            "bias": state.bias,
+            "iterationsDone": state.iterations_done,
+            "gradientNorm": state.gradient_norm,
+        },
+        "predictions": [predict_proba(state, row) for row in matrix],
+        "transition": {
+            "primaries": [primary_category(session) for session in sessions],
+            "vocabulary": list(table.vocabulary),
+            "counts": table.counts,
+            "marginal": table.marginal,
+            "smoothing": table.smoothing,
+            # One distribution per known starting category, plus the fallback a category
+            # nobody has ever started from must fall back to.
+            "distributions": {
+                category: table.distribution(category) for category in table.vocabulary
+            },
+            "unseenDistribution": table.distribution("__never-seen__"),
         },
     }
 

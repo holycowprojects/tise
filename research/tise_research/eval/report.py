@@ -178,7 +178,9 @@ these baselines uses dwell time — they see only the category and `window_end` 
 `full` and `history` variants are **identical by construction**. Every number here is
 achievable by the shipped extension.
 
-The distinction becomes live at T10, when features that *can* use duration arrive.
+It stayed that way at T10. D35 stopped Tise measuring dwell in either direction, so every
+feature in `fs_2` is compat class `history` and the `full` class is empty (D51). The
+distinction is kept because it is real, not because anything currently uses it.
 
 {sections}
 
@@ -190,8 +192,10 @@ The distinction becomes live at T10, when features that *can* use duration arriv
 - **Small tails.** Most categories never clear the label floor. That is a fact about the
   data, not a tuning choice, and it will not improve much with more history because the
   distribution is dominated by a handful of domains.
-- **No model yet.** Everything here is a baseline. The first real model arrives at T11,
-  and it will be reported on exactly these folds.
+- **`logreg_fs2` is not a baseline.** It appears in these tables because D24 requires the
+  baselines beside it on identical folds, and this is where those folds are defined. What
+  it means — where it clears the D28 bar, where it does not, and the per-fold picture the
+  pooled score hides — is in `model.md`, and that is the file to read about it.
 """,
         encoding="utf-8",
     )

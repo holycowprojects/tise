@@ -16,6 +16,7 @@ export interface DeletionOutcome {
   readonly eventsDeleted: number;
   readonly metaKeysDeleted: number;
   readonly featureRowsDeleted: number;
+  readonly labelsDeleted: number;
 }
 
 export async function deleteEverything(): Promise<DeletionOutcome> {
@@ -24,18 +25,21 @@ export async function deleteEverything(): Promise<DeletionOutcome> {
   const eventsDeleted = await db.count("events");
   const metaKeysDeleted = await db.count("meta");
   const featureRowsDeleted = await db.count("features");
+  const labelsDeleted = await db.count("labels");
 
-  // Features survive *retention* (D11) and not deletion. Retention is a promise about
-  // how long raw browsing is kept; "delete everything" is a promise about everything.
-  const tx = db.transaction(["events", "meta", "features"], "readwrite");
+  // Features and labels survive *retention* (D11) and not deletion. Retention is a
+  // promise about how long raw browsing is kept; "delete everything" is a promise about
+  // everything — the trained model in `meta` included.
+  const tx = db.transaction(["events", "meta", "features", "labels"], "readwrite");
   await Promise.all([
     tx.objectStore("events").clear(),
     tx.objectStore("meta").clear(),
     tx.objectStore("features").clear(),
+    tx.objectStore("labels").clear(),
     tx.done,
   ]);
 
-  return { eventsDeleted, metaKeysDeleted, featureRowsDeleted };
+  return { eventsDeleted, metaKeysDeleted, featureRowsDeleted, labelsDeleted };
 }
 
 /** Every store holds nothing. The assertion behind the delete-all claim. */
@@ -44,6 +48,7 @@ export async function isEmpty(): Promise<boolean> {
   return (
     (await db.count("events")) === 0 &&
     (await db.count("meta")) === 0 &&
-    (await db.count("features")) === 0
+    (await db.count("features")) === 0 &&
+    (await db.count("labels")) === 0
   );
 }

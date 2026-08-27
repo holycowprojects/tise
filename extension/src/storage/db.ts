@@ -13,13 +13,17 @@
  * browsing itself.
  */
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
+import type { Label } from "../features/labels";
 import type { FeatureRow } from "../features/vector";
 import type { TiseEvent } from "../types";
 
 export const DB_NAME = "tise";
 
-/** 2 added the `features` store. Upgrades are additive; nothing is ever dropped here. */
-export const DB_VERSION = 2;
+/**
+ * 2 added the `features` store; 3 added `labels`. Upgrades are additive; nothing is ever
+ * dropped here.
+ */
+export const DB_VERSION = 3;
 
 export interface TiseDB extends DBSchema {
   events: {
@@ -45,6 +49,23 @@ export interface TiseDB extends DBSchema {
     value: FeatureRow;
     indexes: { windowEnd: string; subject: string };
   };
+  /**
+   * `return_24h` outcomes, one per feature row and keyed the same way.
+   *
+   * Kept apart from `features` rather than folded into the row, because the two have
+   * different lifecycles: a feature vector is final the instant it is computed, while an
+   * outcome is provisional until its horizon has elapsed and is **rewritten** when it
+   * resolves. Storing a mutable field inside an immutable row is how a "recomputed"
+   * feature quietly becomes a different feature.
+   *
+   * Like `features`, it outlives raw events (D11) — a person keeps what was learned from
+   * their browsing without keeping a record of the browsing itself.
+   */
+  labels: {
+    key: [string, string, string];
+    value: Label;
+    indexes: { windowEnd: string; subject: string };
+  };
 }
 
 let handle: Promise<IDBPDatabase<TiseDB>> | null = null;
@@ -67,6 +88,13 @@ export function openTiseDb(): Promise<IDBPDatabase<TiseDB>> {
         });
         features.createIndex("windowEnd", "windowEnd");
         features.createIndex("subject", "subject");
+      }
+      if (!db.objectStoreNames.contains("labels")) {
+        const labels = db.createObjectStore("labels", {
+          keyPath: ["target", "subject", "windowEnd"],
+        });
+        labels.createIndex("windowEnd", "windowEnd");
+        labels.createIndex("subject", "subject");
       }
     },
   });

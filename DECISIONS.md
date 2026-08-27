@@ -1406,3 +1406,198 @@ implementation.
 
 Worth recording because it is the failure mode a parity suite is *most* prone to: a test
 that reads the oracle and calls it verification.
+
+---
+
+## T11 — in-browser training
+
+### D54 — The optimiser is written out by hand, in both languages
+
+scikit-learn solves logistic regression with LBFGS: a line search over a quasi-Newton
+approximation. Nothing in a browser is going to reproduce its iterates to 1e-9, and a
+model whose coefficients cannot be reproduced in the extension is a model the extension
+does not ship. The whole premise of Tise is that training happens on the user's own
+machine over the user's own browsing, so the optimiser has to be something both languages
+can execute identically.
+
+It is therefore **full-batch gradient descent with a fixed iteration count**, from a
+starting point of all zeros, accumulating in a fixed row-major order. No random
+initialisation, no seed, no early stopping — every one of those is a place two
+implementations can diverge without either being wrong.
+
+The cost is real: LBFGS would converge in tens of iterations where this takes thousands.
+That is the price of the parity contract, and it is paid rather than argued away.
+
+**Measured:** on the fixture, after 4,000 gradient steps and ~72,000 `exp` calls, the
+largest disagreement between Python and TypeScript is **2.2e-16** on any coefficient and
+**4.4e-16** on any matrix cell — seven orders of magnitude below the 1e-9 tolerance. The
+concern that accumulated floating-point error would make the tolerance tight turned out
+to be unfounded, and it was checked rather than assumed.
+
+### D55 — The step size is derived from the design matrix, not declared
+
+A hand-picked learning rate works on the data it was picked on. Gradient descent diverges
+once the step exceeds `2/L`, and `L` depends on how collinear the columns are — which
+depends on whose browsing it is. "0.5 worked on my history" is not a claim worth shipping
+to somebody else's machine, where the failure would be a model that silently produces
+garbage rather than an error anyone sees.
+
+So the step is `1/L` for an upper bound on the curvature computed from the matrix itself:
+a quarter of the mean squared row norm plus `l2/n`. It provably cannot diverge for any
+input, including perfectly collinear columns.
+
+This was **not** the first design. The first used a declared `learning_rate = 0.5`,
+which passed every test — and would have diverged on a profile whose columns happened to
+be more correlated than mine. The bound is a smaller step and costs iterations; the
+iteration count went from 1,000 to 4,000 to pay for it.
+
+The guarantee is tested by violating it: a test multiplies the step by 400 and asserts the
+fit does diverge. A bound nobody has watched do anything is arithmetic, not a safeguard.
+
+### D56 — Absence gets its own column rather than a filled-in value
+
+D51 made absence `null` and never a sentinel, precisely so nothing downstream fits a
+coefficient to a number that was never measured. A linear model cannot consume `null`, so
+something has to go there — and whatever goes there is exactly the invented number D51
+forbade.
+
+The resolution is to fill with the **training mean** and add a **column recording that the
+fill happened**. The model learns what absence is worth instead of being told it is worth
+the average. Four of the fourteen features are nullable, so the design matrix has 18
+columns.
+
+`priorReturnRate__missing` is very nearly `priorSessionCount == 0` restated, so two of
+those columns are close to collinear. That redundancy is left in and recorded rather than
+tidied away: dropping the indicator because another column implies it would be reasoning
+about the data instead of measuring it, and L2 absorbs it.
+
+Standardisation is **part of the fitted model** — means and deviations come from the
+training window only and are reapplied unchanged. Refitting them across train and test is
+the textbook leak, and it does not look like a leak; it looks like a slightly better
+score. A column with no variation in training gets a scale of 1, which turns it into
+zeros: it carries no information, and the model should not be able to fit it. On the
+fixture exactly one column is constant (`categoryShare30d__missing`) and its coefficient
+is exactly 0, which a test asserts.
+
+### D57 — Training is chunked, and the training set is pinned when a job starts
+
+MV3 terminates service workers with no warning and no callback, so anything that must
+finish cannot be one long call. Training advances a fixed number of steps per wake-up and
+writes a complete, resumable state each time. Chunked training and one-shot training
+produce **bitwise identical** results, asserted by running at chunk sizes of 1, 3, 7, 50,
+999 and 10,000 and by dropping the database handle between chunks.
+
+The subtler half: chunk seven must train on exactly what chunk one did. If browsing
+happens mid-run, or an import backfills older history, the set moves and the result is
+several fits blended by accident — which looks like nothing at all. So a job records its
+window and row count, and **restarts** if either stops matching. Restarting is visible and
+cheap; continuing is invisible and wrong.
+
+### D58 — Labels live in their own store, at database version 3
+
+A feature row alone cannot retrain anything; it has no answer attached. So labels persist
+on the same terms as features (D11) — outliving raw events, so a person keeps what was
+learned from their browsing without keeping the browsing.
+
+They are a separate store rather than a field on `FeatureRow` because the two have
+different lifecycles. **A feature vector is final the instant it is computed. An outcome is
+provisional until its horizon has elapsed**, and is rewritten when it resolves. Putting a
+mutable field inside an immutable row is how a "recomputed" feature quietly becomes a
+different feature. It also keeps the `FeatureRow` schema unchanged, which is on the
+ask-first list.
+
+`enforceRetention` still touches `events` and nothing else. `deleteEverything` clears
+labels, features and the trained model: retention is a promise about how long raw browsing
+is kept, deletion is a promise about everything.
+
+### D59 — The offscreen document was not needed, and the permission has not been removed
+
+The plan specified training in an offscreen document, on the reasoning that training is
+long-running. **Chunking removes the premise**: no single call is long. The service worker
+does a chunk in milliseconds and is free to die immediately afterwards.
+
+So `offscreen` is currently an unused permission. It has **not** been removed, for two
+reasons. Removing a permission is a manifest change and is on the ask-first list. And D31
+justified it from an observation, so retiring it deserves an observation too — a timed
+chunk on a profile with real history, not an argument from the shape of the code.
+
+Recommendation to Akash: remove it at T18 unless a real-profile timing says otherwise. A
+permission the extension does not use is a permission that has to be justified to the Web
+Store and to anyone reading the manifest, and "we might need it later" is exactly the
+reasoning that produces the manifests this project criticised at T5.
+
+### D60 — The bar is cleared on Edge, and the result is weaker than that number alone
+
+D28 set the bar at **Brier 0.1254 on Edge**, what `category_base_rate` scores there.
+
+`logreg_fs2` scores **0.1119**, skill **+0.400** against the base rate's +0.328. The bar
+is cleared, on the corpus it was set on, on identical folds.
+
+**That is the most flattering true sentence available, and it is not the whole result.**
+
+- On Edge the model wins **2 of 5 folds**. The pooled score clears the bar because the two
+  folds it wins, it wins by a lot. Pooling rewards the size of a win, not its consistency.
+- On **Chrome it loses outright**: 0.2195 against 0.1868, barely better than reporting the
+  global base rate.
+- On Firefox it clears the bar and wins 4 of 5 folds.
+- Across all three corpora: **8 of 15 folds**.
+
+The pattern is the same everywhere: **the model wins the early folds and loses the late
+ones**, which is the opposite of what more training data should do.
+
+One measured fact bears on that, and it is a lead rather than a conclusion. Several
+features are cumulative counters that only grow, so in an expanding-window backtest a test
+row always sits later in the calendar than every training row. On Edge, **77.5% of test
+rows have `hoursSinceFirstSeen` outside the range the coefficients were fitted on**;
+`priorSessionCount` 42.1%, `eventCount30d` 31.1%. A linear model extrapolating beyond its
+fitted range is a reason to expect exactly this shape of failure.
+
+Confirming it means changing those features and re-running these folds — and the change
+has to be chosen **without looking at these numbers**, or the fix is fitted to the test
+set. That is T16, along with the confidence intervals that would say whether a 2-of-5
+fold split means anything at all at these sample sizes.
+
+Nothing was tuned to produce this. `l2` is fixed at 1 for every fold and every corpus,
+and no feature was added, dropped or transformed after seeing a score. The cyclic encoding
+of `hourOfDay` and `dayOfWeek` that a linear model would ordinarily want was deliberately
+**not** added, so that if it is added later its effect can be measured against this.
+
+### D61 — The parity fixture never tested the horizon boundary, and now does
+
+Found the way these things get found: the label boundary in the TypeScript mirror was
+changed from `<=` to `<` on purpose, and **all 227 tests passed**.
+
+The fixture header had claimed since T3 to cover "a recurrence inside the horizon and one
+outside it", and it did. It never covered one landing *on* it, so the boundary itself was
+unobservable and either language could have had it wrong indefinitely. The closest any
+label came to 24 hours was 23.25.
+
+Two events were appended — a session on day 12 and a return exactly 24 hours later — and
+the same break now fails 3 tests. The extension is additive: no existing outcome changed,
+no label was dropped, every previously frozen session is preserved, and that was verified
+against `git show HEAD` rather than asserted. A fixture-trust test now requires at least
+one label to sit exactly on the horizon, so the gap cannot silently reopen.
+
+This is the second time a hole has been found in the tests rather than the code — T10 had
+two assertions that read values out of the oracle instead of computing them. Both were
+found by breaking something and counting what failed. **A parity suite that has never been
+watched fail has not been tested**, and the count matters as much as the failure: a break
+that fails one test where it should fail three is itself a finding.
+
+### D62 — The iteration budget is justified by a measurement, not by a threshold
+
+4,000 steps reaches a gradient norm around 1e-16 on the synthetic fixture and only about
+**2.4e-5** on real browsing. Calling the latter "converged" would use a word the number
+does not support, and the first draft of `model.md` did exactly that before the number was
+read properly.
+
+The useful question is not whether the gradient reaches zero but whether the remaining
+distance changes an answer this project publishes. `analysis/convergence_budget.py`
+answers it directly: multiplying the budget by five moves the pooled Brier by **1.3e-5 on
+Edge, 4.2e-6 on Chrome, 4.5e-8 on Firefox** — all far below the fourth decimal place the
+reports quote.
+
+So the budget is sufficient *for the claims being made*, which is a different and smaller
+statement than "the optimiser has finished". Raising it would cost battery on somebody
+else's laptop to buy a change nobody can see. Both halves are in
+`docs/benchmarks/convergence-budget.md` so the distinction stays visible.

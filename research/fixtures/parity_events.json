@@ -147,6 +147,22 @@
       "transition": "link",
       "dwellSeconds": null,
       "source": "import"
+    },
+    {
+      "eventId": "evt-017",
+      "occurredAt": "2026-06-12T10:00:00+00:00",
+      "domain": "youtube.com",
+      "transition": "link",
+      "dwellSeconds": null,
+      "source": "import"
+    },
+    {
+      "eventId": "evt-018",
+      "occurredAt": "2026-06-13T10:00:00+00:00",
+      "domain": "youtube.com",
+      "transition": "link",
+      "dwellSeconds": null,
+      "source": "import"
     }
   ]
 }

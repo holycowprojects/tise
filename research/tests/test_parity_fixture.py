@@ -13,11 +13,13 @@ describes a model nobody shipped, and nothing ever tells you.
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
 from tise_research.parity_fixture import (
     FIXTURE_DIR,
+    build_events,
     build_expected_document,
     build_input_document,
 )
@@ -74,6 +76,35 @@ class TestFixtureCoversWhatItClaimsTo:
         expected = _load(EXPECTED_PATH)
         assert expected["sessions"][1]["startedAt"].endswith("10:20:01+00:00")
 
+    def test_a_recurrence_lands_exactly_on_the_horizon(self):
+        """Without this, `<=` and `<` are indistinguishable and both suites stay green.
+
+        Found at T11 by flipping the boundary in the TypeScript mirror and watching 227
+        tests pass. The fixture header had always claimed to cover a recurrence inside the
+        horizon and one outside it, and it did — but never one *on* it.
+        """
+        expected = _load(EXPECTED_PATH)
+        horizon = timedelta(hours=expected["horizonHours"])
+
+        # Rebuilt from the pipeline rather than read back out of the oracle, so this
+        # asserts a property of the data and not of what was written down.
+        moments: dict[str, list[datetime]] = {}
+        for event in build_events():
+            moments.setdefault(event.category, []).append(event.occurred_at)
+        for instants in moments.values():
+            instants.sort()
+
+        on_boundary = 0
+        for label in expected["labels"]:
+            window_end = datetime.fromisoformat(label["windowEnd"])
+            after = [m for m in moments[label["subject"]] if m > window_end]
+            if after and after[0] == window_end + horizon:
+                on_boundary += 1
+                assert label["outcome"] is True, (
+                    "a recurrence exactly on the horizon is inside it"
+                )
+        assert on_boundary >= 1, "the horizon boundary is not exercised by any label"
+
     def test_both_outcomes_appear(self):
         outcomes = {label["outcome"] for label in _load(EXPECTED_PATH)["labels"]}
         assert outcomes == {True, False}, "a fixture with one outcome tests half the code"
@@ -112,3 +143,77 @@ class TestFixtureIsSynthetic:
         assert summary["positiveCount"] == sum(
             1 for label in expected["labels"] if label["outcome"]
         )
+
+
+@pytest.mark.parity
+class TestTheModelSectionIsWorthTrusting:
+    """A fixture that never exercises a code path cannot catch a bug in it.
+
+    The T10 lesson applies here in full: an assertion that reads a value out of the oracle
+    and compares it to itself proves that Python wrote what Python wrote. Every assertion
+    below is computed from something else, or is a property the value must satisfy.
+    """
+
+    def setup_method(self) -> None:
+        self.model = _load(EXPECTED_PATH)["model"]
+
+    def test_the_matrix_is_shaped_like_the_features_it_came_from(self):
+        expected = _load(EXPECTED_PATH)
+        assert len(self.model["matrix"]) == len(expected["features"])
+        assert len(self.model["outcomes"]) == len(expected["labels"])
+        for row in self.model["matrix"]:
+            assert len(row) == len(self.model["designColumns"])
+
+    def test_training_converged_rather_than_running_out_of_iterations(self):
+        """An unconverged fit is not wrong in any way a score reveals, only worse."""
+        assert self.model["logreg"]["gradientNorm"] < 1e-8
+        assert self.model["logreg"]["iterationsDone"] == self.model["spec"]["iterations"]
+
+    def test_the_step_is_below_the_divergence_threshold_for_this_matrix(self):
+        """Recomputed here from the matrix, not read back from the oracle."""
+        matrix = self.model["matrix"]
+        n = len(matrix)
+        bound = (
+            sum(1.0 + sum(value * value for value in row) for row in matrix) / (4 * n)
+            + self.model["spec"]["l2"] / n
+        )
+        assert 0.0 < self.model["stepSize"] < 2.0 / bound
+
+    def test_the_column_that_never_varies_gets_a_weight_of_exactly_zero(self):
+        """`categoryShare30d` is never absent, so its indicator carries no information.
+
+        The preprocessor turns a zero-variance column into zeros, and a zero column has
+        zero gradient, so its weight can never leave the origin. Asserted because the
+        alternative — a tiny non-zero coefficient on a column with no information — is
+        what happens if the zero-variance guard is dropped.
+        """
+        columns = self.model["designColumns"]
+        weights = self.model["logreg"]["weights"]
+        constant = [
+            name
+            for index, name in enumerate(columns)
+            if len({row[index] for row in self.model["matrix"]}) == 1
+        ]
+        assert constant == ["categoryShare30d__missing"]
+        assert weights[columns.index("categoryShare30d__missing")] == 0.0
+
+    def test_predictions_are_probabilities_and_are_not_all_the_same(self):
+        predictions = self.model["predictions"]
+        assert all(0.0 < value < 1.0 for value in predictions)
+        assert len(set(predictions)) > 1, "a constant predictor proves nothing"
+
+    def test_the_transition_table_has_something_to_transition_between(self):
+        transition = self.model["transition"]
+        assert len(transition["vocabulary"]) >= 2
+        assert len(transition["primaries"]) == len(_load(EXPECTED_PATH)["sessions"])
+
+    def test_every_distribution_sums_to_one(self):
+        for name, distribution in self.model["transition"]["distributions"].items():
+            assert sum(distribution.values()) == pytest.approx(1.0), name
+        unseen = self.model["transition"]["unseenDistribution"]
+        assert sum(unseen.values()) == pytest.approx(1.0)
+
+    def test_smoothing_keeps_every_row_short_of_certainty(self):
+        """The D26 problem: a row built on two observations must not claim 100%."""
+        for name, distribution in self.model["transition"]["distributions"].items():
+            assert max(distribution.values()) < 1.0, name
