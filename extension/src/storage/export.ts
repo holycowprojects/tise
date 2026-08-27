@@ -15,13 +15,22 @@
  * `research/fixtures/export_v1.json` is the contract both sides assert against.
  */
 import { allEvents } from "./events";
+import { allPredictions } from "./predictions";
 import { loadSettings } from "./settings";
 import { CATEGORY_MAP_VERSION } from "../categories/map";
 import { SUFFIX_LIST_VERSION } from "../collect/domain";
 import type { TiseEvent } from "../types";
+import type { Prediction } from "../model/prediction";
 
-/** Bumped only on a breaking change. The Python loader refuses anything it is not. */
-export const EXPORT_SCHEMA = "tise.export.v1";
+/**
+ * Bumped only on a breaking change. The Python loader refuses anything it is not.
+ *
+ * v2 added `predictions`. Additive — a v2 file is a v1 file with one more key — but the
+ * version moves anyway, because "the loader happens to ignore it" is not a contract. A
+ * loader that silently accepted a file whose predictions it dropped would produce a
+ * benchmark missing exactly the rows the file was exported to carry.
+ */
+export const EXPORT_SCHEMA = "tise.export.v2";
 
 export interface TiseExport {
   readonly schema: string;
@@ -34,6 +43,15 @@ export interface TiseExport {
   readonly rawRetentionDays: number;
   readonly overrides: Readonly<Record<string, string>>;
   readonly events: readonly TiseEvent[];
+  /**
+   * Every prediction, resolved and pending, shown and abstained.
+   *
+   * Included for the same reason the export contains everything else: this file is both
+   * "you can take your data out" and "this is how the benchmarks were made", and a
+   * reliability curve cannot be checked by anyone who was not given the predictions it
+   * was drawn from.
+   */
+  readonly predictions: readonly Prediction[];
 }
 
 export async function buildExport(options: {
@@ -51,6 +69,7 @@ export async function buildExport(options: {
     rawRetentionDays: settings.rawRetentionDays,
     overrides: settings.overrides,
     events: await allEvents(),
+    predictions: await allPredictions(),
   };
 }
 

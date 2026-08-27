@@ -27,6 +27,7 @@ import {
   TRAINING_ALARM,
   TRAINING_PERIOD_MINUTES,
 } from "./model/train";
+import { updateRegistry } from "./model/registry";
 
 chrome.webNavigation.onCommitted.addListener(
   (details) => {
@@ -80,6 +81,11 @@ chrome.alarms.onAlarm.addListener((alarm) => {
       horizonHours: DEFAULT_HORIZON_HOURS,
     });
     await runTrainingChunk({ timeoutSeconds: settings.sessionTimeoutSeconds });
+
+    // Predict for newly closed sessions and resolve whatever has come due. Both halves
+    // are idempotent, so running this on every alarm — including ones where training did
+    // nothing — costs a pass and cannot corrupt anything.
+    await updateRegistry({ now: Date.now() });
   })();
 });
 

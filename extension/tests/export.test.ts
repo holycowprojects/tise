@@ -1,6 +1,11 @@
 /**
  * The export, checked against the same file the Python loader is checked against:
- * `research/fixtures/export_v1.json`.
+ * `research/fixtures/export_v2.json`.
+ *
+ * `export_v1.json` is kept frozen next to it and is **not** updated: the Python loader
+ * still reads it, which is how the backward-compatibility promise is tested rather than
+ * asserted. Someone who exported their browsing before the registry existed should not
+ * find the file unreadable because a later version added a key.
  *
  * This is the third shared-data contract in the project, after `domains.json` and
  * `domain_cases.json`. Neither language owns the fixture. If the exporter's shape drifts
@@ -13,6 +18,7 @@ import { IDBFactory } from "fake-indexeddb";
 import { beforeEach, describe, expect, it } from "vitest";
 import { closeTiseDb } from "../src/storage/db";
 import { putEvents } from "../src/storage/events";
+import { putPredictions } from "../src/storage/predictions";
 import { saveSettings } from "../src/storage/settings";
 import {
   buildExport,
@@ -24,7 +30,7 @@ import {
 import { EVENT_FIELDS, type TiseEvent } from "../src/types";
 
 const FIXTURE_PATH = fileURLToPath(
-  new URL("../../research/fixtures/export_v1.json", import.meta.url),
+  new URL("../../research/fixtures/export_v2.json", import.meta.url),
 );
 const FIXTURE: TiseExport = JSON.parse(readFileSync(FIXTURE_PATH, "utf8"));
 
@@ -34,6 +40,7 @@ beforeEach(async () => {
   await closeTiseDb();
   globalThis.indexedDB = new IDBFactory();
   await putEvents(FIXTURE.events as TiseEvent[]);
+  await putPredictions(FIXTURE.predictions);
   await saveSettings({
     sessionTimeoutSeconds: FIXTURE.sessionTimeoutSeconds,
     rawRetentionDays: FIXTURE.rawRetentionDays,
@@ -80,6 +87,7 @@ describe("the export contains nothing beyond the schema", () => {
       "exportedAt",
       "extensionVersion",
       "overrides",
+      "predictions",
       "rawRetentionDays",
       "schema",
       "sessionTimeoutSeconds",

@@ -8,6 +8,7 @@
  * "I never agreed to this", and only one of those should survive a reinstall.
  */
 import { readMeta, writeMeta } from "./db";
+import { recordCollectionStarted, recordCollectionStopped } from "./coverage";
 
 const SETTINGS_KEY = "settings";
 
@@ -40,9 +41,26 @@ export async function loadSettings(): Promise<Settings> {
   return { ...DEFAULT_SETTINGS, ...(stored ?? {}) };
 }
 
+/**
+ * The single choke point for changing settings, and therefore the place coverage is
+ * recorded.
+ *
+ * Every route into pausing or resuming — the popup button, revoking consent, delete-all —
+ * comes through here, so hooking it once catches all of them. Recording the transition in
+ * the caller instead would mean remembering to do it at every future call site, and the
+ * failure would be silent: predictions would resolve to `miss` for windows nobody watched.
+ */
 export async function saveSettings(patch: Partial<Settings>): Promise<Settings> {
-  const next = { ...(await loadSettings()), ...patch };
+  const previous = await loadSettings();
+  const next = { ...previous, ...patch };
   await writeMeta(SETTINGS_KEY, next);
+
+  const was = isCollecting(previous);
+  const is = isCollecting(next);
+  if (was !== is) {
+    const now = Date.now();
+    await (is ? recordCollectionStarted(now) : recordCollectionStopped(now));
+  }
   return next;
 }
 

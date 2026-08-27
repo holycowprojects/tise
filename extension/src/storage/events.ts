@@ -62,6 +62,20 @@ export async function recentEvents(limit: number): Promise<TiseEvent[]> {
  * index in order and returns at the first live row, so it costs a scan of the imported
  * prefix once per import and nothing at all afterwards.
  */
+/**
+ * The oldest event still stored, of any source. `null` when nothing is stored.
+ *
+ * Distinct from `earliestLiveEventAt`, which answers a different question for the import.
+ * This one answers "how far back does the evidence go" — which is what tells the resolver
+ * whether retention removed a prediction window before anyone looked at it. Confusing the
+ * two would let an import-only profile resolve everything to `expired`.
+ */
+export async function earliestEventAt(): Promise<string | null> {
+  const db = await openTiseDb();
+  const cursor = await db.transaction("events").store.index("occurredAt").openCursor();
+  return cursor === null ? null : cursor.value.occurredAt;
+}
+
 export async function earliestLiveEventAt(): Promise<string | null> {
   const db = await openTiseDb();
   let cursor = await db.transaction("events").store.index("occurredAt").openCursor();

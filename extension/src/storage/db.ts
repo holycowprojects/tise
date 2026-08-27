@@ -14,16 +14,17 @@
  */
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 import type { Label } from "../features/labels";
+import type { Prediction } from "../model/prediction";
 import type { FeatureRow } from "../features/vector";
 import type { TiseEvent } from "../types";
 
 export const DB_NAME = "tise";
 
 /**
- * 2 added the `features` store; 3 added `labels`. Upgrades are additive; nothing is ever
- * dropped here.
+ * 2 added the `features` store; 3 added `labels`; 4 added `predictions`. Upgrades are
+ * additive; nothing is ever dropped here.
  */
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 
 export interface TiseDB extends DBSchema {
   events: {
@@ -66,6 +67,22 @@ export interface TiseDB extends DBSchema {
     value: Label;
     indexes: { windowEnd: string; subject: string };
   };
+  /**
+   * Every prediction Tise has made, including the ones it declined to show.
+   *
+   * Abstained predictions are stored precisely *because* they are not displayed: the only
+   * way to find out whether abstaining was the right call is to record what would have
+   * been said and check it later. A registry that kept only the shown predictions could
+   * never answer that.
+   *
+   * Keyed on (target, subject, windowStart) so re-running the prediction pass replaces
+   * rather than duplicates — the same idempotence `features` and `labels` rely on.
+   */
+  predictions: {
+    key: [string, string, string];
+    value: Prediction;
+    indexes: { windowEnd: string; outcome: string; subject: string };
+  };
 }
 
 let handle: Promise<IDBPDatabase<TiseDB>> | null = null;
@@ -95,6 +112,14 @@ export function openTiseDb(): Promise<IDBPDatabase<TiseDB>> {
         });
         labels.createIndex("windowEnd", "windowEnd");
         labels.createIndex("subject", "subject");
+      }
+      if (!db.objectStoreNames.contains("predictions")) {
+        const predictions = db.createObjectStore("predictions", {
+          keyPath: ["target", "subject", "windowStart"],
+        });
+        predictions.createIndex("windowEnd", "windowEnd");
+        predictions.createIndex("outcome", "outcome");
+        predictions.createIndex("subject", "subject");
       }
     },
   });

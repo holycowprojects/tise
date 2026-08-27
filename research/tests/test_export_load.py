@@ -21,8 +21,10 @@ from tise_research.features.labels import return_24h_labels
 from tise_research.features.sessions import sessionise
 
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "export_v1.json"
+V2_FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "export_v2.json"
 
 _RAW = json.loads(FIXTURE.read_text(encoding="utf-8"))
+_V2_RAW = json.loads(V2_FIXTURE.read_text(encoding="utf-8"))
 
 
 def test_the_fixture_loads_without_transformation() -> None:
@@ -84,7 +86,7 @@ def test_the_loop_closes_all_the_way_to_labels() -> None:
 
 
 def test_an_unknown_schema_is_refused_rather_than_guessed() -> None:
-    raw = dict(_RAW, schema="tise.export.v2")
+    raw = dict(_RAW, schema="tise.export.v9")
     with pytest.raises(ValueError, match="unsupported export schema"):
         parse_export(raw)
 
@@ -110,13 +112,120 @@ def test_a_naive_timestamp_is_refused() -> None:
 
 
 def test_the_schema_string_is_pinned() -> None:
-    assert EXPORT_SCHEMA == "tise.export.v1"
-    assert _RAW["schema"] == EXPORT_SCHEMA
+    assert EXPORT_SCHEMA == "tise.export.v2"
+    assert _V2_RAW["schema"] == EXPORT_SCHEMA
+    assert _RAW["schema"] == "tise.export.v1"
 
 
 def test_the_fixture_holds_no_url() -> None:
     """The same assertion the extension makes, made again on the other side of the pipe."""
     text = FIXTURE.read_text(encoding="utf-8")
+    assert "http://" not in text
+    assert "https://" not in text
+    assert "?" not in text
+
+
+class TestBackwardCompatibility:
+    """v1 is kept and still read. The promise is tested, not asserted.
+
+    Someone who exported their browsing before the registry existed should not find the
+    file unreadable because a later version added a key. The v1 fixture is therefore
+    frozen — it is never regenerated — and this class is why.
+    """
+
+    def test_a_v1_export_still_loads(self) -> None:
+        export = load_export(FIXTURE)
+        assert export.schema == "tise.export.v1"
+        assert len(export.events) == 6
+
+    def test_a_v1_export_has_no_predictions_rather_than_failing(self) -> None:
+        assert load_export(FIXTURE).predictions == ()
+
+
+class TestPredictions:
+    def setup_method(self) -> None:
+        self.export = load_export(V2_FIXTURE)
+
+    def test_every_prediction_survives_the_round_trip(self) -> None:
+        assert len(self.export.predictions) == 4
+
+    def test_every_outcome_is_exercised_by_the_fixture(self) -> None:
+        """A fixture missing an outcome cannot catch a bug in handling it."""
+        outcomes = {row.outcome for row in self.export.predictions}
+        assert outcomes == {"pending", "hit", "miss", "expired"}
+
+    def test_both_abstention_states_are_exercised(self) -> None:
+        states = {row.abstained for row in self.export.predictions}
+        assert states == {True, False}
+
+    def test_abstained_predictions_are_present_at_all(self) -> None:
+        """They are recorded precisely because they are not displayed."""
+        assert any(row.abstained for row in self.export.predictions)
+
+    def test_expired_is_not_scoreable_and_miss_is(self) -> None:
+        """The one thing a reader of this record is most likely to get wrong.
+
+        Counting `expired` as a negative would put a fabricated miss into the reliability
+        curve — D52's mistake in a new place.
+        """
+        by_outcome = {row.outcome: row for row in self.export.predictions}
+        assert by_outcome["miss"].scoreable is True
+        assert by_outcome["hit"].scoreable is True
+        assert by_outcome["expired"].scoreable is False
+        assert by_outcome["pending"].scoreable is False
+
+    def test_instants_are_aware(self) -> None:
+        for row in self.export.predictions:
+            assert row.created_at.tzinfo is not None
+            assert row.window_start.tzinfo is not None
+            assert row.window_end.tzinfo is not None
+
+    def test_a_pending_prediction_has_no_resolution_instant(self) -> None:
+        pending = next(r for r in self.export.predictions if r.outcome == "pending")
+        assert pending.resolved_at is None
+
+    def test_a_resolved_prediction_has_one(self) -> None:
+        settled = [r for r in self.export.predictions if r.outcome != "pending"]
+        assert settled and all(r.resolved_at is not None for r in settled)
+
+    def test_the_data_cutoff_never_reaches_into_the_window(self) -> None:
+        """A prediction that used data from inside its own window is not a prediction."""
+        for row in self.export.predictions:
+            assert row.data_cutoff == row.window_start
+
+    def test_the_window_is_the_declared_horizon(self) -> None:
+        for row in self.export.predictions:
+            span = (row.window_end - row.window_start).total_seconds() / 3600
+            assert span == 24.0
+
+    def test_every_prediction_says_what_produced_it(self) -> None:
+        """A stored prediction without its model is not reproducible."""
+        for row in self.export.predictions:
+            assert row.model_name
+            assert row.model_version
+            assert row.feature_set == "fs_2"
+
+    def test_evidence_carries_no_url(self) -> None:
+        for row in self.export.predictions:
+            for line in row.evidence:
+                assert "http" not in line
+                assert "/" not in line
+
+    def test_a_malformed_prediction_names_its_index(self) -> None:
+        raw = json.loads(V2_FIXTURE.read_text(encoding="utf-8"))
+        del raw["predictions"][1]["probability"]
+        with pytest.raises(ValueError, match="prediction 1 is malformed"):
+            parse_export(raw)
+
+    def test_predictions_come_back_in_a_stable_order(self) -> None:
+        starts = [
+            (row.window_start, row.subject) for row in self.export.predictions
+        ]
+        assert starts == sorted(starts)
+
+
+def test_the_v2_fixture_holds_no_url() -> None:
+    text = V2_FIXTURE.read_text(encoding="utf-8")
     assert "http://" not in text
     assert "https://" not in text
     assert "?" not in text

@@ -17,6 +17,7 @@ import { isCollecting, loadSettings, saveSettings } from "../../src/storage/sett
 import { countLabels } from "../../src/storage/labels";
 import { readJob, readModel } from "../../src/model/train";
 import { isIdentity } from "../../src/model/calibrate";
+import { allPredictions, predictionCounts } from "../../src/storage/predictions";
 
 function element(id: string): HTMLElement {
   const found = document.getElementById(id);
@@ -194,6 +195,46 @@ async function renderTraining(consented: boolean): Promise<void> {
   detail.textContent = `${facts.join(". ")}. Trained ${new Date(model.trainedAt).toLocaleString()}.`;
 }
 
+/**
+ * The registry panel. Counts only — no prediction is shown here.
+ *
+ * That is not a placeholder for T14. On this data every prediction is abstained (D70), so
+ * a panel listing "what Tise thinks you will do next" would be listing things the
+ * measurement said not to claim. What can honestly be shown today is how many predictions
+ * exist and how they resolved, including how many were withheld.
+ */
+async function renderRegistry(consented: boolean): Promise<void> {
+  const block = element("registry-block");
+  block.hidden = !consented;
+  if (!consented) return;
+
+  const status = element("registry-status");
+  const detail = element("registry-detail");
+  const predictions = await allPredictions();
+
+  if (predictions.length === 0) {
+    status.textContent = "No predictions yet";
+    detail.textContent =
+      "Predictions are made for sessions that have closed, once a model exists.";
+    return;
+  }
+
+  const counts = await predictionCounts();
+  const withheld = predictions.filter((p) => p.abstained).length;
+  const scoreable = (counts["hit"] ?? 0) + (counts["miss"] ?? 0);
+
+  status.textContent = `${predictions.length.toLocaleString()} predictions`;
+  const parts = [
+    `${counts["hit"] ?? 0} hit, ${counts["miss"] ?? 0} miss, ` +
+      `${counts["pending"] ?? 0} pending, ${counts["expired"] ?? 0} expired`,
+    // `expired` is called out rather than folded in, because a reader who assumes it is a
+    // miss will read a fabricated negative into the score.
+    `${scoreable} scored — expired means Tise was not watching, so it counts as nothing`,
+    `${withheld} withheld below the confidence threshold, kept so it can be checked later`,
+  ];
+  detail.textContent = parts.join(". ") + ".";
+}
+
 async function render(): Promise<void> {
   if (pollTimer !== null) {
     clearTimeout(pollTimer);
@@ -226,6 +267,7 @@ async function render(): Promise<void> {
 
   await renderImport(settings.consentGrantedAt !== null);
   await renderTraining(settings.consentGrantedAt !== null);
+  await renderRegistry(settings.consentGrantedAt !== null);
 
   const categories = [...(await countsByCategory())].sort((a, b) => b[1] - a[1]);
   replace(

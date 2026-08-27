@@ -245,9 +245,24 @@ working and committable.
   - **Two more fixture gaps, found by breaking things** (D71): a real decile-binning bug
     (`int(0.3/0.1) == 2`), and a logit clamp no parity test touched. Both closed
 
-- [ ] **T13 · Prediction registry and automatic outcome resolution** · M · deps: T12
-  - `hit` / `miss` / `expired` resolved with no user confirmation anywhere
-  - Verify: force a prediction, satisfy it by browsing, confirm `hit` without clicking
+- [x] **T13 · Prediction registry and automatic outcome resolution** · M · deps: T12
+  - `hit` / `miss` / `expired` resolved with no user confirmation anywhere (D6)
+  - Verify: `npm test -- registry` ✓ — 491 Python, 318 TypeScript, both linters clean
+  - **`expired` is not a miss** (D72). A window Tise did not watch produces no measurement
+    and is scored by nobody — D52's rule in a new place. Needed a coverage log of when
+    collection was off, hooked into `saveSettings` so every route in is caught
+  - **Resolution is a pure function**, so idempotence and restart-safety are structural
+    rather than arranged (D73). `resolveAll` returns only what changed, so "a second pass
+    does nothing" is directly assertable
+  - **Abstained predictions are stored**, and on this data that is all of them (D74). The
+    only way to learn whether abstaining was right is to write down what would have been
+    said. T16 needs exactly these rows
+  - Export is now **v2**; the loader reads v1 too and `export_v1.json` stays frozen, so
+    backward compatibility is tested rather than asserted (D76)
+  - **Third hole in my own tests** (D77): one of eight breaks failed *nothing* — the
+    registry pass could rewrite resolved predictions back to `pending` and no test noticed,
+    because every test stopped at an early return. Fixed with an end-to-end group
+  - Owed: the two manual checks — satisfy a prediction by browsing, and let one expire
 
 - [ ] **CHECKPOINT D** — the extension scores itself; reliability curve exists
 

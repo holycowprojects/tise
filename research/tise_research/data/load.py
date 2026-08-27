@@ -22,11 +22,58 @@ from typing import Any
 
 from tise_research.features.events import Event
 
-__all__ = ["EXPORT_SCHEMA", "TiseExport", "load_export", "parse_export"]
+__all__ = [
+    "EXPORT_SCHEMA",
+    "SUPPORTED_SCHEMAS",
+    "ExportedPrediction",
+    "TiseExport",
+    "load_export",
+    "parse_export",
+]
 
-EXPORT_SCHEMA = "tise.export.v1"
+#: What the extension writes today.
+EXPORT_SCHEMA = "tise.export.v2"
+
+#: What this loader will read. v2 added `predictions`; a v1 file is a v2 file without them,
+#: so it is still readable and loads with an empty tuple. Accepting v1 is a deliberate
+#: promise rather than an accident of parsing — someone who exported their browsing months
+#: ago should not find the file unreadable because a later version added a key.
+SUPPORTED_SCHEMAS = ("tise.export.v1", "tise.export.v2")
 
 _REQUIRED = ("schema", "exportedAt", "events")
+
+
+@dataclass(frozen=True, slots=True)
+class ExportedPrediction:
+    """One row of the prediction registry, as the extension recorded it.
+
+    `outcome` is `"pending"`, `"hit"`, `"miss"` or `"expired"`. **`expired` is not a miss**
+    — it means the window closed while Tise was not watching, so nothing was measured, and
+    anything scoring these must exclude them rather than counting them as negatives. That
+    is D52's rule in a new place, and it is the one thing about this record that a reader
+    is most likely to get wrong.
+    """
+
+    prediction_id: str
+    created_at: datetime
+    target: str
+    subject: str
+    probability: float
+    window_start: datetime
+    window_end: datetime
+    abstained: bool
+    model_name: str
+    model_version: str
+    feature_set: str
+    data_cutoff: datetime
+    evidence: tuple[str, ...]
+    outcome: str
+    resolved_at: datetime | None
+
+    @property
+    def scoreable(self) -> bool:
+        """Only `hit` and `miss` are measurements. See the note on `outcome`."""
+        return self.outcome in ("hit", "miss")
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +89,9 @@ class TiseExport:
     raw_retention_days: int
     overrides: dict[str, str]
     events: tuple[Event, ...]
+    #: Empty for a v1 export, which predates the registry.
+    predictions: tuple[ExportedPrediction, ...] = ()
+    schema: str = EXPORT_SCHEMA
 
 
 def _parse_instant(value: str) -> datetime:
@@ -58,10 +108,10 @@ def parse_export(raw: dict[str, Any]) -> TiseExport:
     if missing:
         raise ValueError(f"export is missing required keys: {missing}")
 
-    if raw["schema"] != EXPORT_SCHEMA:
+    if raw["schema"] not in SUPPORTED_SCHEMAS:
         raise ValueError(
             f"unsupported export schema {raw['schema']!r}; this loader reads "
-            f"{EXPORT_SCHEMA!r}. Refusing rather than guessing."
+            f"{SUPPORTED_SCHEMAS!r}. Refusing rather than guessing."
         )
 
     events = []
@@ -81,6 +131,32 @@ def parse_export(raw: dict[str, Any]) -> TiseExport:
         except (KeyError, ValueError) as error:
             raise ValueError(f"event {index} is malformed: {error}") from error
 
+    predictions = []
+    for index, row in enumerate(raw.get("predictions") or []):
+        try:
+            resolved = row["resolvedAt"]
+            predictions.append(
+                ExportedPrediction(
+                    prediction_id=str(row["predictionId"]),
+                    created_at=_parse_instant(str(row["createdAt"])),
+                    target=str(row["target"]),
+                    subject=str(row["subject"]),
+                    probability=float(row["probability"]),
+                    window_start=_parse_instant(str(row["windowStart"])),
+                    window_end=_parse_instant(str(row["windowEnd"])),
+                    abstained=bool(row["abstained"]),
+                    model_name=str(row["modelName"]),
+                    model_version=str(row["modelVersion"]),
+                    feature_set=str(row["featureSet"]),
+                    data_cutoff=_parse_instant(str(row["dataCutoff"])),
+                    evidence=tuple(str(line) for line in row["evidence"]),
+                    outcome=str(row["outcome"]),
+                    resolved_at=None if resolved is None else _parse_instant(str(resolved)),
+                )
+            )
+        except (KeyError, TypeError, ValueError) as error:
+            raise ValueError(f"prediction {index} is malformed: {error}") from error
+
     # `sessionId` is deliberately dropped. Session ids are locally assigned and opaque
     # (D36); the research tier re-derives sessions from timestamps with `sessionise`, and
     # carrying the extension's ids across would invite a comparison that must never be
@@ -94,7 +170,28 @@ def parse_export(raw: dict[str, Any]) -> TiseExport:
         raw_retention_days=int(raw.get("rawRetentionDays", 0)),
         overrides={str(k): str(v) for k, v in (raw.get("overrides") or {}).items()},
         events=tuple(sorted(events, key=lambda event: (event.occurred_at, event.event_id))),
+        predictions=tuple(
+            sorted(predictions, key=lambda row: (row.window_start, row.subject))
+        ),
+        schema=str(raw["schema"]),
     )
+
+
+def prediction_summary(export: TiseExport) -> str:
+    """Counts by outcome, with the unscoreable ones called out rather than folded in."""
+    if not export.predictions:
+        return "  none recorded"
+    counts = Counter(row.outcome for row in export.predictions)
+    abstained = sum(1 for row in export.predictions if row.abstained)
+    scoreable = sum(1 for row in export.predictions if row.scoreable)
+    lines = [
+        f"  {outcome:<10} {count:>6,}" for outcome, count in sorted(counts.items())
+    ]
+    lines.append(f"  {'abstained':<10} {abstained:>6,}  (recorded, never displayed)")
+    lines.append(
+        f"  {'scoreable':<10} {scoreable:>6,}  (hit or miss; expired is not a miss)"
+    )
+    return "\n".join(lines)
 
 
 def load_export(path: Path) -> TiseExport:
@@ -110,7 +207,7 @@ def main() -> None:
     categories = Counter(event.category for event in export.events)
     sources = Counter(event.source for event in export.events)
 
-    print(f"schema           {EXPORT_SCHEMA}")
+    print(f"schema           {export.schema}")
     print(f"exported         {export.exported_at.isoformat()}")
     print(f"extension        {export.extension_version}")
     print(f"category map     v{export.category_map_version}")
@@ -119,6 +216,10 @@ def main() -> None:
     print(f"raw retention    {export.raw_retention_days} days")
     print(f"overrides        {len(export.overrides)}")
     print(f"events           {len(export.events):,}")
+    print(f"predictions      {len(export.predictions):,}")
+
+    print("predictions by outcome")
+    print(prediction_summary(export))
 
     if export.events:
         first = export.events[0].occurred_at

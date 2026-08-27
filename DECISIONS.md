@@ -1866,3 +1866,132 @@ Six deliberate breaks, each reverted: hard targets instead of soft, the logit cl
 Wilson bound reduced to a point estimate, threshold selection taking the highest instead of
 the lowest, abstention ignoring an unmet target, and training no longer holding out a
 calibration slice.
+
+---
+
+## T13 — the prediction registry
+
+### D72 — `expired` is not a miss, and that needed a record of when Tise was not watching
+
+SPEC.md gave the four outcomes — `pending`, `hit`, `miss`, `expired` — and did not say
+what separates the last two. It matters more than it looks.
+
+A `miss` is a **claim about the world**: the window closed and the person did not come
+back. That claim is only true if Tise was watching for the whole window. If collection was
+paused for six of the twenty-four hours, "no return was seen" is not evidence that no
+return happened — it is the absence of evidence, and recording it as a miss puts a
+fabricated negative into the reliability curve.
+
+So `expired` means *the window closed and Tise could not tell*, and it is **scored by
+nobody**. `ExportedPrediction.scoreable` is true for `hit` and `miss` only.
+
+This is D52's rule in a new place. There, prior sessions whose horizon had not elapsed were
+excluded from both sides of the ratio rather than counted as misses, because counting them
+as misses is the tempting shortcut that looks conservative and is wrong. Same shortcut,
+same answer.
+
+Three things produce `expired`, and each is a real hole rather than a hypothetical one:
+
+- **Collection was off** for part of the window — paused, or consent withdrawn.
+- **The window opened before consent** was ever given.
+- **Retention deleted the evidence** before anyone looked. Rare at a 30-day window against
+  a 24-hour horizon, and not impossible.
+
+A **closed browser is not a gap**. If the person was not browsing, no return genuinely
+happened, and that is a real miss. What counts is Tise being unable to observe browsing
+that may have occurred.
+
+`storage/coverage.ts` records gaps rather than uptime, because gaps are rare — an empty
+list is the honest representation of "always watching". Recording is hooked into
+`saveSettings`, which is the single choke point every route into pausing passes through:
+the popup, consent withdrawal, delete-all. Hooking the callers instead would mean
+remembering at every future call site, and the failure would be silent — predictions
+resolving to `miss` for windows nobody watched.
+
+**A hit is still a hit through a gap.** A return that *was* observed is evidence whatever
+was missed around it; only the negative needs full coverage to be trustworthy.
+
+### D73 — Resolution is a pure function, so idempotence is structural
+
+The acceptance criterion was "resolution is idempotent and correct across browser
+restarts". That is met by `resolveOutcome` being a pure function of
+`(prediction, events, coverage, now)` — there is no cursor to lose, no partial progress to
+reconcile, and no "last resolved at" marker that could disagree with the store.
+
+`resolveAll` returns only the predictions whose outcome *changed*, which makes idempotence
+directly assertable: a second pass over the same state returns an empty list, rather than
+having to be inferred from row counts that happen to match.
+
+The registry pass creates before it resolves, so a session that closed and was returned to
+between two alarms gets both its prediction and its resolution in one pass.
+
+### D74 — Abstained predictions are stored, and on this data that is all of them
+
+Every prediction is written to the registry including the ones the abstention policy
+refuses to display. They are stored *precisely because* they are not shown: the only way to
+learn whether abstaining was the right call is to write down what would have been said and
+check it against what happened.
+
+D70 makes this concrete rather than theoretical. On the author's own browsing **every**
+prediction is abstained, so a registry keeping only displayed predictions would be empty
+and could never answer whether the silence was justified. T16 will need exactly these rows.
+
+The popup panel therefore shows counts and no predictions. That is not a placeholder for
+T14 — a panel listing "what Tise thinks you will do next" would be listing things the
+measurement said not to claim.
+
+### D75 — `windowEnd` means opposite ends of the same day in two schemas
+
+A `Label` and a `FeatureRow` have a `windowEnd`: the instant the label became *decidable*,
+which is when a session closed. Features look strictly before it.
+
+A `Prediction` has `windowStart` and `windowEnd`: the span the prediction is *about*.
+`windowStart` is that same session close; `windowEnd` is 24 hours later.
+
+So `prediction.windowStart === label.windowEnd` — the same instant under two names, and
+`prediction.windowEnd` is a full day past anything a `Label` calls by that name. Both are
+strings, so nothing catches a confusion between them at the type level.
+
+Renaming was considered and rejected: `Prediction`'s field names are fixed by SPEC.md, and
+`Label.windowEnd` is in the frozen parity fixture and in every committed benchmark. The
+mitigation is that **exactly one function performs the conversion** (`buildPredictions`),
+it is spelled out where it happens, and `assertStorablePrediction` enforces
+`dataCutoff === windowStart` on every write — so a prediction built from the wrong end of
+the day cannot be stored at all.
+
+### D76 — The export is v2, and v1 is kept readable on purpose
+
+`predictions` was added to the export, so the schema moved to `tise.export.v2`. The change
+is additive — a v2 file is a v1 file with one more key — and the version moved anyway,
+because "the loader happens to ignore it" is not a contract. A loader silently accepting a
+file whose predictions it dropped would produce a benchmark missing exactly the rows the
+file was exported to carry.
+
+The Python loader reads **both**. `research/fixtures/export_v1.json` is kept frozen and is
+never regenerated: someone who exported their browsing before the registry existed should
+not find the file unreadable because a later version added a key, and keeping the old
+fixture is how that promise is *tested* rather than asserted.
+
+`export_v2.json` is hand-designed like the parity fixture, and exercises all four outcomes
+and both abstention states. A fixture missing an outcome cannot catch a bug in handling it.
+
+### D77 — A third hole in my own tests, found the same way
+
+Eight deliberate breaks. Seven failed between one and three tests. The eighth — removing
+the filter that stops the registry pass rewriting predictions it has already made — failed
+**nothing**.
+
+That break resets a resolved outcome back to `pending`, silently erasing a measurement.
+The cause was the shape of the suite rather than the code: every registry test either
+exercised `updateRegistry`'s refusals (no consent, no model) or called `resolveAll`
+directly, so the path *between* them — the one that needs a trained model to reach — had no
+test through it at all.
+
+Fixed with an end-to-end group that trains a real model and runs the pass twice. The same
+break now fails.
+
+This is the third time: T10 had two assertions that read values out of the oracle instead
+of computing them; T12 had a logit clamp no parity test touched; T13 had a whole code path
+behind an early return. **The count matters as much as the failure** — a break that fails
+nothing is a finding about the tests, and the only way to see it is to break things one at
+a time and count.

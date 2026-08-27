@@ -1,0 +1,154 @@
+{
+  "schema": "tise.export.v2",
+  "exportedAt": "2026-08-26T12:00:00.000Z",
+  "extensionVersion": "0.1.0",
+  "categoryMapVersion": 1,
+  "suffixListVersion": 1,
+  "sessionTimeoutSeconds": 1800,
+  "rawRetentionDays": 30,
+  "overrides": {
+    "youtube.com": "learning"
+  },
+  "events": [
+    {
+      "eventId": "imp_101",
+      "occurredAt": "2026-08-24T09:00:00.000Z",
+      "source": "import",
+      "domain": "news.ycombinator.com",
+      "category": "news",
+      "transition": "typed",
+      "dwellSeconds": null,
+      "sessionId": "2026-08-24T09:00:00.000Z"
+    },
+    {
+      "eventId": "imp_102",
+      "occurredAt": "2026-08-24T09:04:00.000Z",
+      "source": "import",
+      "domain": "github.com",
+      "category": "dev",
+      "transition": "link",
+      "dwellSeconds": null,
+      "sessionId": "2026-08-24T09:00:00.000Z"
+    },
+    {
+      "eventId": "imp_103",
+      "occurredAt": "2026-08-24T14:30:00.000Z",
+      "source": "import",
+      "domain": "youtube.com",
+      "category": "learning",
+      "transition": "link",
+      "dwellSeconds": null,
+      "sessionId": "2026-08-24T14:30:00.000Z"
+    },
+    {
+      "eventId": "d1e4a0c2-0000-4000-8000-000000000001",
+      "occurredAt": "2026-08-26T08:15:00.000Z",
+      "source": "live",
+      "domain": "google.com",
+      "category": "search",
+      "transition": "typed",
+      "dwellSeconds": null,
+      "sessionId": "2026-08-26T08:15:00.000Z"
+    },
+    {
+      "eventId": "d1e4a0c2-0000-4000-8000-000000000002",
+      "occurredAt": "2026-08-26T08:16:00.000Z",
+      "source": "live",
+      "domain": "example.co.uk",
+      "category": "unknown",
+      "transition": "link",
+      "dwellSeconds": null,
+      "sessionId": "2026-08-26T08:15:00.000Z"
+    },
+    {
+      "eventId": "d1e4a0c2-0000-4000-8000-000000000003",
+      "occurredAt": "2026-08-26T11:00:00.000Z",
+      "source": "live",
+      "domain": "youtube.com",
+      "category": "learning",
+      "transition": "link",
+      "dwellSeconds": null,
+      "sessionId": "2026-08-26T11:00:00.000Z"
+    }
+  ],
+  "predictions": [
+    {
+      "predictionId": "return_24h:news:2026-08-24T09:04:00.000Z",
+      "createdAt": "2026-08-24T09:34:00.000Z",
+      "target": "return_24h",
+      "subject": "news",
+      "probability": 0.82,
+      "windowStart": "2026-08-24T09:04:00.000Z",
+      "windowEnd": "2026-08-25T09:04:00.000Z",
+      "abstained": false,
+      "modelName": "logreg_fs2",
+      "modelVersion": "cal_1@2026-08-24T08:00:00.000Z",
+      "featureSet": "fs_2",
+      "dataCutoff": "2026-08-24T09:04:00.000Z",
+      "evidence": [
+        "seen on 3 days in the last week",
+        "12 visits in the last 30 days"
+      ],
+      "outcome": "miss",
+      "resolvedAt": "2026-08-25T09:30:00.000Z"
+    },
+    {
+      "predictionId": "return_24h:learning:2026-08-24T14:30:00.000Z",
+      "createdAt": "2026-08-24T15:00:00.000Z",
+      "target": "return_24h",
+      "subject": "learning",
+      "probability": 0.91,
+      "windowStart": "2026-08-24T14:30:00.000Z",
+      "windowEnd": "2026-08-25T14:30:00.000Z",
+      "abstained": true,
+      "modelName": "logreg_fs2",
+      "modelVersion": "cal_1@2026-08-24T08:00:00.000Z",
+      "featureSet": "fs_2",
+      "dataCutoff": "2026-08-24T14:30:00.000Z",
+      "evidence": [
+        "last seen 5 hours ago",
+        "returned within a day after 67% of the last 6 sessions"
+      ],
+      "outcome": "expired",
+      "resolvedAt": "2026-08-25T15:00:00.000Z"
+    },
+    {
+      "predictionId": "return_24h:search:2026-08-26T08:16:00.000Z",
+      "createdAt": "2026-08-26T08:46:00.000Z",
+      "target": "return_24h",
+      "subject": "search",
+      "probability": 0.74,
+      "windowStart": "2026-08-26T08:16:00.000Z",
+      "windowEnd": "2026-08-27T08:16:00.000Z",
+      "abstained": true,
+      "modelName": "logreg_fs2",
+      "modelVersion": "cal_1@2026-08-26T06:00:00.000Z",
+      "featureSet": "fs_2",
+      "dataCutoff": "2026-08-26T08:16:00.000Z",
+      "evidence": [
+        "last seen within the hour"
+      ],
+      "outcome": "pending",
+      "resolvedAt": null
+    },
+    {
+      "predictionId": "return_24h:unknown:2026-08-26T08:16:00.000Z",
+      "createdAt": "2026-08-26T08:46:00.000Z",
+      "target": "return_24h",
+      "subject": "unknown",
+      "probability": 0.55,
+      "windowStart": "2026-08-26T08:16:00.000Z",
+      "windowEnd": "2026-08-27T08:16:00.000Z",
+      "abstained": false,
+      "modelName": "logreg_fs2",
+      "modelVersion": "cal_1@2026-08-26T06:00:00.000Z",
+      "featureSet": "fs_2",
+      "dataCutoff": "2026-08-26T08:16:00.000Z",
+      "evidence": [
+        "3 visits in the last 30 days"
+      ],
+      "outcome": "hit",
+      "resolvedAt": "2026-08-26T11:05:00.000Z"
+    }
+  ]
+}
