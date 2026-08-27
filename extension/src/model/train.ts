@@ -7,11 +7,11 @@
  * state behind. That is the shape here: an alarm fires, one chunk of gradient steps runs,
  * the state is written, the worker is free to die. The next alarm picks it up.
  *
- * **Whether an offscreen document is needed at all is a measurement, not an assumption.**
- * The plan named one, on the reasoning that training is long-running. Chunking removes
- * the premise: no single call is long. The `offscreen` permission stays in the manifest
- * until a real profile has been timed, because removing a justified permission on the
- * strength of an argument is the same mistake as adding one.
+ * **No offscreen document.** The plan named one, on the reasoning that training is
+ * long-running. Chunking removes the premise: no single call is long. The `offscreen`
+ * permission was withdrawn from the manifest at T11 (D63), and `manifest.test.ts` asserts
+ * it stays out — so if anything here ever does need a document that outlives the worker,
+ * it fails loudly rather than silently reaching for a capability nobody re-justified.
  *
  * **The training set is pinned when a job starts.** Chunk seven must train on exactly
  * what chunk one did, or the run is not one fit — it is several fits averaged by

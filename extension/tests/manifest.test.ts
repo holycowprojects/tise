@@ -15,8 +15,17 @@ const manifest = JSON.parse(
 ) as Record<string, unknown>;
 
 describe("manifest", () => {
-  it("declares exactly the permissions D31 justified", () => {
-    expect(manifest["permissions"]).toEqual(["webNavigation", "alarms", "offscreen"]);
+  it("declares exactly the permissions D31 justified, minus the one D63 retired", () => {
+    expect(manifest["permissions"]).toEqual(["webNavigation", "alarms"]);
+  });
+
+  it("does not ask for `offscreen`, which nothing uses", () => {
+    // D31 justified it for training. D57 made training chunked, so no single call is long
+    // enough to need a document that outlives the worker, and D63 removed it. This is a
+    // separate assertion from the one above because it is a separate claim: not "the set
+    // is what we expect" but "this specific capability is not requested".
+    expect(manifest["permissions"]).not.toContain("offscreen");
+    expect(JSON.stringify(manifest)).not.toContain("offscreen");
   });
 
   it("keeps history optional, so install grants no ability to read anything", () => {

@@ -144,10 +144,18 @@ Draft. Each becomes final only when its supporting claim above reads **observed*
 > your retention setting, and retraining its model. Alarms are used instead of a
 > continuously running process so the extension consumes nothing while idle.
 
-**`offscreen`**
-> Model training runs in an offscreen document because Chrome terminates extension
-> service workers during long computations. This keeps training on your own machine
-> rather than moving it to a server.
+**`offscreen` — withdrawn at T11, no longer requested (D63)**
+
+~~*Model training runs in an offscreen document because Chrome terminates extension
+service workers during long computations.*~~
+
+The justification above was written at T5 and was sound when written. T11 built training
+as a chunked, alarm-driven job instead: each wake-up advances a fixed number of gradient
+steps and writes a complete resumable state, so **no single call is long enough for the
+worker's lifetime to matter**. That removed the premise, and the permission with it.
+
+Kept here struck through rather than deleted, because the point of this file is the record
+of what was justified and why — including the parts that stopped being true.
 
 **Host permissions — none requested**
 > Tise does not request access to any website. It cannot read the content of the pages

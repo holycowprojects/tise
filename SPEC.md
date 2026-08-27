@@ -92,7 +92,7 @@ reported honestly rather than hidden.
 
 | Layer | Choice | Notes |
 |---|---|---|
-| Extension | TypeScript 5.x, Chrome Manifest V3 | Service worker + offscreen document |
+| Extension | TypeScript 5.x, Chrome Manifest V3 | Service worker only (D63) |
 | Extension build | Vite | Outputs to `extension/dist/` |
 | Extension UI | Vanilla TS + CSS | No framework — D5 caps polish deliberately |
 | Extension storage | IndexedDB via `idb` | SQLite is not practical in an extension |
@@ -438,7 +438,7 @@ Testable conditions for "V1 is done":
 | Risk | Mitigation |
 |---|---|
 | TS/Python feature drift silently invalidates every benchmark | Parity suite, CI-gated, blocking |
-| MV3 service worker is killed mid-training | Train in an offscreen document; chunk work; `chrome.alarms` to resume |
+| MV3 service worker is killed mid-training | Chunk the work; `chrome.alarms` to resume. Chunking alone was sufficient, so no offscreen document (D63) |
 | Bursty browsing yields too few labels | Event-level prediction as well as session-level (D9); history import provides backfill |
 | Imported history lacks dwell time, so bootstrap features differ from live | `compat` field on every feature row; models trained per compat class |
 | Web Store review rejects the permission set | Minimum permissions verified experimentally before listing; every one justified in writing |

@@ -190,8 +190,8 @@ working and committable.
 
 - [x] **T11 · In-browser training** · M · deps: T10
   - Transition table + logreg, chunked, resumable, alarm-driven. **No offscreen document**
-    — chunking removed the premise (D59); the permission stays until a real profile is
-    timed, and removing it is Akash's call
+    — chunking removed the premise (D59), and Akash removed the permission (D63). The
+    manifest is now `webNavigation` + `alarms`, `history` optional, no hosts
   - Verify: `uv run pytest -q` ✓ (422) `&& npm test` ✓ (227), both linters clean, builds
   - **The bar is cleared, and the result is weaker than that number** (D60). Edge Brier
     **0.1119** vs the 0.1254 bar, skill +0.400 — while winning only **2 of 5 folds**.

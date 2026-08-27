@@ -5,7 +5,7 @@
   "description": "Learns from your own browsing and predicts what you'll do next, entirely on your device. Nothing is ever transmitted.",
   "minimum_chrome_version": "116",
 
-  "permissions": ["webNavigation", "alarms", "offscreen"],
+  "permissions": ["webNavigation", "alarms"],
   "optional_permissions": ["history"],
 
   "background": {

@@ -1601,3 +1601,31 @@ So the budget is sufficient *for the claims being made*, which is a different an
 statement than "the optimiser has finished". Raising it would cost battery on somebody
 else's laptop to buy a change nobody can see. Both halves are in
 `docs/benchmarks/convergence-budget.md` so the distinction stays visible.
+
+### D63 — `offscreen` withdrawn from the manifest
+
+Amends D31, which required `webNavigation`, `alarms` and `offscreen`. The manifest is now
+**`webNavigation` + `alarms`**, `history` optional, no host permissions.
+
+D31 justified `offscreen` for training, and that justification was sound when written.
+D57 then built training as a chunked, alarm-driven job: each wake-up advances a fixed
+number of gradient steps and writes a complete resumable state, so no single call is long
+enough for the worker's lifetime to matter. The premise was gone; the permission had
+outlived it.
+
+D59 recorded this and left the permission in place pending a real-profile timing, on the
+principle that retiring something justified by observation deserves an observation. Akash
+overrode that and removed it now. He is right, and the reasoning is worth keeping: **an
+unused permission is not neutral.** It has to be justified to the Web Store, it appears in
+the install warning, and it sits in a manifest whose whole claim is that nothing is
+requested that is not needed. Waiting for a measurement before removing a capability
+nothing calls is the same "we might need it later" reasoning this project criticised at T5
+— and the timing that D59 wanted can be taken with the permission absent just as easily,
+because if the chunked trainer ever did need a document that outlives the worker, the
+manifest test would fail rather than the code silently succeeding.
+
+`manifest.test.ts` now asserts the string appears nowhere in the manifest, as a separate
+assertion from the permission-set equality: one says "the set is what we expect", the
+other says "this specific capability is not requested". The T5 justification text survives
+struck through in `docs/permissions.md` rather than deleted, because that file's value is
+the record of what was justified and why, including the parts that stopped being true.
