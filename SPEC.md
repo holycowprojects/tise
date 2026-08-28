@@ -129,9 +129,10 @@ uv run ruff check .
 uv run ruff format .
 
 uv run python -m tise_research.data.load    --export ../data/export.json
-uv run python -m tise_research.eval.backtest --target return_24h
-uv run python -m tise_research.eval.calibrate --model logreg
-uv run python -m tise_research.eval.tournament --target return_24h --out ../docs/benchmarks/
+uv run python -m tise_research.eval.backtest --with-model      # superseded target
+uv run python -m tise_research.eval.calibrate --model logreg   # superseded target
+uv run python -m tise_research.eval.tournament                 # superseded target
+uv run python analysis/day_of_week.py
 
 # Analysis (from repo root)
 uv run python analysis/history_shape.py --db "<path to Chrome History>" --out data/
@@ -221,12 +222,12 @@ interface FeatureRow {
 interface Prediction {
   predictionId: string;
   createdAt: string;
-  target: "return_24h" | "next_session_category";
+  target: "block_volume" | "novelty" | "dormancy" | "next_session_category";
   subject: string;          // the topic or category being predicted about
   probability: number;      // calibrated, 0..1
   windowStart: string;
   windowEnd: string;
-  abstained: boolean;       // true when below the coverage threshold
+  abstained: boolean;       // retained for stored return_24h rows; D88 retired the policy
   modelName: string;
   modelVersion: string;
   featureSet: string;
@@ -245,20 +246,60 @@ the contradiction recorded in the audit.
 
 ## Prediction Targets
 
-### T1 — `return_24h` (primary, evaluated)
+### T1 — `block_volume` (primary, **not yet measured**)
+
+> Will topic *X*'s activity in the next block be above *X*'s own trailing median for
+> blocks of that type?
+
+Blocks are `weekday` (Mon–Fri) and `weekend` (Sat–Sun), fixed for V1. Friday night
+predicts the weekend; Sunday night predicts the week. One labelled example per
+(qualifying topic, block). Resolves automatically at block end.
+
+**A median split has a base rate of 50% by construction, for every user.** That is the
+point of it: `return_24h` silently inherited one person's ~70% base rate as a premise, and
+a user who browsed differently would have received a near-saturated or near-empty target
+with nothing in the design noticing.
+
+**Qualifying rule.** A topic gets a volume card only if it appeared in at least half the
+prior blocks. Below that its median is 0, "more than 0" collapses into "will it appear at
+all", and the 50% property is lost. Rarer topics route to T4 instead.
+
+**Status: pre-registration pending.** No label yield, base rate or cluster measurement
+exists yet. See D88 — the target is pre-registered only after that measurement, and may
+still be replaced by T3 or T4.
+
+### T1-superseded — `return_24h` (retired as product target, D88)
 
 > Given activity in topic *X* today, what is the probability of returning to topic *X*
 > within 24 hours?
 
-One labelled example per (active topic, day). Resolves automatically. Binary, which
-gives a clean reliability curve. **This is the number the showcase rests on.**
+Retired because a session is not a unit a person cares about, and a 65–72% base rate is
+nearly all of the answer. **Kept as research**: D15–D87 and every report in
+`docs/benchmarks/` stand as a recorded, superseded result — they are the evidence that
+justifies the change.
 
 ### T2 — `next_session_category` (UI only, reported but not headline)
 
 Multiclass over the category set. Displayed as a top-3 list. Reported as top-1 and top-3
 accuracy; calibration is not claimed for it in V1.
 
-### T3 — purchase intent (demo, explicitly unvalidated)
+### T3 — novelty (candidate, unmeasured)
+
+> Will the next block contain a domain not seen in the prior 30 days?
+
+Resolvable from stored domains alone. Answers "are you exploring or entrenching", which is
+information a person does not have about themselves. Base rate unknown; if it is near 100%
+the target is dead, and the measurement will say so.
+
+### T4 — dormancy (candidate, unmeasured)
+
+> This topic has not appeared in *N* blocks. Is it finished?
+
+The inverse framing, and it rescues what D26 currently discards: 9 of 15 categories sit
+below the label floor, and those sparse ones are exactly where "is this dead?" is both
+answerable and interesting. Also the destination for topics failing T1's qualifying rule.
+
+### T5 — purchase intent (demo, explicitly unvalidated)
 
 Shown in the UI with a visible "not enough data to evaluate this" label. Present because
 it is the intuitive example; never presented as a measured claim (D6).
@@ -280,12 +321,22 @@ Time-series foundation models are **out of scope for V1.** The audit found they 
 problem shape Tise does not have, and require far more history than a user will have.
 If tested later, it will be on activity-volume forecasting only, clearly scoped.
 
-### Abstention
+### Showing the evidence, not abstaining (D88)
 
-Predictions below a coverage threshold are not displayed. The threshold is tuned on
-validation data, not chosen by intuition. The accuracy-versus-coverage curve is a
-published result — "at 40% coverage the model is right 85% of the time" is a stronger and
-more honest claim than a single accuracy number.
+**Every prediction is shown, and every prediction carries its denominator.**
+
+> **Shopping this weekend · 71%** — *11 of your last 15 weekends.*
+
+One floor remains: a topic needs a minimum number of prior blocks before it appears at
+all. Percentages are whole numbers — a decimal place implies 1-in-1000 resolution from
+fifteen observations.
+
+This replaces D69/D70's certify-or-stay-silent rule, which is retired with the target it
+was built for. That rule was sound and, on real data, silenced everything: no threshold
+could certify 90% accuracy because doing so needed >12,800 answered rows against 61–133
+available. Thin evidence is now made **visible** rather than hidden behind silence.
+
+The accuracy-versus-coverage curve is still a published result. It is no longer a gate.
 
 ---
 
@@ -294,16 +345,34 @@ more honest claim than a single accuracy number.
 The largest undesigned piece in the original documents (open question Q2). Layered, in
 order:
 
-1. **Shipped map** — `extension/src/categories/domains.json`, roughly 500 curated
-   registrable domains to categories. Human-readable, reviewable in a pull request,
-   auditable by anyone. Its being inspectable is a privacy feature.
+1. **Shipped map** — `extension/src/categories/domains.json`, **264** curated registrable
+   domains across 15 categories, plus 24 keyword rules. Human-readable, reviewable in a
+   pull request, auditable by anyone. Its being inspectable is a privacy feature.
+   Deliberately **generic**: employer, school, local government, neighbourhood businesses
+   and personal accounts are excluded on purpose, because this file is public and a domain
+   list is a profile.
 2. **Keyword rules** — over page title tokens and URL path segments, when the domain is
    unknown. Tokens are used and discarded; never persisted.
-3. **`unknown`** — a valid, first-class value. The unknown rate is a tracked quality
-   metric, surfaced in the dashboard and in the benchmark report.
-4. **User override** — a local per-domain override, stored locally, never uploaded.
+3. **Learned clusters (D88)** — domains grouped by session co-occurrence and time of day,
+   computed **on-device**, named by the user once a cluster has held together:
 
-No LLM, no remote lookup, no network call of any kind.
+   > *We noticed a pattern. 6 sites you visit together, usually weekday mornings.
+   > What should we call this?*
+
+   This is the only route that can shrink `unknown`, because what lands there is personal
+   by nature — precisely what layer 1 excludes on purpose. **The goal is converting
+   `unknown` into named clusters, not multiplying categories:** D26 already finds 9 of 15
+   categories below the label floor, so the taxonomy is too fine for the data, not too
+   coarse. Versioned as its own taxonomy and benchmarked separately — categories are the
+   subject of every prediction, so swapping them silently redefines the target.
+4. **`unknown`** — a valid, first-class value, and a tracked quality metric. It currently
+   holds ~20% of Chrome labels (79 labels, 92.5% positive), all discarded from published
+   numbers because a bucket called "unknown" is unpresentable.
+5. **User override** — a local per-domain override, stored locally, never uploaded. Always
+   wins.
+
+No LLM, no remote lookup, no network call of any kind. Cluster naming is done by the user
+because it is the one part no local model can do.
 
 ---
 
@@ -423,11 +492,16 @@ Testable conditions for "V1 is done":
 4. `deleteAll()` leaves zero rows; export validates against the published schema.
 5. Parity suite passes: TS and Python features identical on the shared fixture.
 6. Leakage test passes.
-7. `return_24h` has ≥ 300 automatically resolved outcomes from real browsing.
+7. `block_volume` clears its data-sufficiency gate on real browsing. **The gate is not yet
+   set** — D88 fixes it after the measurement, because it is calibrated to what is
+   achievable and no score exists to bias it. T1's original "≥300 in 8 weeks" is retired
+   with the target it belonged to.
 8. A reliability curve exists from those outcomes, with Brier score and ECE reported.
-9. The shipped model beats all three baselines on `return_24h`, or ships with a written
-   explanation of why it does not.
-10. An accuracy-versus-coverage curve is published for the abstention threshold.
+9. The shipped model beats all three baselines on `block_volume`, or ships with a written
+   explanation of why it does not. **The performance bar is pre-registered before any
+   model is fitted** (D88), the way D81 did it.
+10. An accuracy-versus-coverage curve is published. It is a result, not a gate — D88
+    replaced abstention with showing every prediction alongside its denominator.
 11. Every number in the README traces to a committed script.
 12. `DECISIONS.md` records at least one documented model failure and its cause.
 

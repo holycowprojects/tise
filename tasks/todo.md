@@ -7,6 +7,74 @@ working and committable.
 
 ---
 
+## ⚠ The target changed (D88) — read before picking anything up
+
+**`return_24h` is retired as the product target.** T1–T17 below were all built for it and
+are left ticked and unedited: they are the evidence trail that justifies the change, not a
+backlog to redo. The machinery they produced — collection, sessions, features, parity,
+prediction, resolution, export, migration — is **reused**, not rewritten.
+
+**The new target is `block_volume`** — will a topic's activity in the next weekday or
+weekend block exceed that topic's own trailing median? A median split is 50/50 by
+construction for every user, which is the direct answer to why `return_24h` could not be
+separated from its baseline.
+
+**Nothing about it has been measured.** T19 is the gate, and until it runs, `block_volume`
+is a hypothesis with a good argument behind it and no numbers.
+
+Work order: **T19 → T20 → T21 → then back to T14/T15/T17/T18.**
+
+---
+
+## Phase 6 — The new target
+
+- [ ] **T19 · Measure all four candidate targets** · M · deps: none — **do this first**
+  - No model is fitted and nothing is scored. Purely descriptive, which is why D88 permits
+    the data-sufficiency gate to be set *after* it
+  - Per corpus, per candidate: **label yield, base rate, and how many topics survive**
+    - `block_volume` — weekday and weekend separately; how many topics clear the
+      qualifying rule (present in ≥ half the prior blocks) and how many die to the
+      median-zero problem
+    - `novelty` — base rate of "a domain not seen in the prior 30 days". **If this is near
+      100% the target is dead**, and this is the number that says so
+    - `dormancy` — how many of D26's 9 sub-floor categories become answerable
+    - `next_session_category` — top-1/top-3 from the transition table that already exists
+      and has **never been benchmarked**. Largest label supply of the four
+  - Also: **cluster stability** from session co-occurrence + time-of-day, and what share of
+    `unknown` becomes nameable. Currently 79 labels / 92.5% positive on Chrome, all discarded
+  - Also: **counts vs shares** for `block_volume`. A share cancels a uniform import-vs-live
+    offset; counts are more intuitive. Cheap to compute both now, expensive to retrofit
+  - Verify: `uv run python analysis/candidate_targets.py` + tests; report at
+    `docs/benchmarks/candidate-targets.md`
+  - **Not to be done here:** choosing the target. That is T20, after these numbers exist
+
+- [ ] **T20 · Pre-register the target** · S · deps: T19
+  - D81's discipline. Argument, exact definition, predictions and adoption rule committed
+    **before** any model is fitted — git holds the order
+  - Sets the **performance** bar. The **data-sufficiency** gate is set from T19 (D88 splits
+    these deliberately: one has no score available to bias it, the other does)
+  - Must state plainly that T19 may kill `block_volume` and promote another candidate
+
+- [ ] **T21 · Build the new target end to end** · L · deps: T20
+  - Labels, features, blocks, the two weekly cards, learned clusters
+  - **Import may set the yardstick; only live collection may score** (D88). An imported
+    block may contribute to a median; a prediction may never be resolved against one —
+    D72's rule in a new place, and it keeps the scorecard clean during bootstrap
+  - Trailing window ~10 blocks, so the import ages itself out in ~5 weeks and no offset
+    correction is needed
+  - Cold start: bootstrap from import; describe-don't-predict as the fallback for a thin
+    import (57 days on this profile; someone else's may return ten)
+
+- [ ] **Owed check — the import-vs-live offset** · S · deps: T21
+  - **Never measured.** D65's 7.7% was research-view vs extension-view, a research bug
+    D78/D79 fixed. Live uses `webNavigation` and drops redirect hops natively; import reads
+    the history DB, cannot, and approximates with `isLikelyRedirect` — which fires on 0.95%
+    of visits, its firing rate and not its error rate
+  - After ~14 days of live collection, re-import that same window and compare block counts
+    against what was collected live. No new permission
+
+---
+
 ## Phase 0 — Does the signal exist? (Python only, no extension)
 
 - [x] **T1 · Measure the shape of real browsing history** · M · deps: none

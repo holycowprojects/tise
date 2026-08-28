@@ -2811,3 +2811,149 @@ owed check been done promptly, this bug would have written wrong labels into rea
 first. The lesson is not that the delay helped; it is that a stale literal on a **stored**
 field has a blast radius a report does not, and the two should not have been treated as the
 same severity when the first one was found.
+
+---
+
+## The target changes
+
+### D88 — Retiring `return_24h`: the model was fine, the question was wrong
+
+Everything from D15 to D87 evaluated one target: *given activity in topic X, will the
+person return to X within 24 hours?* It is being retired as the product target. Akash's
+diagnosis, in his words: **"Average user does not care the prediction for a session."**
+
+**This is not a model failure, and it matters that it is recorded as something else.** D80
+found the model indistinguishable from a table of per-category base rates. D70 found it
+abstains from everything. Those were treated as evidence about the *model* — more data, a
+better transform, a stronger challenger. D85's tournament closed off the last of those:
+XGBoost cannot separate itself from a hand-written logistic regression either. The
+consistent reading across all three is that **the target carries little to predict**, and
+no model was going to fix that.
+
+Two root causes, both structural:
+
+1. **A base rate of 65-72% is nearly all of the answer.** Always saying "yes" is already
+   ~70% right, `category_base_rate` reaches Brier 0.1254, and the 90% abstention target is
+   almost free to reach and nearly impossible to beat. Most of every label's information is
+   spent re-establishing what was already known.
+2. **A session is not a unit a person cares about.** Tise computes 6-7 predictions a day
+   and shows none. Even answered, "you may revisit `video` within 24 hours" is not
+   information anyone acts on.
+
+**`return_24h` is retired as the product target and kept as research.** D15-D87, every
+report in `docs/benchmarks/`, and the intervals all stand as a recorded, superseded result.
+They are the evidence trail that justifies this change; deleting them would remove the
+reason for it. The prediction, resolution and registry machinery is reused rather than
+rewritten — D72's `expired` rule, D73's pure resolution, D74's stored abstentions and D76's
+export all carry over unchanged.
+
+### The new target — `block_volume`
+
+> Will this category's activity in the next block be **above that category's own trailing
+> median** for blocks of that type?
+
+- **Blocks:** `weekday` (Mon-Fri) and `weekend` (Sat-Sun), **fixed** for V1. Learned
+  per-person blocks stay on the roadmap — Chrome peaks on Friday at 81.4%, so there is
+  evidence for them, but they need many weeks before stabilising and make cold start worse.
+- **The loop:** Friday night predicts the weekend; Sunday night predicts the week.
+- **Resolves itself** at block end. D6 survives intact — still no confirmation button.
+
+**The load-bearing property is that a median split has a base rate of 50% by construction,
+for every user, whatever their habits.** That is the direct answer to cause 1 above. It also
+transfers: `return_24h` silently inherited *this author's* 70% base rate as a premise, and
+someone browsing very differently would have received a target that was near-saturated or
+near-empty with nothing in the design noticing. A median is computed from whoever is using
+it. This is D81's argument — replace what encodes the observer with what encodes the
+behaviour — applied to the target rather than to a feature.
+
+**The known flaw, recorded now rather than discovered later.** The 50% guarantee holds only
+where the trailing median is above zero. A category appearing in 2 of the last 10 weekends
+has a median of 0, "more than 0" collapses back to "will it appear at all", and the base
+rate goes with it. So a category qualifies for a volume card only if it appeared in **at
+least half** the prior blocks; everything rarer is routed to the dormancy card instead,
+where "is this finished?" is the better question anyway.
+
+### Abstention is replaced, not weakened
+
+D69 and D70's machinery — Wilson lower bound, certify or stay silent — is retired with the
+target it was built for. It is replaced by: **always show the probability, always show its
+denominator.**
+
+> **Shopping this weekend - 71%** — *11 of your last 15 weekends.*
+
+One floor remains: a category needs a minimum number of prior blocks before it appears at
+all. Thin evidence becomes **visible** rather than being hidden behind silence, which is
+what D70's rule amounted to in practice. Percentages are whole numbers; a decimal place
+implies 1-in-1000 resolution from fifteen observations.
+
+### Categories must be learned, not only looked up
+
+`unknown` holds **79 labels at 92.5% positive on Chrome** — roughly a fifth of all labels,
+discarded from every published number because a bucket called "unknown" is unpresentable.
+It is large *by design*: the shipped map excludes employer, school, local government and
+neighbourhood domains on purpose, because the file is public and a domain list is a profile.
+So a user's actual life lands there and stays there.
+
+A bigger shipped map cannot fix this — the missing domains are personal by nature. T10b is
+therefore promoted from optional to load-bearing: **cluster domains by session
+co-occurrence and time of day, on-device**, and ask the user to name a cluster once it has
+held together. No text, no titles, no server, no LLM. The taxonomy becomes theirs.
+
+**More categories is not the goal and would not help on its own.** D26 already finds 9 of 15
+categories below the label floor; the taxonomy is too fine for the data, not too coarse. The
+objective is specifically to *convert `unknown` into named clusters*, not to multiply
+categories.
+
+### Cold start bootstraps from imported history
+
+The first-run import gives real blocks immediately — D64's 90-day request returned 57 days,
+about eight blocks of each type — so a median exists on day one and the first weekend can be
+predicted.
+
+**Correction to something asserted earlier in this session:** D65's 7.7% composition gap was
+the *research tier's* view against the extension's, a research bug D78/D79 fixed. **The
+import-versus-live offset has never been measured.** Live collection uses `webNavigation`,
+which drops redirect hops natively; import reads the history database, which cannot, and
+approximates it with the `isLikelyRedirect` heuristic. The heuristic fires on 0.95% of
+visits, which is its firing rate and not its error rate.
+
+Since that offset cannot be measured without a profile carrying both sources over the same
+days, **the design does not depend on knowing it**:
+
+1. **A trailing window of ~10 blocks ages the import out.** After roughly five weeks of live
+   collection the imported blocks have left the window and the bias is gone, with no scale
+   factor to compute and nothing to get wrong.
+2. **Import may set the yardstick; only live collection may score.** An imported block can
+   contribute to a median. A prediction may **never** be resolved against one. This is D72's
+   rule in a new place — a window Tise did not watch produces no measurement — and it means
+   the approximation can affect what Tise *says* during bootstrap but can never reach the
+   scorecard.
+3. **The bootstrap period says so on the card**, and the line disappears once the window
+   holds only live data.
+4. **Measuring the offset is added to the owed real-profile checks:** after ~14 days, re-
+   import that window and compare against what was collected live. No new permission.
+
+The describe-don't-predict screen survives as the fallback for a thin import — that profile
+returned 57 days because it held nothing older, and someone else's may return ten.
+
+### The gate is split in two
+
+T1's founding gate — ~300 labels in 8 weeks or change the target — is being renegotiated,
+deliberately and on the record. Akash chose to set the replacement after measuring. That is
+sound for one half and not the other, so it is split:
+
+- **Data sufficiency: set after the measurement.** It is calibrated to what is achievable and
+  there is no score available to bias it — the measurement is descriptive, and fits no model.
+- **Performance: pre-registered before any model is fitted**, the way D81 did it. Choosing a
+  bar after seeing what a model scores is the failure the whole method exists to prevent.
+
+### What is now unmeasured, and must not be forgotten
+
+Nothing in this entry has been measured. Whether `block_volume` yields usable labels at
+2 per category per week, whether the qualifying rule leaves enough categories standing,
+whether co-occurrence clusters are stable, whether novelty has any room in its base rate —
+all open. `return_24h` at least had T1's gate run before a line of it was built.
+
+The next task is that measurement, and **the target is pre-registered only after it** —
+including the possibility that the measurement kills `block_volume` and one of the other
+three candidates takes its place.
