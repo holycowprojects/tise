@@ -27,9 +27,14 @@ extension can actually train.
 The bar is D28: **Brier 0.1254 on Edge**, the score `category_base_rate` reaches there.
 Beating chance is not interesting; beating a table of per-category base rates is.
 
-- **Cleared on:** history-edge, history-firefox
-- **Missed on:** history-chrome
-- Across every corpus the model wins **8 of 15 folds**.
+**On no corpus measured here is the model distinguishable from the bar.** Every 95% interval on the paired Brier difference includes zero, under both resampling units. That is not a claim that the model is equivalent to `category_base_rate` — it is a claim that this much data cannot tell them apart, in either direction. Every sentence below about clearing or missing the bar is a point estimate inside an interval that contains zero, and D28's bar has not been shown to be cleared or missed anywhere.
+
+By point estimate alone, which is the weaker reading:
+
+- **Below the bar on:** history-edge, history-firefox
+- **Above the bar on:** history-chrome
+- Across every corpus the model wins **8 of 15 folds** — a model
+  with no skill at all wins 7 or so by construction.
 
 **Read the second line before the first.** A pooled Brier rewards the *size* of a win, not its consistency, so a model can clear the bar while losing more folds than it wins. On **history-edge** it clears the bar while winning only 2 of 5 folds. The per-fold tables below are the honest picture.
 
@@ -55,7 +60,16 @@ to the test set. That work is T16.
 
 322 labels, base rate 71.4%, 5 folds.
 
-**Does not clear the bar.** 0.2096 against 0.1963, which is worse. It wins **3 of 5 folds** once `unknown` is excluded from both sides.
+**Not established.** The point estimate is worse than the bar, and the 95% interval includes zero, so this corpus cannot tell the model and `category_base_rate` apart. Separating it from zero at this effect size would take roughly **1,167 test rows** against the 141 here — and only if the estimate survives collecting them.
+
+| Paired Brier difference (bar − model), positive favours the model | 95% interval |
+|---|---|
+| resampling **rows** (assumes labels are independent — they are not) | -0.0133 [-0.0438, +0.0163] |
+| resampling **categories** (12 clusters, the defensible bound) | -0.0133 [-0.0608, +0.0156] |
+
+A model no better than the bar wins **3 of 5** folds or more with probability **0.50**, so the fold count is not evidence here either.
+
+Point estimate: **does not clear the bar**, 0.2096 against 0.1963. It wins 3 of 5 folds once `unknown` is excluded from both sides.
 
 | Model | Brier | Log loss | Skill vs base rate |
 |---|---:|---:|---:|
@@ -99,7 +113,16 @@ model being wrong, not unfinished.
 
 503 labels, base rate 69.2%, 5 folds.
 
-**Clears the bar.** 0.1124 against 0.1254. It wins **2 of 5 folds** once `unknown` is excluded from both sides.
+**Not established.** The point estimate is better than the bar, and the 95% interval includes zero, so this corpus cannot tell the model and `category_base_rate` apart. Separating it from zero at this effect size would take roughly **1,151 test rows** against the 271 here — and only if the estimate survives collecting them.
+
+| Paired Brier difference (bar − model), positive favours the model | 95% interval |
+|---|---|
+| resampling **rows** (assumes labels are independent — they are not) | +0.0130 [-0.0071, +0.0319] |
+| resampling **categories** (12 clusters, the defensible bound) | +0.0130 [-0.0138, +0.0397] |
+
+A model no better than the bar wins **2 of 5** folds or more with probability **0.81**, so the fold count is not evidence here either.
+
+Point estimate: **clears the bar**, 0.1124 against 0.1254. It wins 2 of 5 folds once `unknown` is excluded from both sides.
 
 | Model | Brier | Log loss | Skill vs base rate |
 |---|---:|---:|---:|
@@ -143,7 +166,16 @@ model being wrong, not unfinished.
 
 173 labels, base rate 64.2%, 5 folds.
 
-**Clears the bar.** 0.2219 against 0.2478. It wins **3 of 5 folds** once `unknown` is excluded from both sides.
+**Not established.** The point estimate is better than the bar, and the 95% interval includes zero, so this corpus cannot tell the model and `category_base_rate` apart. Separating it from zero at this effect size would take roughly **1,343 test rows** against the 83 here — and only if the estimate survives collecting them.
+
+| Paired Brier difference (bar − model), positive favours the model | 95% interval |
+|---|---|
+| resampling **rows** (assumes labels are independent — they are not) | +0.0259 [-0.0302, +0.0837] |
+| resampling **categories** (10 clusters, the defensible bound) | +0.0259 [-0.0220, +0.1865] |
+
+A model no better than the bar wins **3 of 5** folds or more with probability **0.50**, so the fold count is not evidence here either.
+
+Point estimate: **clears the bar**, 0.2219 against 0.2478. It wins 3 of 5 folds once `unknown` is excluded from both sides.
 
 | Model | Brier | Log loss | Skill vs base rate |
 |---|---:|---:|---:|
@@ -186,16 +218,20 @@ model being wrong, not unfinished.
 ## Limitations
 
 - **One person's browsing.** Every number describes the author. Nothing generalises.
-- **No confidence intervals.** The fold-level differences here are tens of labels wide,
-  and several of the per-fold gaps are well inside what noise could produce. Intervals
-  are T16, and until they exist "wins 2 of 5 folds" is the more honest summary than any
-  single Brier score.
+- **The test sets are small, and the intervals above say so.** Each fold holds tens of
+  labels; every per-fold gap on this page is well inside what noise produces. The
+  intervals are the headline for that reason, and no per-fold difference should be read
+  as a result.
+- **The bootstrap assumes the folds can be pooled.** Rows come from an expanding-window
+  backtest, so later folds were scored by models fitted on more data. Pooling them treats
+  every row as one draw from one process, which is a simplification in the model's
+  favour: it hides that the late folds are where it does worst.
+- **No calibration is applied to these numbers.** They are raw logistic outputs; the
+  Platt step and the abstention threshold live in `calibration.md`.
 - **Regularisation is not tuned, on purpose.** `l2` is fixed at
   1 pseudo-observations for every fold and every corpus. Choosing it per
   fold from the training window is legitimate and would probably help the small early
   folds; choosing it by looking at this report would not.
-- **No calibration yet.** These are raw logistic outputs. Reliability curves and the
-  abstention threshold are T12.
 - **`unknown` is excluded from every headline** (D27) and is the most predictable
   category there is (D42). Including it would improve every number on this page and mean
   nothing.

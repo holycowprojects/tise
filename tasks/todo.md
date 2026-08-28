@@ -57,7 +57,8 @@ working and committable.
 
 - [x] **CHECKPOINT A** — real numbers from real browsing; gate passed; fixture frozen
   - **Last cheap exit. Everything after this is product engineering.**
-  - Owed before any number reaches the README: confidence intervals (T16)
+  - [x] Owed before any number reaches the README: confidence intervals — **done**
+    (D80). The README still carries no numbers, so the promise was never broken
 
 ---
 
@@ -285,12 +286,20 @@ working and committable.
 
 - [ ] **T16 · Model tournament and benchmark report** · M · deps: T13
   - Identical folds for every model; report the XGBoost-vs-shipped gap; one documented failure
-  - **Still to do:** confidence intervals; the cumulative-feature transform (chosen blind);
-    the tournament itself. The corpus sub-task below is done and every benchmark re-run
+  - **Still to do:** the cumulative-feature transform (chosen blind), and the tournament
+    itself. The corpus sub-task and confidence intervals are done, every benchmark re-run
   - Verify: `uv run pytest research/tests/test_baseline_gate.py`
-  - **Confidence intervals are the gate on every T11 claim.** "Wins 2 of 5 folds" on ~55
-    test labels a fold may be indistinguishable from noise, and until intervals exist that
-    sentence is the honest summary rather than the Brier score (D60)
+  - [x] **Confidence intervals — done, and the headline did not survive them** (D80).
+    Every 95% interval on the paired Brier difference **includes zero, on every corpus,
+    under both resampling units**. D28's bar is not shown to be cleared on Edge, and the
+    model is not shown to lose on Chrome either. `model.md` leads with that, computed
+    from the intervals rather than written down
+  - **The fold counts were never evidence.** A no-skill model wins 2 of 5 or more with
+    probability **0.81**; even 5 of 5 is 0.031. D60's most-quoted caveat was as unfounded
+    as the score it cautioned against
+  - **Reachable, unlike D70's abstention gap:** separating Edge's +0.0130 from zero needs
+    roughly **1,151 test rows against 271** — about 4x the data, versus the >12,800
+    answered rows T12 needed. Neither is a promise; both size the distance to decisive
   - **Cumulative features extrapolate** — 77.5% of Edge test rows sit outside the fitted
     range of `hoursSinceFirstSeen`. Any transform must be chosen without looking at the
     current scores, or it is fitted to the test set (D60)

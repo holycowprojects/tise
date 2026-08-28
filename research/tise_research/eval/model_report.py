@@ -21,6 +21,12 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from tise_research.eval.backtest import BacktestResult, rolling_origin_folds
+from tise_research.eval.intervals import (
+    Interval,
+    brier_difference_interval,
+    fold_win_probability,
+    rows_to_exclude_zero,
+)
 from tise_research.eval.metrics import brier_score
 from tise_research.features.labels import Label
 from tise_research.features.vector import FEATURE_NAMES
@@ -115,7 +121,42 @@ class CorpusEvidence:
 
     @property
     def cleared(self) -> bool:
+        """Point estimate only. Read `established` before quoting this (D80)."""
         return self.model_brier < self.bar_brier
+
+    @property
+    def row_interval(self) -> Interval | None:
+        """Paired bootstrap over test rows. Positive means the model beats the bar."""
+        return brier_difference_interval(
+            self.result.pooled_outcomes,
+            self.result.pooled_probabilities[MODEL_NAME],
+            self.result.pooled_probabilities[BAR_MODEL],
+        )
+
+    @property
+    def subject_interval(self) -> Interval | None:
+        """The same, resampling whole categories. The bound a claim has to survive."""
+        return brier_difference_interval(
+            self.result.pooled_outcomes,
+            self.result.pooled_probabilities[MODEL_NAME],
+            self.result.pooled_probabilities[BAR_MODEL],
+            subjects=self.result.pooled_subjects,
+        )
+
+    @property
+    def established(self) -> bool:
+        """Whether the difference from the bar survives its own interval, either way.
+
+        `cleared` compares two point estimates and will always answer something. This
+        answers whether that comparison means anything, and on every corpus measured so
+        far it answers no.
+        """
+        interval = self.subject_interval
+        return interval is not None and interval.excludes_zero
+
+    @property
+    def fold_win_p(self) -> float | None:
+        return fold_win_probability(self.wins, len(self.folds))
 
 
 def _fold_table(evidence: CorpusEvidence) -> str:
@@ -157,16 +198,64 @@ def _pooled_table(evidence: CorpusEvidence) -> str:
     return "\n".join(rows)
 
 
+def _interval_block(evidence: CorpusEvidence) -> str:
+    """The interval comes before the point estimate, because it governs it (D80)."""
+    row, subject = evidence.row_interval, evidence.subject_interval
+    if row is None or subject is None:
+        return "_No pooled test rows, so no interval._"
+
+    direction = "better than" if row.point > 0 else "worse than"
+    if evidence.established:
+        headline = (
+            f"**Established: the model is {direction} the bar.** The paired difference "
+            "excludes zero when whole categories are resampled."
+        )
+    else:
+        needed = rows_to_exclude_zero(subject, len(evidence.result.pooled_outcomes))
+        projection = (
+            f" Separating it from zero at this effect size would take roughly "
+            f"**{needed:,} test rows** against the {len(evidence.result.pooled_outcomes):,} "
+            "here — and only if the estimate survives collecting them."
+            if needed
+            else ""
+        )
+        headline = (
+            f"**Not established.** The point estimate is {direction} the bar, and the "
+            f"95% interval includes zero, so this corpus cannot tell the model and "
+            f"`{BAR_MODEL}` apart.{projection}"
+        )
+
+    row_ci = f"{row.point:+.4f} [{row.low:+.4f}, {row.high:+.4f}]"
+    subject_ci = f"{subject.point:+.4f} [{subject.low:+.4f}, {subject.high:+.4f}]"
+    win_p = evidence.fold_win_p
+    folds_line = (
+        f"A model no better than the bar wins **{evidence.wins} of "
+        f"{len(evidence.folds)}** folds or more with probability **{win_p:.2f}**, so the "
+        "fold count is not evidence here either."
+        if win_p is not None
+        else ""
+    )
+
+    return f"""{headline}
+
+| Paired Brier difference (bar − model), positive favours the model | 95% interval |
+|---|---|
+| resampling **rows** (assumes labels are independent — they are not) | {row_ci} |
+| resampling **categories** ({subject.units} clusters, the defensible bound) | {subject_ci} |
+
+{folds_line}"""
+
+
 def _corpus_section(evidence: CorpusEvidence) -> str:
     verdict = (
-        f"**Clears the bar.** {evidence.model_brier:.4f} against "
+        f"Point estimate: **clears the bar**, {evidence.model_brier:.4f} against "
         f"{evidence.bar_brier:.4f}."
         if evidence.cleared
-        else f"**Does not clear the bar.** {evidence.model_brier:.4f} against "
-        f"{evidence.bar_brier:.4f}, which is worse."
+        else f"Point estimate: **does not clear the bar**, {evidence.model_brier:.4f} "
+        f"against {evidence.bar_brier:.4f}."
     )
     consistency = (
-        f"It wins **{evidence.wins} of {len(evidence.folds)} folds** once `unknown` is "
+        f"It wins {evidence.wins} of {len(evidence.folds)} folds once `unknown` is "
         "excluded from both sides."
     )
     gradients = max((fold["gradient_norm"] for fold in evidence.folds), default=0.0)
@@ -178,6 +267,8 @@ def _corpus_section(evidence: CorpusEvidence) -> str:
     return f"""### {evidence.name}
 
 {header}
+
+{_interval_block(evidence)}
 
 {verdict} {consistency}
 
@@ -248,6 +339,26 @@ def write_model_report(
             "stay that way, so both are reported."
         )
 
+    # The headline is derived from the intervals, never written down, so it cannot outlive
+    # the numbers underneath it (D80).
+    established = [item.name for item in evidence if item.established]
+    if not established:
+        headline = (
+            "**On no corpus measured here is the model distinguishable from the bar.** "
+            "Every 95% interval on the paired Brier difference includes zero, under both "
+            "resampling units. That is not a claim that the model is equivalent to "
+            "`category_base_rate` — it is a claim that this much data cannot tell them "
+            "apart, in either direction. Every sentence below about clearing or missing "
+            "the bar is a point estimate inside an interval that contains zero, and D28's "
+            "bar has not been shown to be cleared or missed anywhere."
+        )
+    else:
+        headline = (
+            "**Distinguishable from the bar on:** "
+            + ", ".join(established)
+            + ". Elsewhere the interval includes zero and the comparison is undecided."
+        )
+
     path.write_text(
         f"""# Model — `return_24h`, logistic regression over `fs_2`
 
@@ -278,9 +389,14 @@ extension can actually train.
 The bar is D28: **Brier 0.1254 on Edge**, the score `category_base_rate` reaches there.
 Beating chance is not interesting; beating a table of per-category base rates is.
 
-- **Cleared on:** {", ".join(cleared) if cleared else "nothing"}
-- **Missed on:** {", ".join(missed) if missed else "nothing"}
-- Across every corpus the model wins **{total_wins} of {total_folds} folds**.
+{headline}
+
+By point estimate alone, which is the weaker reading:
+
+- **Below the bar on:** {", ".join(cleared) if cleared else "nothing"}
+- **Above the bar on:** {", ".join(missed) if missed else "nothing"}
+- Across every corpus the model wins **{total_wins} of {total_folds} folds** — a model
+  with no skill at all wins {total_folds // 2} or so by construction.
 
 {caveat}
 
@@ -307,16 +423,20 @@ to the test set. That work is T16.
 ## Limitations
 
 - **One person's browsing.** Every number describes the author. Nothing generalises.
-- **No confidence intervals.** The fold-level differences here are tens of labels wide,
-  and several of the per-fold gaps are well inside what noise could produce. Intervals
-  are T16, and until they exist "wins 2 of 5 folds" is the more honest summary than any
-  single Brier score.
+- **The test sets are small, and the intervals above say so.** Each fold holds tens of
+  labels; every per-fold gap on this page is well inside what noise produces. The
+  intervals are the headline for that reason, and no per-fold difference should be read
+  as a result.
+- **The bootstrap assumes the folds can be pooled.** Rows come from an expanding-window
+  backtest, so later folds were scored by models fitted on more data. Pooling them treats
+  every row as one draw from one process, which is a simplification in the model's
+  favour: it hides that the late folds are where it does worst.
+- **No calibration is applied to these numbers.** They are raw logistic outputs; the
+  Platt step and the abstention threshold live in `calibration.md`.
 - **Regularisation is not tuned, on purpose.** `l2` is fixed at
   {DEFAULT_SPEC.l2:g} pseudo-observations for every fold and every corpus. Choosing it per
   fold from the training window is legitimate and would probably help the small early
   folds; choosing it by looking at this report would not.
-- **No calibration yet.** These are raw logistic outputs. Reliability curves and the
-  abstention threshold are T12.
 - **`unknown` is excluded from every headline** (D27) and is the most predictable
   category there is (D42). Including it would improve every number on this page and mean
   nothing.

@@ -159,6 +159,13 @@ class BacktestResult:
     models: dict[str, ModelResult]
     folds: tuple[FoldResult, ...]
     per_category: dict[str, CategoryResult]
+    #: The pooled headline test rows, kept so an interval can be computed after the fact
+    #: (D80). Outcomes, each model's probability, and the subject each row belongs to —
+    #: the last is what makes a cluster bootstrap possible, and a Brier score alone
+    #: cannot be given an interval once these are thrown away.
+    pooled_outcomes: tuple[bool, ...]
+    pooled_subjects: tuple[str, ...]
+    pooled_probabilities: dict[str, tuple[float, ...]]
     headline_excludes_unknown: bool
     unknown_label_count: int
     min_category_labels: int
@@ -190,6 +197,7 @@ def run_backtest(
 
     pooled_outcomes: dict[str, list[bool]] = defaultdict(list)
     pooled_probabilities: dict[str, list[float]] = defaultdict(list)
+    pooled_subjects: list[str] = []
     by_category: dict[str, dict[str, list]] = defaultdict(
         lambda: {"outcomes": [], "probabilities": defaultdict(list)}
     )
@@ -214,6 +222,7 @@ def run_backtest(
                     pooled_probabilities[name].append(probability)
                     if name == REFERENCE_MODEL:
                         pooled_outcomes["_"].append(label.outcome)
+                        pooled_subjects.append(label.subject)
 
         fold_results.append(
             FoldResult(
@@ -279,6 +288,11 @@ def run_backtest(
         models=models,
         folds=tuple(fold_results),
         per_category=per_category,
+        pooled_outcomes=tuple(headline_outcomes),
+        pooled_subjects=tuple(pooled_subjects),
+        pooled_probabilities={
+            name: tuple(pooled_probabilities[name]) for name in fitters
+        },
         headline_excludes_unknown=True,
         unknown_label_count=sum(
             1 for label in ordered if label.subject == EXCLUDED_FROM_HEADLINE

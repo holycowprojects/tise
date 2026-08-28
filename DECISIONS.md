@@ -2201,3 +2201,70 @@ a guess. The source was public and one fetch away the whole time.
 API "hands over chain ends only". `is_chain_end` remains as a bit test; `is_visible` is the
 product-visible rule. D78's diagnosis of the original defect — that the research corpus
 kept chain starts and discarded landing pages — stands.
+
+### D80 — Confidence intervals, and the headline claim does not survive them
+
+The bar was owed intervals since CHECKPOINT A: *"owed before any number reaches the README:
+confidence intervals (T16)"*. They now exist, and the first thing they do is withdraw the
+project's flagship claim.
+
+**Every 95% interval on the paired Brier difference includes zero, on every corpus, under
+both resampling units.**
+
+| corpus | rows | bar − model | 95% (rows) | 95% (categories) | folds |
+|---|---:|---:|---|---|---|
+| Edge (primary) | 271 | +0.0130 | [−0.0071, +0.0319] | [−0.0138, +0.0397] | 2 of 5, p=0.81 |
+| Chrome | 141 | −0.0133 | [−0.0438, +0.0163] | [−0.0608, +0.0156] | 2 of 5, p=0.81 |
+| Firefox | 83 | +0.0259 | [−0.0302, +0.0837] | [−0.0220, +0.1865] | 3 of 5, p=0.50 |
+
+So **D28's bar has not been shown to be cleared on Edge**, and — symmetrically — the model
+has **not been shown to lose on Chrome** either. D60's headline, repeated through D78 and
+D79, was a point estimate inside an interval containing zero. `model.md` now leads with
+that, computed from the intervals rather than written down.
+
+**This also retires a smaller embarrassment.** Across this session I reported Edge moving
+0.1119 → 0.1124 → 0.1124 and called it "worse" twice. The interval half-width there is
+about 0.02. I was narrating differences forty times smaller than the resolution of the
+measurement, in an append-only decision log, as though they were findings. They were not
+findings; they were the fourth decimal place of a noisy estimate.
+
+**Method.** The comparison is **paired**: both models score the same rows, so the estimand
+is the per-row difference in squared error, not two independently estimated Brier scores.
+Checking whether two separate intervals overlap is a weaker and frequently wrong test —
+overlapping intervals are entirely compatible with a difference that reliably excludes zero.
+
+**Two resampling units, both published.** Resampling rows assumes labels are independent.
+They are not: all of them come from about twelve categories, and sessions within a category
+share whatever makes that category predictable. Resampling **categories** respects that and
+is the bound a claim about *the model* has to survive. Reporting only the row interval
+would have been the flattering choice and, on Edge, would still not have cleared zero.
+
+**The fold counts were never evidence.** A model with no skill wins each fold with
+probability one half, so "wins 2 of 5" happens **81%** of the time by chance and even a
+clean sweep of 5 is 0.031. With five folds the count cannot be convincing in either
+direction — which retrospectively means D60's most-quoted caveat, "wins only 2 of 5 folds",
+was as unfounded as the Brier score it was cautioning against.
+
+**How far off is decisive?** Roughly **1,151 test rows on Edge against the 271 there** —
+about four times the data, and only if the point estimate survives collecting it. That is
+worth contrasting with D70, where certifying the abstention target needed >12,800 answered
+rows: this gap is reachable, that one was not. Neither number is a promise; both are
+statements about how far the evidence is from being decisive.
+
+**A seed, declared.** `BOOTSTRAP_SEED = 20260828`, committed and never tuned. The optimiser
+deliberately has none (D54) because it must be reproducible in a browser; here randomness
+*is* the method, and a fixed seed is what makes a published interval regenerable. A test
+asserts the bounds move by less than 0.01 across other seeds, so the seed is an
+implementation detail rather than a choice shaping a number.
+
+**Found by breaking it, in the fixture again.** The first version of `test_intervals.py`
+used probabilities of 0.9 and 0.1 throughout, which makes every row's paired difference
+exactly 0.24 — zero variance. The bootstrap correctly returned a zero-width interval and
+two tests failed on it. A fixture with no spread cannot exercise anything that estimates
+spread, which is the same lesson as D79's fixture, one domain over.
+
+**What this does not say.** Not that the model is worthless, and not that it equals the
+baseline. It says this much of one person's browsing cannot separate them, which is a
+statement about the evidence rather than about the model. The honest position for the
+README, T18 and any published claim is: **`logreg_fs2` is not yet distinguishable from a
+table of per-category base rates.**
