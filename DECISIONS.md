@@ -3415,3 +3415,130 @@ afterwards. This one was chosen by reading the data first — what does it descr
 questions does it naturally answer — and it produced 26x the labels and the first balanced
 base rate on the first attempt. That is not proof the approach is better, but it is the only
 target that arrived at a plausible result without a redesign, and it took one session.
+
+---
+
+## Four targets, one pre-registration
+
+### D94 — Pre-registering all four targets, before any of them is fitted
+
+Akash's direction: Tise predicts all four candidates identified by reasoning from the data
+rather than from a target. This entry fixes every definition, bar, cluster unit and adoption
+rule **before implementation**. Git holds the order, as it did for D81 and D91.
+
+**One change applies to all four, and it is the most consequential thing in this entry.**
+
+#### The cluster unit changes, and here is the argument and the confession
+
+Every interval this project has published was resampled over **9-12 subject clusters**,
+because the subject has always been the category and there are ~15 of them. D93's Edge run
+had **2,805 test rows** and an interval built from **11 things**. Bootstrap width scales
+roughly with 1/√clusters, so no comparison in this repository has ever been able to resolve a
+small effect — regardless of how much data it had.
+
+**The confession:** I am proposing this *after* seeing that category-clustering failed to
+separate D93's result, and the arithmetic suggests session-clustering would have separated
+it (√(147/11) ≈ 3.7× narrower, which turns +0.0055 [−0.0001, +0.0097] into roughly
+[+0.0042, +0.0068]). That is exactly the shape of a forking path, and it is why this is
+being registered in advance of the run rather than applied to the old one.
+
+**The argument, which stands independently of that:** for a **per-visit** label the natural
+correlation unit is the **session**, not the category. Two visits in one sitting share
+context, device state, mood and time; two visits to `video` three months apart share only a
+label. Clustering by category models a dependence that is weaker than the one actually
+present, and ignores the one that is.
+
+**The rule:** every target below declares its cluster unit in advance, and **both** the
+declared unit and the category unit are reported side by side. If they disagree, that
+disagreement is the finding and gets its own entry.
+
+---
+
+### T-A · `visit_engaged` — will this visit hold you?
+
+> At the moment a page opens: will dwell exceed the median dwell for this **category** over
+> its trailing 20 visits?
+
+**The label is deliberately identical to D93's `as_1`.** D93 measured 10,502 labels at a
+50.0%/50.3% base rate and missed separation from a constant by 0.0001. Changing the label
+now would make any improvement unattributable. **One thing changes: the features** (`domain`
+and sequence context added) **and one thing changes: the cluster unit**. Both are stated
+here so the comparison against D93 is exact.
+
+- **Features** — `as_2` = `as_1` plus domain familiarity (visits to this domain, share of
+  its category, is-this-a-daily-domain), sequence context (previous category, previous
+  domain, previous dwell ratio, same-domain-as-previous). **`domain` has been stored since
+  T1 and read by zero features**; this is its first use.
+- **Cluster unit:** session. Category reported alongside.
+- **Bar:** `global_base_rate`, a constant. D93 established that `category_base_rate` is the
+  wrong bar here and is *worse than a constant*, because a per-category median split makes
+  every category ~50% by construction.
+- **Adoption:** the paired interval against the constant, session-clustered, excludes zero
+  in the model's favour **on Edge**.
+
+### T-B · `browsing_next_hour` — will you be here?
+
+> For each clock hour in the observed span: will at least one visit occur in the next hour?
+
+- **Subject is the hour-of-day bucket**, not the category. That makes
+  `category_base_rate` the *per-hour* rate automatically, which is the correct bar and needs
+  no new baseline code.
+- **Cluster unit:** calendar day (56-90 per corpus).
+- **Bar:** the per-hour rate. Beating a flat rate would be trivial — circadian rhythm is the
+  strongest regularity a person has — so the bar is the rhythm itself.
+- **Adoption:** interval against the **per-hour rate** excludes zero in the model's favour on
+  Edge. Beating only `global_base_rate` does **not** qualify.
+
+### T-C · `next_category` — what comes next?
+
+> Given the category just finished, which category comes next?
+
+- **Multiclass**, so Brier does not apply directly. Evaluated on **top-1 accuracy**, with
+  top-3 reported.
+- **Labels:** every category change, **within** sessions as well as between them. D91 fixed
+  the between-session bar; the within-session supply is far larger and untested.
+- **Cluster unit:** session.
+- **Bar:** the **33.2% always-the-global-mode floor** from T19. Explicitly *not* the 44.5%
+  per-category mode, which is in-sample and would score a model against its own fit.
+- **Adoption:** bootstrap interval on the accuracy difference against the floor excludes
+  zero in the model's favour on Edge.
+
+### T-D · `tab_return` — will you come back to this tab?
+
+> When a tab is switched away from: will it be activated again before it is closed?
+
+- **Cannot be measured on any existing corpus.** The history database records visits, not
+  tabs, so there is no offline version of this. It requires the **`tabs`** permission and
+  live collection, and it is registered here so its definition is fixed before any data
+  exists rather than shaped by the first data that arrives.
+- **Cluster unit:** session. **Bar:** `global_base_rate`.
+- **Blocked**, and stated as blocked rather than quietly deferred.
+
+---
+
+### Predictions, recorded now
+
+1. **T-A separates from the constant on Edge.** The direct claim, and the one I most expect
+   to be right — D93 missed by 0.0001 with neither `domain` nor sequence features and with a
+   cluster unit that could not resolve the effect.
+2. **`domain` features carry more weight than `transition` did.** `transition` entered at
+   −0.212 on first use. Domain familiarity distinguishes a site visited 400 times from one
+   seen once, which is a larger behavioural difference than link-versus-typed.
+3. **T-B beats a flat rate easily and does *not* beat the per-hour rate.** Circadian rhythm
+   is nearly all of the signal, and a model that adds recent-activity features on top of it
+   will find little left. **This is the prediction most likely to embarrass me**, and it is
+   why the bar is the rhythm rather than a constant.
+4. **T-C's within-session supply exceeds 1,500 labels per corpus** — an order of magnitude
+   above the 238 between-session transitions T19 measured.
+
+### The stopping rule, fixed now
+
+Akash has said machine learning stays. That is the direction and it is not in question
+here. What is fixed here is what counts as an answer:
+
+**If none of T-A, T-B or T-C separates from its declared bar, the finding is that one
+person's browsing at this scale does not support a model, Tise ships descriptive, and that
+result is published as the headline rather than buried.** T-D remains open only because it
+is unmeasured, not because it is a fallback.
+
+Three targets, three bars, all declared before a line of the model exists.
