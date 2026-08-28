@@ -50,6 +50,25 @@ import { sessionise } from "../features/sessions";
 export const TRAINING_ALARM = "tise:train";
 
 /**
+ * `logreg_fs3`. The feature set is in the name so a stored record cannot hide which one
+ * produced it — the mirror of `model_name` in `research/.../models/return_model.py`.
+ *
+ * It is derived rather than written down because it was written down once, and D83 then
+ * shipped `fs_3` while the literal stayed at `logreg_fs2`. Every prediction stored after
+ * that carried a `modelName` naming one feature set and a `featureSet` naming another.
+ *
+ * `replaceAll`, not `replace`: Python's `str.replace` replaces every occurrence and
+ * JavaScript's replaces only the first, so a set like `fs_3_b` would silently produce two
+ * different names in the two languages.
+ */
+export function modelName(featureSet: string): string {
+  return `logreg_${featureSet.replaceAll("_", "")}`;
+}
+
+/** The name of the model this build actually trains. */
+export const MODEL_NAME = modelName(FEATURE_SET);
+
+/**
  * Six hours, matching retention. Training is not urgent — a model an afternoon out of
  * date is not a worse model in any way a user can perceive — and a frequent alarm on a
  * battery-powered machine is a cost with no matching benefit.

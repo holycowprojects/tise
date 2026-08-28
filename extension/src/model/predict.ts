@@ -22,7 +22,7 @@ import { applyCalibration } from "./calibrate";
 import { predictProba } from "./logreg";
 import { evidenceFor, type Prediction } from "./prediction";
 import { transform } from "./prep";
-import type { TrainedModel } from "./train";
+import { MODEL_NAME, type TrainedModel } from "./train";
 
 export const TARGET = "return_24h";
 
@@ -71,7 +71,7 @@ export function buildPredictions(
         windowStart: session.endedAt,
         windowEnd: new Date(closedAt + horizonMs).toISOString(),
         abstained: !shouldAnswer(model.policy, probability),
-        modelName: "logreg_fs2",
+        modelName: MODEL_NAME,
         // The instant of the fit identifies it uniquely, which is what makes a stored
         // prediction reproducible: two models trained on different days are different
         // models even when every hyperparameter matches.

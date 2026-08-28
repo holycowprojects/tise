@@ -36,7 +36,12 @@ import {
 import type { Prediction } from "../src/model/prediction";
 import { resolveAll, resolveOutcome, type ResolutionContext } from "../src/model/resolve";
 import { updateRegistry } from "../src/model/registry";
-import { refreshDataset, runTrainingChunk } from "../src/model/train";
+import {
+  MODEL_NAME,
+  modelName,
+  refreshDataset,
+  runTrainingChunk,
+} from "../src/model/train";
 import type { FeatureRow } from "../src/features/vector";
 import {
   FEATURE_NAMES,
@@ -454,10 +459,14 @@ describe("the whole loop, with a real trained model", () => {
     await trainedProfile();
     await updateRegistry({ now: NOW });
     for (const stored of await allPredictions()) {
-      expect(stored.modelName).toBe("logreg_fs2");
+      expect(stored.modelName).toBe(MODEL_NAME);
       expect(stored.modelVersion).toMatch(/^cal_1@/);
       expect(stored.featureSet).toBe(FEATURE_SET);
       expect(stored.dataCutoff).toBe(stored.windowStart);
+      // The pairing, not either half. This assertion is the one that was missing: the
+      // literal above used to read `logreg_fs2` while the line under it derived `fs_3`,
+      // so the test passed while pinning the contradiction in place.
+      expect(stored.modelName).toBe(modelName(stored.featureSet));
     }
   });
 

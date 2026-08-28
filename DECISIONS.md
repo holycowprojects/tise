@@ -2770,3 +2770,44 @@ and the generator computes it independently on the other two, where it is **mono
 well** — factors of 3.0 on Chrome, 6.7 on Edge, 5.4 on Firefox. A post-hoc pattern that
 holds on two corpora it was not built from is worth more than one that does not, and still
 less than one that was predicted.
+
+### D87 — The third stale label, and this time the test was holding it in place
+
+`predict.ts` wrote `modelName: "logreg_fs2"` onto every prediction it stored, while the
+`featureSet` field on the line below it derived `fs_3` from the constant. Since D83 every
+stored prediction has named one feature set and recorded another. The probability was
+right; the record of what produced it was a version behind.
+
+That is the same defect as D86's `model.md` titles, in a worse place — a report is
+regenerated, a stored record is not. It is now fixed at the source: `modelName(featureSet)`
+in `train.ts` mirrors `model_name` in `return_model.py`, and `MODEL_NAME` follows
+`FEATURE_SET`. **`replaceAll`, not `replace`** — Python's `str.replace` takes every
+occurrence and JavaScript's takes only the first, so a set named `fs_3_b` would have
+produced two different names in the two languages. The parity suite would not have caught
+it: a model's display name is not a feature and is not in the oracle.
+
+**The new part, and the reason this gets its own entry.** D78 and D86 were failures of
+*absence* — `corpus.py` had no test file, `model_report.py` had no test file. This one had a
+test. `registry.test.ts` asserted `expect(stored.modelName).toBe("logreg_fs2")` **and
+passed**, three lines above an assertion that derived `featureSet` dynamically. The test was
+not missing the bug; it was **pinning it in place**, and it would have gone on doing so
+through every future feature set. A test that hardcodes the value it is guarding converts a
+bug into a specification.
+
+So the guard added is not another value assertion. `tests/model-name.test.ts` checks the
+**shape of the code**: no source file may contain a quoted `logreg_*` name at all, comments
+excepted. A value test passes again the moment someone writes a literal that happens to be
+current; this one cannot. The break was confirmed applied before it was believed — the
+literal was verified present in `predict.ts` by grep, then failed exactly one test.
+
+The registry test keeps its assertion but gains the one that was missing:
+`modelName === modelName(featureSet)`, the **pairing** rather than either half. Neither
+field alone could ever have revealed the contradiction.
+
+**No migration is needed, and that is luck rather than design.** The `fs_3` build has not
+yet been loaded on the real profile — that is the check still owed from D83 — so every
+prediction stored there dates from the `fs_2` era and its `modelName` is correct. Had the
+owed check been done promptly, this bug would have written wrong labels into real records
+first. The lesson is not that the delay helped; it is that a stale literal on a **stored**
+field has a blast radius a report does not, and the two should not have been treated as the
+same severity when the first one was found.
