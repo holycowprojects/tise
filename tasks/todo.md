@@ -113,14 +113,43 @@ Work order: **T19 → T20 → T21 → then back to T14/T15/T17/T18.**
     agreeing, unlike the single 50.0% D89 refused to read anything into
   - `block_volume` is **viable**, not correct. Nothing scored, no model fitted
 
-- [ ] **T20 · Pre-register the target** · S · deps: T19, T19b — **next**
-  - **Two candidates now have a measured claim**, and the choice is real:
-    `block_volume` daily (**403** labels, 36–47% or 41–49% on shares) against
-    `next_session_category` (**238** labels, 33.2% floor vs 44.5% mode)
-  - D89's "the only candidate passing both tests" is **out of date** — D90 supersedes it
-  - Pre-register argument, definition, predictions and adoption rule **before** any model
-    is fitted (D81's discipline). D88 splits the gate: data sufficiency from T19/T19b,
-    performance registered in advance
+- [x] **T20 · Pre-register the target** · S · deps: T19, T19b — **done** (D91)
+  - Committed **before any model exists** for these targets. Git holds the order, as D81
+  - **`block_volume`, daily** is the target. Every parameter declared: 10-block trailing
+    window, 6 prior blocks minimum, present-in-half qualifying rule, **strict `>`**, and
+    **raw counts rather than shares**
+  - **Counts over shares was the close call.** Shares are nearer balanced (41–49% vs
+    36–47%) and cancel the unmeasured import-vs-live offset. But shares are
+    **compositional** — video spiking makes dev's card read "down" when dev did not move,
+    which is arithmetically true and substantively false. And the offset argument is much
+    weaker daily: a 10-block window spans **10 days**, so imports age out in a fortnight.
+    Shares reported alongside throughout, so a wrong call here is visible
+  - **What ships is now two independent questions**, a distinction `return_24h` never had:
+    (1) does the target ship — yes if the user's own data clears the qualifying rule;
+    (2) does the *learned model* ship, or the base-rate table? A card can be driven by
+    `category_base_rate` alone, so **ML is justified only if it beats that**
+  - **The bar:** paired Brier vs `category_base_rate`, subject-clustered, must **exclude
+    zero in the model's favour on Edge**. Stricter than D81's adopt-unless-worse, because
+    there the argument was structural and here the only argument *is* the score.
+    **If unmet, the table ships** — an outcome with a written plan, not a failure
+  - **Predictions:** (1) beats `global_base_rate` everywhere; (2) **not** distinguishable
+    from `category_base_rate` on Edge — every such comparison in this project has included
+    zero; (3) **`same_as_last` beats `category_base_rate` somewhere**, because daily
+    browsing is bursty and a per-topic average cannot represent persistence. (3) is the one
+    most likely to change what gets built
+  - **`next_session_category` is secondary**, measured because it has never been
+    benchmarked. Its bar is the **33.2% floor**, not the 44.5% per-category mode — that
+    figure is in-sample and using it would score a model against its own fit. It can become
+    primary only if `block_volume` fails its gate **on a real profile**, never by scoring
+    better; that exception is written down precisely to stop the forking path
+
+- [ ] **T21 · Build and measure the new target** · L · deps: T20 — **next**
+  - Labels, features and folds for daily `block_volume`; baselines on identical folds;
+    intervals. Then the report, checked against D91's three predictions
+  - **Import may set the yardstick; only live collection may score** (D88)
+  - Feature set is an open question — `fs_3` was designed for `return_24h`. D86 measured
+    day-of-week as non-monotone with an 18–29 point spread, so a cyclic encoding is the
+    obvious first candidate and is losslessly migratable
   - D81's discipline. Argument, exact definition, predictions and adoption rule committed
     **before** any model is fitted — git holds the order
   - Sets the **performance** bar. The **data-sufficiency** gate is set from T19 (D88 splits

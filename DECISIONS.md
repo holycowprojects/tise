@@ -3127,3 +3127,141 @@ an argument about how people experience a week. It was a good argument and it wa
 one question about the block size recovered the target D89 had just declared dead. The
 measurement had been built by then, so answering it cost an hour — the same machinery, one
 parameter. **Build the measurement before the conviction, and a change of mind is cheap.**
+
+### D91 — Pre-registering the target, before any model is fitted
+
+D88 split the gate deliberately: data sufficiency set **after** T19's measurement, because a
+descriptive measurement produces no score to bias it; performance set **before** any model
+exists, because a bar chosen after seeing what a model scores is not a bar. T19 and T19b
+supplied the first half. This entry fixes the second, and every choice below is made with no
+model score of any kind in existence for these targets.
+
+Committed before implementation. Git holds the order, as it did for D81.
+
+---
+
+#### The target: `block_volume`, daily
+
+> For topic *C* and local day *D*: is *C*'s event count on *D* **strictly greater** than the
+> median of *C*'s counts over the trailing 10 complete days before *D*?
+
+Every parameter, declared now:
+
+| | Value | Why this and not something else |
+|---|---|---|
+| Block | one **local** calendar day | Smallest unit that still has a "usual". D90: weekly gave 48 labels, daily gives 403. |
+| Trailing window | **10 blocks** | D88 chose ~10 so an imported bootstrap ages out. At daily granularity that is 10 days rather than 70, which also shrinks the trend contamination D89 found. |
+| Minimum history | **6 prior blocks** | Below that there is no median worth the name. |
+| Qualifying rule | present in **≥ half** the window | D88's rule. T19b showed it already excludes the median-zero case at daily granularity: measured 0.0% on all three corpora. |
+| Comparison | **strict `>`** | Matches the claim the card makes — "more than usual" is not "at least usual". Ties are 2.4–3.6% (T19b) so little rests on it, and the tie rate is published beside every base rate. |
+| Quantity | **raw counts**, not shares | See below. |
+
+**Counts, not shares, and this one is genuinely close.** Shares are nearer balanced on all
+three corpora (41.1 / 44.4 / 49.4 against 36.3 / 39.3 / 47.0) and cancel the unmeasured
+import-versus-live offset. Two things decide it the other way. First, shares are
+**compositional**: if video spikes, every other topic's share falls, so a card would read
+"dev is down" when dev did not move — a statement that is arithmetically true and
+substantively false, which is the worst kind. Second, the offset argument is much weaker at
+daily granularity than it was at weekly: a 10-block trailing window now spans **10 days**, so
+imported blocks age out of every median within a fortnight rather than over two months.
+Shares are computed and reported alongside throughout, so if this is wrong it is visible.
+
+**The base rate will not be 50%, and that is accepted rather than assumed away.** T19b
+measured 36–47%. D88's claim that a median split is balanced by construction is false on real
+data and has been for two entries now. What daily granularity buys is that the target is not
+*saturated* — unlike `return_24h` at 65–72%, where a constant answer was already most of the
+way right. Not-saturated is the property that matters, and it is weaker than what D88 claimed.
+
+---
+
+#### What ships is decided in two independent steps
+
+This distinction did not exist for `return_24h` and its absence is part of why that target
+ran as long as it did.
+
+**Step 1 — does the target ship at all?** Yes, if the data-sufficiency gate passes. That gate
+is now a **shipping rule that runs on the user's machine**, not a fact about this corpus:
+
+> A topic gets a volume card only once it has **6 prior blocks** and clears the qualifying
+> rule. A user sees no volume cards at all until at least **one** topic qualifies.
+
+On these corpora that yields 4–7 topics each, so it passes here. Its real job is on somebody
+else's browsing, where it may not.
+
+**Step 2 — does the *learned model* ship, or the base-rate table?** Separate question, and
+the honest answer may be the table. A card reading *"Shopping today · 71% — 11 of your last
+15 days"* can be driven by `category_base_rate` alone. **Machine learning is justified only if
+it beats that**, and if it does not, Tise ships the table and says so in the README. That is a
+smaller claim and a true one, and D80's whole lesson is that the smaller true claim is worth
+more than the larger unsupported one.
+
+---
+
+#### The performance bar, fixed now
+
+The reference is **`category_base_rate`** — a per-topic table of how often that topic is above
+its own median. D28's principle, transplanted: beating chance is uninteresting, beating a
+per-topic table is the question.
+
+**The learned model is adopted over the table only if** its paired Brier difference against
+`category_base_rate`, resampled by **subject cluster**, **excludes zero in the model's
+favour**, on **Edge** (the largest corpus, 196 labels).
+
+Point estimates do not qualify. Fold counts especially do not — D80 established a no-skill
+model wins 2 of 5 folds or more 81% of the time. This is a **stricter** rule than D81's
+adopt-unless-worse, and deliberately so: D81 was adopting a feature transform on a structural
+argument with the score as a veto, whereas here the only argument for the model over the table
+*is* the score.
+
+**If the bar is not cleared, the table ships.** That is not a failure state, it is an outcome
+with a written plan.
+
+---
+
+#### Predictions, recorded now
+
+1. **The model will beat `global_base_rate` on all three corpora** by point estimate. A low
+   bar, and failing it would mean the features carry nothing at all.
+2. **The model will not be distinguishable from `category_base_rate` by subject-clustered
+   interval on Edge.** Every such comparison in this project has included zero — D80 for the
+   model against its bar, D85 for XGBoost against the model. I expect the pattern to hold and
+   the bar in the section above to go unmet.
+3. **`same_as_last` will beat `category_base_rate` on at least one corpus.** This is the
+   interesting one and it is specific to daily blocks. Browsing is bursty and autocorrelated:
+   a heavy shopping day is more likely to follow a heavy shopping day. A per-topic average
+   cannot represent that at all, and a one-step persistence rule can. If it holds, the useful
+   signal in this target is **persistence**, not the per-topic rate — and that is a finding
+   about what to build next regardless of what the model scores.
+
+Prediction 2 is the one I would most like to be wrong about, and prediction 3 is the one most
+likely to change what gets built.
+
+---
+
+#### The secondary: `next_session_category`
+
+Measured in the same run, because it has existed in both languages since T10 and has **never
+been benchmarked**, which is a hole in the project independent of any of this.
+
+Its bar, also fixed now: **top-1 accuracy on rolling-origin test folds must exceed the 33.2%
+always-the-global-mode floor**, by a subject-clustered interval excluding zero.
+
+The 44.5% per-category mode from T19 is **not** a bar — it is an in-sample figure, the
+training-set mode scored on itself, and using it as a threshold would be scoring a model
+against its own fit.
+
+**It cannot be promoted over `block_volume` by scoring better.** The two answer different
+questions and only one has a stated product. The single circumstance in which
+`next_session_category` becomes primary is fixed here: **`block_volume` fails its
+data-sufficiency gate on a real profile** — not on these corpora, where it passes — **and**
+`next_session_category` clears the bar above. Any other route from "it scored well" to "it
+ships" is the garden of forking paths, and writing the exception down now is what stops it.
+
+---
+
+#### What this entry cannot do
+
+It cannot make the target correct. T19b established that `block_volume` is **viable** — it
+produces labels on every corpus — and nothing more. No model has been fitted to it, its base
+rate is unbalanced, and the trend contamination D89 found is smaller at daily granularity but
+unquantified. Those are open, and the next entry reports them against these predictions.
