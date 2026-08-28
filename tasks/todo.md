@@ -143,13 +143,40 @@ Work order: **T19 → T20 → T21 → then back to T14/T15/T17/T18.**
     primary only if `block_volume` fails its gate **on a real profile**, never by scoring
     better; that exception is written down precisely to stop the forking path
 
-- [ ] **T21 · Build and measure the new target** · L · deps: T20 — **next**
-  - Labels, features and folds for daily `block_volume`; baselines on identical folds;
-    intervals. Then the report, checked against D91's three predictions
-  - **Import may set the yardstick; only live collection may score** (D88)
-  - Feature set is an open question — `fs_3` was designed for `return_24h`. D86 measured
-    day-of-week as non-monotone with an 18–29 point spread, so a cyclic encoding is the
-    obvious first candidate and is losslessly migratable
+- [x] **T21 · Build and measure `block_volume`** · L · deps: T20 — **the table ships, not
+      the model** (D92)
+  - Verify: `uv run python analysis/block_volume.py` ✓ — 663 Python, 338 TypeScript, both
+    linters clean. Report at `docs/benchmarks/block-volume.md`
+  - **Two of D91's three predictions FAILED**, and the one that HELD was written so that
+    holding it means the model misses its own bar
+  - **Prediction 1 failed, and that is worse than missing the bar.** Edge: model **0.2607**
+    against `global_base_rate` **0.2529** — *beaten by a single constant*, on all three
+    corpora. Ten features and eleven design columns lose to predicting one number
+  - **Prediction 3 failed, and it kills the mechanism `bs_1` was built around.**
+    `same_as_last` scores 0.4140 vs the bar's 0.2479 on Edge — far worse, everywhere.
+    Weights agree independently: `prevAbove` **−0.041**, `streakAbove` **+0.065**. So
+    "was today above your usual?" is close to **independent day to day**
+  - **The card survives; the model does not.** *"Shopping today · 71% — 11 of your last 15"*
+    is `category_base_rate` alone: a per-topic rate, computable on-device with no training,
+    and **nothing measured beats it**
+  - **Across three targets the same finding:** on one person's browsing a per-topic rate is
+    very hard to beat. Logreg on 14 features, on 18, XGBoost tuned for small data, and now a
+    purpose-built block set have all failed to separate from one
+  - `bs_1` declared in `vector.py` **before fitting**, with no TS twin — nothing ships until
+    a target is adopted. Leakage is structural: labels and features emitted in one forward
+    pass before the block joins any state, and `test_block_labels.py` asserts it
+
+- [ ] **T22 · Measure `next_session_category`** · M · deps: T21 — **next**
+  - The remaining candidate. 238 labels, **never fitted at all**, code in both languages
+    since T10. Bar fixed in D91: beat the **33.2% always-the-mode floor** by a
+    subject-clustered interval excluding zero — *not* the 44.5% per-category mode, which is
+    in-sample and would score a model against its own fit
+  - D91 also fixed the only circumstance in which it can become primary, so a good score
+    cannot become a route to shipping it
+
+- [ ] **T23 · Ship the base-rate card** · M · deps: T21
+  - D92: the card works without a model. Per-topic rate, denominator shown, computed
+    on-device. This is shippable now and does not wait on T22
   - D81's discipline. Argument, exact definition, predictions and adoption rule committed
     **before** any model is fitted — git holds the order
   - Sets the **performance** bar. The **data-sufficiency** gate is set from T19 (D88 splits

@@ -113,7 +113,41 @@ _FS3: tuple[str, ...] = tuple(
     for name in _FS2
 )
 
-FEATURE_SETS: dict[str, tuple[str, ...]] = {"fs_2": _FS2, "fs_3": _FS3}
+#: `bs_1` — the first feature set for `block_volume` (D91). **Declared before any model was
+#: fitted to it**, and computed from blocks rather than from a session, so nothing in
+#: `fs_2`/`fs_3` applies: those describe a category at the instant a session closed.
+#:
+#: Three ideas, and each is here for a stated reason rather than because it was available:
+#:
+#: * **Persistence** — `prevAbove`, `lastRatio`, `streakAbove`, `daysSinceAbove`. D91's
+#:   third prediction is that `same_as_last` beats a per-topic table, because daily browsing
+#:   is bursty. If that holds, these carry it; if it fails, they should be near-useless, and
+#:   either way the prediction is checkable against these coefficients.
+#: * **Level** — `medianLevel`, `activeRate10`, `topicShare10`. How large and how regular
+#:   this topic is, which conditions everything else.
+#: * **Calendar** — `dayOfWeekSin`/`dayOfWeekCos`. D86 measured an 18-29 point day-of-week
+#:   spread that is **non-monotone**, so a plain integer cannot represent it and a cyclic
+#:   pair can. This is the first place that finding is acted on.
+#:
+#: Everything unbounded is saturated, per D81: a feature that can only grow lets a test row
+#: land arbitrarily far outside the range its coefficient was fitted on.
+#:
+#: **No TypeScript twin yet.** The parity contract binds features the extension computes,
+#: and nothing here ships until the target is adopted. Recorded so the gap is deliberate.
+_BS1: tuple[str, ...] = (
+    "prevAbove",
+    "lastRatio",
+    "streakAbove",
+    "daysSinceAbove",
+    "medianLevel",
+    "activeRate10",
+    "topicShare10",
+    "totalRatio",
+    "dayOfWeekSin",
+    "dayOfWeekCos",
+)
+
+FEATURE_SETS: dict[str, tuple[str, ...]] = {"fs_2": _FS2, "fs_3": _FS3, "bs_1": _BS1}
 
 FEATURE_NAMES: tuple[str, ...] = FEATURE_SETS[DEFAULT_FEATURE_SET]
 

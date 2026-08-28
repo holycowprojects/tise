@@ -71,6 +71,11 @@ NULLABLE_BY_SET: dict[str, tuple[str, ...]] = {
         "categoryShare30d",
         "priorReturnRate",
     ),
+    # `bs_1` has exactly one legitimate absence: a topic that has never been above its own
+    # median has no "blocks since it last was". Everything else is computed from a window
+    # that is guaranteed non-empty by the minimum-history rule, so a null anywhere else is
+    # a bug and `raw_row` raises rather than quietly imputing it.
+    "bs_1": ("daysSinceAbove",),
 }
 
 NULLABLE_FEATURES: tuple[str, ...] = NULLABLE_BY_SET[DEFAULT_FEATURE_SET]

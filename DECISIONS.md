@@ -3265,3 +3265,76 @@ It cannot make the target correct. T19b established that `block_volume` is **via
 produces labels on every corpus — and nothing more. No model has been fitted to it, its base
 rate is unbalanced, and the trend contamination D89 found is smaller at daily granularity but
 unquantified. Those are open, and the next entry reports them against these predictions.
+
+### D92 — `block_volume` is measurable and not predictable. The table ships, the model does not.
+
+D91 fixed the bar, the parameters and three predictions before any model existed for this
+target. `analysis/block_volume.py` produces the numbers. Two of the three predictions failed,
+and the one that held was the one written so that **holding it means the model fails**.
+
+| # | Prediction | Verdict |
+|---|---|---|
+| 1 | The model beats `global_base_rate` on all three corpora | **FAILED** — beats it on none |
+| 2 | The model is **not** distinguishable from `category_base_rate` on Edge | **HELD** |
+| 3 | `same_as_last` beats `category_base_rate` somewhere | **FAILED** — beats it on none |
+
+**D91's adoption rule is not met, so the base-rate table ships and the learned model does
+not.** That was written down in advance as an outcome with a plan rather than a failure
+state, and it is the outcome.
+
+**Prediction 1 failing is worse than the bar being missed.** Edge: model **0.2607**,
+`category_base_rate` 0.2479, `global_base_rate` **0.2529**. The model is beaten by a single
+constant. Chrome is the only corpus where it edges the bar at all (0.2439 against 0.2454) and
+it still loses to the constant there. Ten features, eleven design columns, and the fit is
+worse than predicting one number for everything.
+
+**Prediction 3 failing is the informative one, and it kills the mechanism the feature set was
+built around.** The argument was that daily browsing is bursty and autocorrelated — a heavy
+shopping day follows a heavy shopping day — so persistence should be real signal that a
+per-topic average cannot represent. Measured, `same_as_last` scores **0.4140 against the
+bar's 0.2479** on Edge, 0.3337 against 0.2454 on Chrome, 0.5939 against 0.2641 on Firefox. Not
+marginally worse: **far** worse, on every corpus.
+
+The fitted weights say the same thing independently. Of the four persistence features in
+`bs_1`, `prevAbove` carries **−0.041** and `streakAbove` **+0.065** — both indistinguishable
+from nothing. The largest weight is `medianLevel` at **+0.563**, which is a statement about
+how big a topic is, not about what it is doing.
+
+**So "was today above your usual?" is close to independent from day to day.** Yesterday
+being above tells you almost nothing about today. That is a real property of the data and it
+is the opposite of what the target was designed around: D88 chose a median split precisely so
+the answer would vary, and it varies — it just varies unpredictably.
+
+**What this means for the product.** The card survives; the model does not.
+
+> **Shopping today · 71%** — *11 of your last 15 days.*
+
+is driven by `category_base_rate` alone: a per-topic count of how often that topic has been
+above its own median. It is honest, it is computable on-device with no training at all, and on
+this data **nothing measured beats it**. Tise can ship that card today and say plainly in the
+README that the number behind it is a rate rather than a model. D80's lesson, one level up:
+the smaller true claim is worth more than the larger unsupported one.
+
+**What has now been established across three targets.** `return_24h` was measurable and
+uninteresting. `block_volume` weekly had too few labels. `block_volume` daily has labels and
+no learnable structure. The consistent finding, stated plainly: **on one person's browsing, a
+per-topic rate is very hard to beat**, and every model this project has fitted — logistic
+regression on 14 features, on 18, XGBoost tuned for small data, and now a purpose-built
+block feature set — has failed to separate itself from one.
+
+That is a result, and it is the honest headline for the showcase. It is also the strongest
+argument for the abstention and interval machinery being the thing worth demonstrating,
+rather than any accuracy figure.
+
+**Caveats that are real but do not rescue it.** Edge's pooled test set is 90 rows across 5
+subject clusters, so the intervals are wide and the *bar* comparison is genuinely undecided
+in both directions. But prediction 1 does not depend on an interval: the model loses to a
+constant by point estimate on all three corpora, and no amount of additional data changes a
+sign that consistent into a positive result. The base rate is 36-47% rather than 50% (D90),
+and volume trends still contaminate the target (D89) — both make the target worse, neither
+makes the model better.
+
+**What is not concluded here.** `next_session_category` is untouched. D91 registered it as
+secondary with its own bar — the 33.2% always-the-mode floor — and the one circumstance in
+which it becomes primary. It has 238 labels against this target's 403 and, unlike this one,
+has never been fitted at all. It is the remaining candidate.
