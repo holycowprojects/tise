@@ -12,18 +12,23 @@ Two things about this file bite everyone who touches it:
 `chrome.history` extension API. Anything computed from `duration_seconds` belongs to the
 `full` compat class and can never ship. See SPEC.md.
 
-**The redirect trap** (D78). The file holds every hop of a redirect chain; the API hands
-over only the chain's end. So the file and the product disagree about what a visit *is*,
-and reading the file naively builds a corpus the extension could never have collected.
-`view` names which dataset you are asking for, and there is no safe default beyond the
-one that matches what ships.
+**The redirect trap** (D78, mechanism corrected by D79). The file holds every hop of a
+redirect chain; the API does not offer most of them. So the file and the product disagree
+about what a visit *is*, and reading the file naively builds a corpus the extension could
+never have collected. `view` names which dataset you are asking for, and there is no safe
+default beyond the one that matches what ships.
+
+**The filter is per URL, not per visit.** `search()` returns a page when *any* of its
+visits is visible; `getVisits()` then hands back **all** of that page's visits, visible or
+not. So a redirect hop on a page you also visited normally does reach the extension, and a
+page that only ever appears mid-chain never does. Filtering visit-by-visit looks close on
+totals and is the wrong shape.
 """
 
 from __future__ import annotations
 
 import shutil
 import sqlite3
-from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -42,6 +47,7 @@ __all__ = [
     "default_history_path",
     "is_chain_end",
     "is_redirect",
+    "is_visible",
     "load_visits",
     "registrable_domain",
     "transition_core",
@@ -50,9 +56,10 @@ __all__ = [
 
 #: Which dataset a read produces. These are three different corpora, not three settings.
 #:
-#: - ``shipped`` — chain ends only, which is what `chrome.history` hands the extension.
-#:   Every benchmark uses this, because a number computed on visits the product cannot
-#:   see describes a model that was never run.
+#: - ``shipped`` — every visit of every page the history API would offer, which is what
+#:   the extension is given (D79: page-level, not visit-level). Every benchmark uses
+#:   this, because a number computed on visits the product cannot see describes a
+#:   model that was never run.
 #: - ``chosen`` — drops visits carrying a redirect bit. The pre-D78 default, kept so the
 #:   superseded numbers stay reproducible rather than merely quoted. It keeps redirect
 #:   chain *starts*, which are plumbing, and drops the landing pages, which are not.
@@ -96,9 +103,9 @@ SERVER_REDIRECT = 0x8000_0000
 REDIRECT_MASK = CLIENT_REDIRECT | SERVER_REDIRECT
 
 # Chain markers. A redirect chain runs from a CHAIN_START visit to a CHAIN_END one, with
-# the hops in between. **The `chrome.history` API hands over chain ends only** (D78,
-# measured: 98.5% of chain-end visits reached a real export against 8.7% of the rest), so
-# this bit — not the redirect mask — decides what the shipped extension can ever see.
+# the hops in between. **Chromium's history results require CHAIN_END** — see
+# `is_visible`, transcribed from the source — so this bit, not the redirect mask, decides
+# which pages the shipped extension is ever offered.
 #
 # The two are not complements. A chain *start* such as `google.com/url?...` carries no
 # redirect bit at all, so filtering on the mask keeps the plumbing and discards the page
@@ -151,12 +158,34 @@ def is_redirect(raw: int) -> bool:
 
 
 def is_chain_end(raw: int) -> bool:
-    """Whether this visit ends a redirect chain, and so reaches the history API.
-
-    This is the *product-visible* test. `is_redirect` describes the file; this describes
-    what the extension is given. See D78 and `analysis/import_simulation.py`.
-    """
+    """Whether this visit ends a redirect chain."""
     return bool(raw & CHAIN_END)
+
+
+#: `KEYWORD_GENERATED` — a navigation synthesised from a search-keyword shortcut.
+KEYWORD_GENERATED = 10
+
+
+def is_visible(raw: int) -> bool:
+    """Chromium's own test for whether a visit belongs in history results.
+
+    Transcribed from `TransitionIsVisible` in
+    `components/history/core/browser/visit_database.cc`:
+
+        (ui::PAGE_TRANSITION_CHAIN_END & transition) != 0 &&
+        ui::PageTransitionIsMainFrame(page_transition) &&
+        !ui::PageTransitionCoreTypeIs(page_transition,
+                                      ui::PAGE_TRANSITION_KEYWORD_GENERATED)
+
+    Read from the source rather than inferred (D79). D78 inferred the chain-end half from
+    a 98.5%/8.7% split and got the other two terms wrong by omission.
+    """
+    core = raw & 0xFF
+    return (
+        bool(raw & CHAIN_END)
+        and core not in (3, 4)  # auto_subframe, manual_subframe — not main frame
+        and core != KEYWORD_GENERATED
+    )
 
 
 def _is_ip_literal(host: str) -> bool:
@@ -265,29 +294,39 @@ def load_visits(
     uri = f"file:{db_path.as_posix()}?mode=ro"
     connection = sqlite3.connect(uri, uri=True)
     try:
-        rows: Iterator[tuple[int, int, int, str]] = connection.execute(_VISITS_QUERY)
-        visits: list[Visit] = []
-        for visit_time, raw_transition, raw_duration, url in rows:
-            domain = registrable_domain(url)
-            if domain is None:
-                continue
-            if view == "shipped" and not is_chain_end(raw_transition):
-                continue
-            if view == "chosen" and is_redirect(raw_transition):
-                continue
-            transition = transition_core(raw_transition)
-            if exclude_subframes and transition in SUBFRAME_TRANSITIONS:
-                continue
-            visits.append(
-                Visit(
-                    visited_at=webkit_to_datetime(visit_time),
-                    domain=domain,
-                    transition=transition,
-                    # 0 means "not recorded", which is an absence, not a zero-second dwell.
-                    duration_seconds=(raw_duration / 1_000_000) if raw_duration > 0 else None,
-                )
-            )
+        rows: list[tuple[int, int, int, str]] = list(connection.execute(_VISITS_QUERY))
     finally:
         connection.close()
+
+    # `search()` selects **URLs** with at least one visible visit; `getVisits()` then
+    # returns every visit of those URLs, visible or not (D79). Filtering visit-by-visit
+    # instead drops 61 visits on this corpus that the extension is in fact given.
+    visible_urls = (
+        {url for _, transition, _, url in rows if is_visible(transition)}
+        if view == "shipped"
+        else set()
+    )
+
+    visits: list[Visit] = []
+    for visit_time, raw_transition, raw_duration, url in rows:
+        domain = registrable_domain(url)
+        if domain is None:
+            continue
+        if view == "shipped" and url not in visible_urls:
+            continue
+        if view == "chosen" and is_redirect(raw_transition):
+            continue
+        transition = transition_core(raw_transition)
+        if exclude_subframes and transition in SUBFRAME_TRANSITIONS:
+            continue
+        visits.append(
+            Visit(
+                visited_at=webkit_to_datetime(visit_time),
+                domain=domain,
+                transition=transition,
+                # 0 means "not recorded", which is an absence, not a zero-second dwell.
+                duration_seconds=(raw_duration / 1_000_000) if raw_duration > 0 else None,
+            )
+        )
 
     return visits

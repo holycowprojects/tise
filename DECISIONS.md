@@ -2119,3 +2119,85 @@ against 8.7% on one corpus — not read out of Chromium's source. It is stated t
 `chrome.history.search()` results against the file directly would settle it. Nothing in the
 extension changed on the strength of this: the import's behaviour was already right, and it
 was the corpus that was describing something else.
+
+### D79 — D78 got the conclusion right and the mechanism wrong, and reading the source found it
+
+Akash asked whether I wanted to study the browser documentation before going further. The
+answer should have been yes before D78 was written, not after.
+
+D78 inferred Chromium's filter from behaviour: a 98.5%/8.7% split between chain-end visits
+and everything else, on one corpus. That inference was **directionally right and
+structurally wrong in two ways**, and both were found by reading `TransitionIsVisible` in
+`components/history/core/browser/visit_database.cc` rather than by measuring harder.
+
+**First: the rule has three terms, not one.**
+
+```cpp
+(ui::PAGE_TRANSITION_CHAIN_END & transition) != 0 &&
+ui::PageTransitionIsMainFrame(page_transition) &&
+!ui::PageTransitionCoreTypeIs(page_transition, ui::PAGE_TRANSITION_KEYWORD_GENERATED)
+```
+
+D78 had the first and omitted the other two. `KEYWORD_GENERATED` in particular is a term
+no amount of measuring this corpus would have suggested.
+
+**Second, and it matters more: the filter is per *page*, not per *visit*.** `search()`
+selects URLs having at least one visible visit; `getVisits()` then returns **every** visit
+of a selected URL, visible or not. D78 filtered visit-by-visit. Splitting the same corpus
+by that distinction shows it immediately:
+
+| non-chain-end visits | present in the real export |
+|---|---:|
+| on a page that also has a visible visit | **91.8%** (56 of 61) |
+| on a page with no visible visit | **0.0%** (0 of 585) |
+
+D78's headline 8.7% was the average of 91.8% and 0.0% — a real number describing two
+populations that behave nothing alike. Averaging across a bimodal split and reading the
+mean as a mechanism is the same error as D65's "totals agree, so the datasets agree",
+one level up.
+
+**The corrected model reproduces the shipped import almost exactly.** The simulation's
+`redirect` skip count is now **49**, which is the exact figure D65 read off the real
+import, and per-domain composition agrees to **0.6%** — against 1.5% under D78's mechanism
+and 7.7% before any of this. The residual is about one day of browsing, which is how much
+older the file copy is than the export.
+
+| corpus | `chosen` | `shipped` (D79) | composition gap | model Brier | folds |
+|---|---:|---:|---:|---|---|
+| Edge (primary) | 5,711 | 5,755 | 1.5% | 0.1119 → **0.1124** | 2 of 5, unchanged |
+| Chrome | 5,012 | 5,129 | 7.0% | 0.2195 → **0.2096** | 2 of 5 → 3 of 5 |
+| Firefox | 909 | 915 | 3.9% | 0.2263 → **0.2219** | 4 of 5 → 3 of 5 |
+
+Every benchmark re-run again. **The conclusion is unchanged for the third time**: 8 of 15
+folds, D28's Edge bar identical to four decimals, clears on Edge and Firefox, loses on
+Chrome. D60 has now survived two different corrections to the corpus it was computed on.
+
+**Why the tests could not catch this, and why the first fix did not either.** Every fixture
+gave each visit its own URL, so page-level and visit-level filtering are indistinguishable
+on them — the suite would have passed either way. That is not a missing assertion but a
+missing *case*: a fixture can be thorough about the trap it was written for and silent
+about the one beside it.
+
+The first replacement fixture **still failed to discriminate**, and only the break count
+showed it. Reverting to per-visit filtering failed **zero** tests, because the hop I had
+added was itself a chain end and therefore visible under either rule. The distinguishing
+visit has to be one that is *not visible on its own*, on a page made visible by some other
+visit — which is precisely the 61-visit population in the table above. `CHROME_MIXED_PAGE`
+and `FIREFOX_MIXED_PAGE` now carry that case, plus a page that only ever starts a chain and
+a keyword-generated page. The same two breaks now fail.
+
+That is worth stating plainly: writing a test *for* a bug I had just diagnosed, with the
+mechanism in front of me, I still wrote one that could not fail. Counting break failures
+is not a flourish on top of the tests; on this occasion it was the only thing standing
+between a real fix and a fix that merely looked tested.
+
+**The general lesson, and the reason this entry exists at all.** D78 was arrived at by
+exact measurement — a one-to-one join, no sampling, no inference from totals — and was
+still wrong about *why*. Measurement establishes that something happens; it does not
+establish the rule producing it, and a mechanism guessed from a strong correlation is still
+a guess. The source was public and one fetch away the whole time.
+
+**Superseded by this entry:** D78's `is_chain_end`-based filter and its statement that the
+API "hands over chain ends only". `is_chain_end` remains as a bit test; `is_visible` is the
+product-visible rule. D78's diagnosis of the original defect — that the research corpus
+kept chain starts and discarded landing pages — stands.

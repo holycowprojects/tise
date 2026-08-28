@@ -294,20 +294,26 @@ working and committable.
   - **Cumulative features extrapolate** — 77.5% of Edge test rows sit outside the fitted
     range of `hoursSinceFirstSeen`. Any transform must be chosen without looking at the
     current scores, or it is fitted to the test set (D60)
-  - [x] **Corpus comparability — settled and re-run** (D78). Not a choice between three
-    fixes: the premise was wrong. **`chrome.history` returns only redirect-chain *ends***
-    — 98.5% of chain-end visits reached a real export against 8.7% of everything else,
-    measured by joining the export's `imp_<visitId>` ids to the file's visit ids. So the
-    research tier's `REDIRECT_MASK` filter kept chain *starts* (`google.com/url`, which
-    carry no redirect bit) and threw away landing pages. Three named views now, default
-    `shipped`; Firefox reconstructs the same definition from `from_visit`. Simulating
-    both stages reproduces the real export to **1.5%**, against 7.7%
-  - **The corpus fix did not rescue the model, and that is the result.** Chrome improves
-    (0.2195 → 0.2099, 2→3 folds), Edge and Firefox get slightly worse, fold total
-    unchanged at 8 of 15, D28's Edge bar identical to 4dp. D60 survives intact
-  - **A break that failed nothing, again** (D78): `load_events` could drop the `view` it
-    was handed and no test noticed — `corpus.py` had no test file at all. That is the one
-    door every published number comes through. `research/tests/test_corpus.py` closes it
+  - [x] **Corpus comparability — settled and re-run** (D78, mechanism corrected by D79).
+    Not a choice between three fixes: the premise was wrong. Chromium offers a **page**
+    only when one of its visits passes `TransitionIsVisible` — chain end, main frame, not
+    keyword-generated — and then hands over all of that page's visits. So the research
+    tier's `REDIRECT_MASK` filter kept chain *starts* (`google.com/url`, no redirect bit)
+    and threw away landing pages. Three named views now, default `shipped`; Firefox
+    reconstructs the same definition from `from_visit`
+  - **D78 inferred the rule; D79 read it from Chromium's source and it was wrong twice** —
+    two of three terms omitted, and per-visit where it is per-page. The corrected
+    simulation reproduces the real import's `redirect` skip count **exactly (49)** and its
+    composition to **0.6%**, against 1.5% and then 7.7%. Akash's call to check the docs
+  - **The corpus fix did not rescue the model, and that is the result.** Chrome
+    0.2195 → **0.2096** (2→3 folds), Edge 0.1119 → **0.1124**, Firefox 0.2263 → **0.2219**
+    (4→3 folds), fold total unchanged at 8 of 15, D28's Edge bar identical to 4dp.
+    D60 has now survived two separate corrections to the corpus underneath it
+  - **Two breaks that failed nothing** (D78, D79): `load_events` could drop the `view` it
+    was handed and no test noticed — `corpus.py` had no test file at all, and it is the
+    one door every published number comes through. Then the fixture written *for* the D79
+    bug still could not fail, because its extra hop was itself visible. Both closed;
+    counting break failures caught both
 
 - [ ] **T17 · CI** · S · deps: T10
   - Both suites on push/PR; parity failure blocks; secret scanning + dependency audit

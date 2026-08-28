@@ -55,12 +55,12 @@ to the test set. That work is T16.
 
 322 labels, base rate 71.4%, 5 folds.
 
-**Does not clear the bar.** 0.2099 against 0.1963, which is worse. It wins **3 of 5 folds** once `unknown` is excluded from both sides.
+**Does not clear the bar.** 0.2096 against 0.1963, which is worse. It wins **3 of 5 folds** once `unknown` is excluded from both sides.
 
 | Model | Brier | Log loss | Skill vs base rate |
 |---|---:|---:|---:|
 | `category_base_rate` *(the bar)* | 0.1963 | 0.5854 | +0.090 |
-| `logreg_fs2` **(the model)** | 0.2099 | 0.7530 | +0.027 |
+| `logreg_fs2` **(the model)** | 0.2096 | 0.7472 | +0.029 |
 | `global_base_rate` | 0.2158 | 0.6254 | +0.000 |
 | `time_of_day` | 0.2240 | 0.6427 | -0.038 |
 | `majority_class` | 0.2908 | 4.0173 | -0.348 |
@@ -72,13 +72,13 @@ Pooled over every fold's test predictions, `unknown` excluded (D27).
 
 | Fold | Train | Test | `logreg_fs2` | `category_base_rate` | Winner |
 |---:|---:|---:|---:|---:|---|
-| 0 | 128 | 26 | 0.1424 | 0.1469 | model |
-| 1 | 166 | 30 | 0.0739 | 0.0941 | model |
-| 2 | 204 | 30 | 0.3510 | 0.2806 | **baseline** |
-| 3 | 242 | 26 | 0.1362 | 0.1590 | model |
-| 4 | 280 | 29 | 0.3313 | 0.2927 | **baseline** |
+| 0 | 128 | 26 | 0.1414 | 0.1469 | model |
+| 1 | 166 | 30 | 0.0738 | 0.0941 | model |
+| 2 | 204 | 30 | 0.3508 | 0.2806 | **baseline** |
+| 3 | 242 | 26 | 0.1367 | 0.1590 | model |
+| 4 | 280 | 29 | 0.3305 | 0.2927 | **baseline** |
 
-Worst gradient norm at the end of any fold's fit: `4.56e-06`. That is small but
+Worst gradient norm at the end of any fold's fit: `4.06e-06`. That is small but
 it is not zero, so "converged" is the wrong word — see `convergence-budget.md`, which
 measures what a five-times-longer fit does to these numbers. A poor score here is the
 model being wrong, not unfinished.
@@ -89,8 +89,8 @@ model being wrong, not unfinished.
 |---|---:|
 | `hoursSinceFirstSeen` | 67.5% |
 | `priorSessionCount` | 24.2% |
-| `eventCount7d` | 19.6% |
-| `eventCount30d` | 12.9% |
+| `eventCount7d` | 19.1% |
+| `eventCount30d` | 12.4% |
 | `sessionCount7d` | 9.8% |
 | `hourOfDay` | 5.2% |
 
@@ -103,7 +103,7 @@ model being wrong, not unfinished.
 
 | Model | Brier | Log loss | Skill vs base rate |
 |---|---:|---:|---:|
-| `logreg_fs2` **(the model)** | 0.1124 | 0.4019 | +0.410 |
+| `logreg_fs2` **(the model)** | 0.1124 | 0.4015 | +0.410 |
 | `category_base_rate` *(the bar)* | 0.1254 | 0.4141 | +0.342 |
 | `majority_class` | 0.1661 | 2.2941 | +0.128 |
 | `time_of_day` | 0.1871 | 0.5632 | +0.017 |
@@ -116,13 +116,13 @@ Pooled over every fold's test predictions, `unknown` excluded (D27).
 
 | Fold | Train | Test | `logreg_fs2` | `category_base_rate` | Winner |
 |---:|---:|---:|---:|---:|---|
-| 0 | 201 | 56 | 0.0656 | 0.1535 | model |
-| 1 | 261 | 53 | 0.0750 | 0.1233 | model |
+| 0 | 201 | 56 | 0.0655 | 0.1535 | model |
+| 1 | 261 | 53 | 0.0749 | 0.1233 | model |
 | 2 | 321 | 54 | 0.1241 | 0.1203 | **baseline** |
 | 3 | 381 | 55 | 0.1537 | 0.0909 | **baseline** |
-| 4 | 441 | 53 | 0.1447 | 0.1385 | **baseline** |
+| 4 | 441 | 53 | 0.1446 | 0.1385 | **baseline** |
 
-Worst gradient norm at the end of any fold's fit: `2.45e-05`. That is small but
+Worst gradient norm at the end of any fold's fit: `2.41e-05`. That is small but
 it is not zero, so "converged" is the wrong word — see `convergence-budget.md`, which
 measures what a five-times-longer fit does to these numbers. A poor score here is the
 model being wrong, not unfinished.
@@ -133,7 +133,7 @@ model being wrong, not unfinished.
 |---|---:|
 | `hoursSinceFirstSeen` | 76.8% |
 | `priorSessionCount` | 42.1% |
-| `eventCount30d` | 30.5% |
+| `eventCount30d` | 30.1% |
 | `priorReturnRate` | 13.2% |
 | `sessionCount7d` | 10.6% |
 | `daysSeen7d` | 6.6% |
@@ -143,11 +143,11 @@ model being wrong, not unfinished.
 
 173 labels, base rate 64.2%, 5 folds.
 
-**Clears the bar.** 0.2298 against 0.2478. It wins **3 of 5 folds** once `unknown` is excluded from both sides.
+**Clears the bar.** 0.2219 against 0.2478. It wins **3 of 5 folds** once `unknown` is excluded from both sides.
 
 | Model | Brier | Log loss | Skill vs base rate |
 |---|---:|---:|---:|
-| `logreg_fs2` **(the model)** | 0.2298 | 0.7008 | +0.106 |
+| `logreg_fs2` **(the model)** | 0.2219 | 0.6789 | +0.137 |
 | `category_base_rate` *(the bar)* | 0.2478 | 0.6983 | +0.036 |
 | `global_base_rate` | 0.2571 | 0.7106 | +0.000 |
 | `time_of_day` | 0.2575 | 0.7140 | -0.002 |
@@ -160,13 +160,13 @@ Pooled over every fold's test predictions, `unknown` excluded (D27).
 
 | Fold | Train | Test | `logreg_fs2` | `category_base_rate` | Winner |
 |---:|---:|---:|---:|---:|---|
-| 0 | 69 | 16 | 0.1667 | 0.2685 | model |
-| 1 | 89 | 17 | 0.1989 | 0.1719 | **baseline** |
-| 2 | 109 | 15 | 0.2253 | 0.2697 | model |
-| 3 | 129 | 18 | 0.2806 | 0.2994 | model |
-| 4 | 149 | 17 | 0.2701 | 0.2303 | **baseline** |
+| 0 | 69 | 16 | 0.1668 | 0.2685 | model |
+| 1 | 89 | 17 | 0.1872 | 0.1719 | **baseline** |
+| 2 | 109 | 15 | 0.2357 | 0.2697 | model |
+| 3 | 129 | 18 | 0.2697 | 0.2994 | model |
+| 4 | 149 | 17 | 0.2455 | 0.2303 | **baseline** |
 
-Worst gradient norm at the end of any fold's fit: `9.67e-07`. That is small but
+Worst gradient norm at the end of any fold's fit: `1.08e-06`. That is small but
 it is not zero, so "converged" is the wrong word — see `convergence-budget.md`, which
 measures what a five-times-longer fit does to these numbers. A poor score here is the
 model being wrong, not unfinished.
@@ -179,7 +179,7 @@ model being wrong, not unfinished.
 | `priorSessionCount` | 30.8% |
 | `eventCount30d` | 27.9% |
 | `hourOfDay` | 5.8% |
-| `hoursSinceLastSeen` | 3.8% |
+| `hoursSinceLastSeen` | 2.9% |
 | `sessionCount7d` | 1.9% |
 
 

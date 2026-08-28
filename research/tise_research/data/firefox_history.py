@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import os
 import sqlite3
-from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -172,29 +171,42 @@ def load_visits(
     connection = sqlite3.connect(uri, uri=True)
     try:
         redirect_sources = _redirect_sources(connection) if view == "shipped" else set()
-        rows: Iterator[tuple[int, int, int, int, str]] = connection.execute(_VISITS_QUERY)
-        visits: list[Visit] = []
-        for visit_id, _from_visit, visit_date, raw_type, url in rows:
-            domain = registrable_domain(url)
-            if domain is None:
-                continue
-            if view == "shipped" and visit_id in redirect_sources:
-                continue
-            if view == "chosen" and is_redirect(raw_type):
-                continue
-            if exclude_subframes and is_subframe(raw_type):
-                continue
-            if exclude_downloads and is_download(raw_type):
-                continue
-            visits.append(
-                Visit(
-                    visited_at=unix_micros_to_datetime(visit_date),
-                    domain=domain,
-                    transition=visit_type_name(raw_type),
-                    duration_seconds=None,  # Firefox records none. Never invent one.
-                )
-            )
+        rows: list[tuple[int, int, int, int, str]] = list(connection.execute(_VISITS_QUERY))
     finally:
         connection.close()
+
+    # URL-level, matching Chromium's `search()` (D79): a page is offered when at least
+    # one of its visits is visible, and then all of its visits come through.
+    visible_urls = (
+        {
+            url
+            for visit_id, _, _, raw_type, url in rows
+            if visit_id not in redirect_sources and not is_subframe(raw_type)
+        }
+        if view == "shipped"
+        else set()
+    )
+
+    visits: list[Visit] = []
+    for _visit_id, _from_visit, visit_date, raw_type, url in rows:
+        domain = registrable_domain(url)
+        if domain is None:
+            continue
+        if view == "shipped" and url not in visible_urls:
+            continue
+        if view == "chosen" and is_redirect(raw_type):
+            continue
+        if exclude_subframes and is_subframe(raw_type):
+            continue
+        if exclude_downloads and is_download(raw_type):
+            continue
+        visits.append(
+            Visit(
+                visited_at=unix_micros_to_datetime(visit_date),
+                domain=domain,
+                transition=visit_type_name(raw_type),
+                duration_seconds=None,  # Firefox records none. Never invent one.
+            )
+        )
 
     return visits

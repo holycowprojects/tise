@@ -37,6 +37,53 @@ CHROME_REDIRECT_CHAIN: list[tuple[int, str, int, int, int]] = [
 ]
 
 
+#: `KEYWORD_GENERATED`, which Chromium's visibility test excludes even when CHAIN_END is
+#: set. Read from the source, not inferred (D79).
+KEYWORD_GENERATED = 10
+
+#: The case that separates a **page-level** filter from a **per-visit** one.
+#:
+#: The distinguishing visit is 3: `shop.example/` appearing *mid-chain*, so it is not
+#: visible on its own — but its page is offered anyway, because visit 1 visited it
+#: normally. `getVisits()` then returns visit 3 too, so the extension is given it. A
+#: per-visit filter drops it, and agrees with reality on every other fixture here, because
+#: they all give each visit its own URL. That is why D78's mechanism went unnoticed, and
+#: why the first attempt at this fixture failed to discriminate either: visit 3 must be
+#: **not visible itself** for the two rules to disagree.
+#:
+#: `start.example/` is the mirror — it only ever appears as a chain start, so it is never
+#: offered. `kw.example/` carries CHAIN_END and is still excluded, by core type.
+CHROME_MIXED_PAGE: list[tuple[int, str, int, int, int]] = [
+    (1, "https://shop.example/", TYPED | CHAIN_START | CHAIN_END, 0, 13_400_000_000_000_000),
+    (2, "https://start.example/", LINK | CHAIN_START, 0, 13_400_000_100_000_000),
+    (3, "https://shop.example/", LINK | CLIENT_REDIRECT, 2, 13_400_000_100_001_000),
+    (
+        4,
+        "https://dest.example/",
+        LINK | SERVER_REDIRECT | CHAIN_END,
+        3,
+        13_400_000_100_002_000,
+    ),
+    (
+        5,
+        "https://kw.example/",
+        KEYWORD_GENERATED | CHAIN_START | CHAIN_END,
+        0,
+        13_400_000_200_000_000,
+    ),
+]
+
+#: Firefox's version of the same discriminating case. Visit 3 is `shop.example/` reached by
+#: a redirect and then redirected away from, so it is mid-chain and not visible on its own;
+#: visit 1 makes the page visible, so visit 3 still comes through.
+FIREFOX_MIXED_PAGE: list[tuple[int, str, int, int, int]] = [
+    (1, "https://shop.example/", 2, 0, 1_780_000_000_000_000),
+    (2, "https://start.example/", 1, 0, 1_780_000_100_000_000),
+    (3, "https://shop.example/", 6, 2, 1_780_000_100_001_000),
+    (4, "https://dest.example/", 5, 3, 1_780_000_100_002_000),
+]
+
+
 #: The same chain in Firefox's vocabulary. The redirect type sits on the visit that was
 #: redirected *to*, which is the opposite end of the chain from Chrome — so dropping the
 #: redirect types here throws away the landing page too, by a different route.

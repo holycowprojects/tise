@@ -26,9 +26,9 @@ five and watching the pooled Brier is a direct test of that.
 
 Drift in pooled Brier from the shipped budget to five times it, per corpus:
 
-- `history-chrome: 2.54e-07`
-- `history-edge: 1.67e-05`
-- `history-firefox: 1.10e-07`
+- `history-chrome: 4.84e-08`
+- `history-edge: 1.70e-05`
+- `history-firefox: 1.04e-08`
 
 Every one of those is far below the fourth decimal place that `model.md` quotes, so the
 shipped budget is sufficient **for the claims being made**. It is not the same as saying
@@ -42,32 +42,32 @@ assumed.
 
 | Iterations | Brier | Log loss | Seconds |
 |---:|---:|---:|---:|
-| 2,000 | 0.209928 | 0.752803 | 10.1 |
-| 4,000 **(shipped)** | 0.209904 | 0.752981 | 12.7 |
-| 8,000 | 0.209904 | 0.752987 | 32.1 |
-| 20,000 | 0.209904 | 0.752987 | 79.2 |
+| 2,000 | 0.209624 | 0.747043 | 5.5 |
+| 4,000 **(shipped)** | 0.209602 | 0.747229 | 7.5 |
+| 8,000 | 0.209602 | 0.747234 | 14.9 |
+| 20,000 | 0.209602 | 0.747234 | 58.1 |
 
-Going from 4,000 to 20,000 iterations moves the pooled Brier by **2.54e-07**.
+Going from 4,000 to 20,000 iterations moves the pooled Brier by **4.84e-08**.
 ### history-edge
 
 | Iterations | Brier | Log loss | Seconds |
 |---:|---:|---:|---:|
-| 2,000 | 0.112207 | 0.401007 | 20.1 |
-| 4,000 **(shipped)** | 0.112422 | 0.401868 | 22.8 |
-| 8,000 | 0.112439 | 0.401946 | 45.2 |
-| 20,000 | 0.112439 | 0.401947 | 128.3 |
+| 2,000 | 0.112153 | 0.400677 | 17.7 |
+| 4,000 **(shipped)** | 0.112371 | 0.401542 | 20.7 |
+| 8,000 | 0.112388 | 0.401620 | 38.5 |
+| 20,000 | 0.112388 | 0.401621 | 84.9 |
 
-Going from 4,000 to 20,000 iterations moves the pooled Brier by **1.67e-05**.
+Going from 4,000 to 20,000 iterations moves the pooled Brier by **1.70e-05**.
 ### history-firefox
 
 | Iterations | Brier | Log loss | Seconds |
 |---:|---:|---:|---:|
-| 2,000 | 0.229751 | 0.700662 | 4.9 |
-| 4,000 **(shipped)** | 0.229756 | 0.700761 | 8.9 |
-| 8,000 | 0.229756 | 0.700762 | 16.9 |
-| 20,000 | 0.229756 | 0.700762 | 43.2 |
+| 2,000 | 0.221876 | 0.678815 | 2.3 |
+| 4,000 **(shipped)** | 0.221886 | 0.678929 | 5.3 |
+| 8,000 | 0.221886 | 0.678930 | 13.0 |
+| 20,000 | 0.221886 | 0.678930 | 33.3 |
 
-Going from 4,000 to 20,000 iterations moves the pooled Brier by **1.10e-07**.
+Going from 4,000 to 20,000 iterations moves the pooled Brier by **1.04e-08**.
 
 ## Limitations
 

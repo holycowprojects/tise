@@ -13,7 +13,11 @@ Values here were verified against a real `places.sqlite`, not recalled.
 from datetime import UTC, datetime
 
 import pytest
-from conftest import FIREFOX_REDIRECT_CHAIN, write_firefox_places
+from conftest import (
+    FIREFOX_MIXED_PAGE,
+    FIREFOX_REDIRECT_CHAIN,
+    write_firefox_places,
+)
 from tise_research.data.firefox_history import (
     is_download,
     is_redirect,
@@ -127,3 +131,22 @@ class TestVisitViews:
         """Visit 3 carries `redirect_permanent` and is still where the person ended up."""
         kept = load_visits(places, view="shipped")
         assert [visit.transition for visit in kept] == ["redirect_permanent", "typed"]
+
+
+class TestVisibilityIsPerPageNotPerVisit:
+    """The D79 correction, in Firefox's vocabulary. See the Chromium test of the same name."""
+
+    @pytest.fixture
+    def places(self, tmp_path):
+        path = tmp_path / "places.sqlite"
+        write_firefox_places(path, FIREFOX_MIXED_PAGE)
+        return path
+
+    def test_a_non_visible_visit_on_a_visible_page_is_still_kept(self, places):
+        """Visit 3 is `shop.example` mid-chain. Its page is offered, so it comes through."""
+        domains = [visit.domain for visit in load_visits(places, view="shipped")]
+        assert domains == ["shop.example", "shop.example", "dest.example"]
+
+    def test_a_page_that_only_ever_starts_a_chain_is_never_offered(self, places):
+        kept = {visit.domain for visit in load_visits(places, view="shipped")}
+        assert "start.example" not in kept

@@ -52,7 +52,7 @@ distinction is kept because it is real, not because anything currently uses it.
 | Model | Brier | Log loss | Skill vs base rate | Test labels |
 |---|---:|---:|---:|---:|
 | `category_base_rate` | 0.1963 | 0.5854 | 0.090 | 141 |
-| `logreg_fs2` | 0.2099 | 0.7530 | 0.027 | 141 |
+| `logreg_fs2` | 0.2096 | 0.7472 | 0.029 | 141 |
 | `global_base_rate` | 0.2158 | 0.6254 | reference | 141 |
 | `time_of_day` | 0.2240 | 0.6427 | -0.038 | 141 |
 | `majority_class` * | 0.2908 | 4.0173 | -0.348 | 141 |
@@ -65,7 +65,7 @@ distinction is kept because it is real, not because anything currently uses it.
 
 | Fold | Train | Test | Test ends | Base rate | `majority_class` | `global_base_rate` | `category_base_rate` | `same_as_last` | `time_of_day` | `logreg_fs2` |
 |---:|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|
-| 0 | 128 | 38 | 2026-08-04 | 81.6% | 0.184 | 0.184 | 0.142 | 0.168 | 0.219 | 0.156 |
+| 0 | 128 | 38 | 2026-08-04 | 81.6% | 0.184 | 0.184 | 0.142 | 0.168 | 0.219 | 0.155 |
 | 1 | 166 | 38 | 2026-08-07 | 94.7% | 0.053 | 0.124 | 0.087 | 0.003 | 0.132 | 0.059 |
 | 2 | 204 | 38 | 2026-08-16 | 63.2% | 0.368 | 0.242 | 0.246 | 0.287 | 0.250 | 0.306 |
 | 3 | 242 | 38 | 2026-08-19 | 86.8% | 0.132 | 0.139 | 0.121 | 0.476 | 0.142 | 0.094 |
@@ -76,7 +76,7 @@ distinction is kept because it is real, not because anything currently uses it.
 
 | Category | Test labels | Base rate | Best Brier | Best model |
 |---|---:|---:|---:|---|
-| search | 51 | 86.3% | 0.1280 | `logreg_fs2` |
+| search | 51 | 86.3% | 0.1276 | `logreg_fs2` |
 | dev | 39 | 76.9% | 0.1871 | `category_base_rate` |
 | ai | 22 | 72.7% | 0.2111 | `time_of_day` |
 | social | 7 | 28.6% | **not modelled** | — |
@@ -100,7 +100,7 @@ distinction is kept because it is real, not because anything currently uses it.
 
 | Model | Brier | Log loss | Skill vs base rate | Test labels |
 |---|---:|---:|---:|---:|
-| `logreg_fs2` | 0.1124 | 0.4019 | 0.410 | 271 |
+| `logreg_fs2` | 0.1124 | 0.4015 | 0.410 | 271 |
 | `category_base_rate` | 0.1254 | 0.4141 | 0.342 | 271 |
 | `majority_class` * | 0.1661 | 2.2941 | 0.128 | 271 |
 | `time_of_day` | 0.1871 | 0.5632 | 0.017 | 271 |
@@ -149,7 +149,7 @@ distinction is kept because it is real, not because anything currently uses it.
 
 | Model | Brier | Log loss | Skill vs base rate | Test labels |
 |---|---:|---:|---:|---:|
-| `logreg_fs2` | 0.2298 | 0.7008 | 0.106 | 83 |
+| `logreg_fs2` | 0.2219 | 0.6789 | 0.137 | 83 |
 | `category_base_rate` | 0.2478 | 0.6983 | 0.036 | 83 |
 | `global_base_rate` | 0.2571 | 0.7106 | reference | 83 |
 | `time_of_day` | 0.2575 | 0.7140 | -0.002 | 83 |
@@ -164,10 +164,10 @@ distinction is kept because it is real, not because anything currently uses it.
 | Fold | Train | Test | Test ends | Base rate | `majority_class` | `global_base_rate` | `category_base_rate` | `same_as_last` | `time_of_day` | `logreg_fs2` |
 |---:|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|
 | 0 | 69 | 20 | 2026-08-03 | 55.0% | 0.450 | 0.283 | 0.272 | 0.552 | 0.276 | 0.170 |
-| 1 | 89 | 20 | 2026-08-06 | 70.0% | 0.300 | 0.210 | 0.180 | 0.166 | 0.198 | 0.209 |
-| 2 | 109 | 20 | 2026-08-08 | 55.0% | 0.450 | 0.269 | 0.263 | 0.362 | 0.276 | 0.238 |
-| 3 | 129 | 20 | 2026-08-20 | 50.0% | 0.500 | 0.280 | 0.296 | 0.452 | 0.261 | 0.282 |
-| 4 | 149 | 24 | 2026-08-25 | 58.3% | 0.417 | 0.248 | 0.235 | 0.340 | 0.286 | 0.276 |
+| 1 | 89 | 20 | 2026-08-06 | 70.0% | 0.300 | 0.210 | 0.180 | 0.166 | 0.198 | 0.199 |
+| 2 | 109 | 20 | 2026-08-08 | 55.0% | 0.450 | 0.269 | 0.263 | 0.362 | 0.276 | 0.246 |
+| 3 | 129 | 20 | 2026-08-20 | 50.0% | 0.500 | 0.280 | 0.296 | 0.452 | 0.261 | 0.273 |
+| 4 | 149 | 24 | 2026-08-25 | 58.3% | 0.417 | 0.248 | 0.235 | 0.340 | 0.286 | 0.273 |
 
 **Per category.** 3 of 11 categories cleared the floor of
 20 test labels; the rest are counted but not scored (D26).
@@ -175,7 +175,7 @@ distinction is kept because it is real, not because anything currently uses it.
 | Category | Test labels | Base rate | Best Brier | Best model |
 |---|---:|---:|---:|---|
 | ai | 35 | 68.6% | 0.2125 | `global_base_rate` |
-| search | 31 | 71.0% | 0.1710 | `logreg_fs2` |
+| search | 31 | 71.0% | 0.1762 | `logreg_fs2` |
 | dev | 6 | 16.7% | **not modelled** | — |
 | government | 3 | 33.3% | **not modelled** | — |
 | shopping | 2 | 0.0% | **not modelled** | — |

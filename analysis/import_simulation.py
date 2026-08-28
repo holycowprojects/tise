@@ -4,20 +4,26 @@
 production while `analysis/redirect_heuristic.py` scored it at recall 0.657 against the
 file's redirect bits, and read that as the rule "recovering roughly one in fourteen".
 
-That comparison assumed both were shown the same visits. They were not. **Chrome's
-history API returns only the *end* of each redirect chain** — the same filter that makes
-the history UI show a landing page rather than the hops that reached it. Measured against
-this corpus: 98.5% of chain-end visits reached the export, against 8.7% of the rest.
+That comparison assumed both were shown the same visits. They were not. **Chrome's history
+API only offers a page when at least one of its visits passes Chromium's own visibility
+test** — `TransitionIsVisible`: chain end, main frame, not keyword-generated. It is the
+same filter that makes the history UI show a landing page rather than the hops that
+reached it.
 
-So the API had already removed most redirect hops before the extension applied any rule
-of its own, and it removed the chain *start* too — `google.com/url?...` is a chain start
-with no redirect bit, which is why the research view keeps it and the extension does not.
-D40's 50 ms rule is left judging the remainder with its referrers deleted.
+The filter is **per page, not per visit** (D79). `search()` selects URLs; `getVisits()`
+then returns *every* visit of a selected URL, hop or not. So a redirect hop on a page you
+also visited normally does reach the extension, while a page that only ever appears
+mid-chain never does — and neither does the chain *start*, `google.com/url?...`, which
+carries no redirect bit at all. That is why the pre-D78 research view kept it and the
+extension did not. D40's 50 ms rule is left judging the remainder with its referrers
+deleted.
 
 This script therefore simulates the import in two stages, and the first one is the part
 that was missing: **what Chrome hands over**, then **what the extension does with it**.
-The verdict is cross-tabulated against the ground-truth redirect bit only the file
-carries.
+The verdict is cross-tabulated against the ground-truth redirect bit only the file carries.
+
+Validation: on the Chrome corpus this reproduces the real export's `redirect` skip count
+exactly (49) and its per-domain composition to 0.6%.
 
 It is a *simulation of the product*, not a second product. Where it differs from
 `prepareEvents` it is a bug in this file, and the differences that remain are listed in
@@ -40,6 +46,7 @@ from tise_research.data.chrome_history import (
     REDIRECT_MASK,
     SUBFRAME_TRANSITIONS,
     datetime_to_webkit,
+    is_visible,
     registrable_domain,
     transition_core,
     webkit_to_datetime,
@@ -61,8 +68,8 @@ CHAIN_END = 0x2000_0000
 
 #: Where this simulation cannot be faithful, stated rather than hidden.
 KNOWN_DIVERGENCES = (
-    "The API stage is emulated as the chain-end filter, which matches 98.5%/8.7% on this "
-    "corpus but is inferred from behaviour, not read from Chrome's source. Anything else "
+    "The API stage applies Chromium's own `TransitionIsVisible`, transcribed from "
+    "`components/history/core/browser/visit_database.cc`, at page level. Anything else "
     "`search()` does — ordering, internal caps — is not observable from a file.",
     "`getVisits` returns visits in milliseconds; the file stores microseconds. Gaps are "
     "compared in microseconds here, which is finer, so a hop this script flags at 50 ms "
@@ -123,13 +130,23 @@ def simulate(
     referrers the shipped code never receives, and the simulation would quietly describe
     a better import than the one that runs.
     """
-    fetched_urls = {row.url for row in rows if start_us <= row.visit_time_us <= end_us}
-    in_corpus = [row for row in rows if row.url in fetched_urls]
+    in_window_urls = {row.url for row in rows if start_us <= row.visit_time_us <= end_us}
+    in_corpus = [row for row in rows if row.url in in_window_urls]
+
+    # The API stage is **per page, not per visit** (D79). `search()` offers a URL when any
+    # of its visits passes Chromium's visibility test; `getVisits()` then returns every
+    # visit of that URL, visible or not. So a hop on a page you also visited normally does
+    # reach the extension.
+    offered = {
+        row.url
+        for row in in_corpus
+        if is_visible(row.transition) and start_us <= row.visit_time_us <= end_us
+    }
 
     verdicts: dict[int, str] = {}
     fetched = []
     for row in in_corpus:
-        if row.is_chain_end:
+        if row.url in offered:
             fetched.append(row)
         else:
             verdicts[row.visit_id] = "api-hidden"
@@ -217,9 +234,11 @@ def render(browser: str, rows: list[Row], verdicts: dict[int, str], window: str)
         "**Question:** D65 read the extension's `redirect` skip counter as the share of",
         "redirect hops the import catches, and concluded the rule was recovering one in",
         "fourteen. That assumed the extension was offered every visit the file holds. It",
-        "is not: Chrome's history API hands over only the **end** of each redirect chain.",
-        "This replays both stages — what Chrome supplies, then what the extension does",
-        "with it — against the redirect bits the extension never sees.",
+        "is not: Chrome offers a **page** only when one of its visits passes",
+        "`TransitionIsVisible` — chain end, main frame, not keyword-generated — and then",
+        "hands over all of that page's visits. This replays both stages, what Chrome",
+        "supplies and then what the extension does with it, against the redirect bits the",
+        "extension never sees.",
         "",
         f"- Window: {window}",
         f"- Visits considered: **{considered:,}**",

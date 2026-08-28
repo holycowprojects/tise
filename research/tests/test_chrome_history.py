@@ -7,12 +7,23 @@ query string, invariant 2 in SPEC.md is broken at the point where events are bor
 from datetime import UTC, datetime
 
 import pytest
-from conftest import CHROME_REDIRECT_CHAIN, write_chrome_history
+from conftest import (
+    CHAIN_END,
+    CHAIN_START,
+    CHROME_MIXED_PAGE,
+    CHROME_REDIRECT_CHAIN,
+    KEYWORD_GENERATED,
+    LINK,
+    SERVER_REDIRECT,
+    TYPED,
+    write_chrome_history,
+)
 from tise_research.data.chrome_history import (
     SECONDS_1601_TO_1970,
     datetime_to_webkit,
     is_chain_end,
     is_redirect,
+    is_visible,
     load_visits,
     registrable_domain,
     transition_core,
@@ -138,6 +149,66 @@ class TestVisitViews:
 
     def test_the_default_is_the_view_that_ships(self, history):
         assert load_visits(history) == load_visits(history, view="shipped")
+
+
+class TestIsVisible:
+    """Chromium's `TransitionIsVisible`, transcribed rather than inferred (D79)."""
+
+    def test_an_ordinary_chain_end_is_visible(self):
+        assert is_visible(CHAIN_END | TYPED) is True
+
+    def test_chain_end_is_required(self):
+        assert is_visible(TYPED | CHAIN_START) is False
+
+    def test_a_subframe_is_not_main_frame(self):
+        """The `PageTransitionIsMainFrame` term. D78 omitted it."""
+        assert is_visible(CHAIN_END | 3) is False
+        assert is_visible(CHAIN_END | 4) is False
+
+    def test_keyword_generated_is_excluded_even_with_chain_end(self):
+        """The third term, and the one nothing else in this project would have caught."""
+        assert is_visible(CHAIN_END | KEYWORD_GENERATED) is False
+
+    def test_a_redirect_hop_that_ends_its_chain_is_visible(self):
+        assert is_visible(CHAIN_END | SERVER_REDIRECT | LINK) is True
+
+
+class TestVisibilityIsPerPageNotPerVisit:
+    """The correction D79 makes to D78, and the case that separates the two.
+
+    `search()` offers a **page** when any of its visits is visible; `getVisits()` then
+    returns all of that page's visits. Filtering visit-by-visit agrees with reality on
+    every fixture that gives each visit its own URL, which is why D78's mechanism went
+    unnoticed — and disagrees on 61 visits of the real Chrome corpus.
+    """
+
+    @pytest.fixture
+    def history(self, tmp_path):
+        path = tmp_path / "History"
+        write_chrome_history(path, CHROME_MIXED_PAGE)
+        return path
+
+    def test_a_non_visible_visit_on_a_visible_page_is_still_kept(self, history):
+        """Visit 3 is `shop.example` mid-chain — not visible itself, offered anyway.
+
+        This is the assertion that separates the two rules. Filtering per visit drops it
+        and passes every other test in this file.
+        """
+        domains = [visit.domain for visit in load_visits(history, view="shipped")]
+        assert domains == ["shop.example", "shop.example", "dest.example"]
+
+    def test_a_page_that_only_ever_appears_as_a_chain_start_is_never_offered(self, history):
+        kept = {visit.domain for visit in load_visits(history, view="shipped")}
+        assert "start.example" not in kept
+
+    def test_a_keyword_generated_page_is_not_offered(self, history):
+        kept = {visit.domain for visit in load_visits(history, view="shipped")}
+        assert "kw.example" not in kept
+
+    def test_the_pre_d78_view_makes_the_opposite_errors(self, history):
+        """It keeps the chain start and the keyword page, and drops the landing page."""
+        domains = [visit.domain for visit in load_visits(history, view="chosen")]
+        assert domains == ["shop.example", "start.example", "kw.example"]
 
 
 class TestRegistrableDomain:
