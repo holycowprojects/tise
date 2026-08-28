@@ -222,6 +222,8 @@ interface FeatureRow {
 interface Prediction {
   predictionId: string;
   createdAt: string;
+  // Shipped today (extension/src/model/prediction.ts): "return_24h" | "next_session_category".
+  // The union below is the T21 target state; the TS type changes when T21 lands, not before.
   target: "block_volume" | "novelty" | "dormancy" | "next_session_category";
   subject: string;          // the topic or category being predicted about
   probability: number;      // calibrated, 0..1

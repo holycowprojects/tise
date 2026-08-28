@@ -1,10 +1,12 @@
 # Tise
 
-**Status: pre-alpha. No working code yet.**
+**Status: working, not yet released.** The extension builds, collects, trains and predicts
+on a real profile. It is not on the Chrome Web Store, and the prediction target changed in
+August 2026 — see [Where this is](#where-this-is).
 
-A privacy-first personal behavioural forecasting system. Tise learns patterns from your
-own browsing, predicts what you are likely to do next, shows you the evidence behind
-every prediction, and then measures whether it was right.
+A privacy-first personal behavioural forecasting system. Tise learns patterns from your own
+browsing, predicts what you are likely to do next, shows you the evidence behind every
+prediction, and then measures whether it was right.
 
 Everything runs on your machine. Nothing is transmitted anywhere.
 
@@ -18,55 +20,115 @@ Everything runs on your machine. Nothing is transmitted anywhere.
 
 Tise does not hand your browsing history to a language model and print whatever number
 comes back. Probabilities come from models that are backtested, calibrated and scored
-against what actually happened.
+against what actually happened — trained **in your browser**, on your own history.
 
 ## Privacy
 
 - Raw browsing data never leaves your device.
+- **No full URL is ever stored.** Every page is reduced to its registrable domain before an
+  event object is constructed — no path, query string, fragment, page content, form value,
+  cookie, credential or keystroke.
 - No accounts, no sync, no telemetry, no analytics.
-- No passwords, cookies, form fields, keystrokes or page content are collected.
 - Raw events are deleted after 30 days by default; only aggregated behavioural features
   are kept longer.
 - You can pause collection, export everything, or delete everything at any time.
+- Nothing is collected before you consent. The extension installs with no capability to
+  read anything.
 
-The author cannot see your data. There is no server that could receive it.
+The author cannot see your data. **There is no server that could receive it** — no backend,
+no API, no hosted component of any kind. The repository layout below is the whole system.
 
 ## Honest limitations
 
 Written down here rather than discovered later:
 
-- **All published benchmark numbers come from one person's browsing** — the author's.
-  Because nothing is collected from users, no larger evaluation is possible.
-- **Predictions about rare events are not measured.** Purchase prediction is included as
-  a demonstration and is labelled as unvalidated. Only frequent events that confirm
-  themselves from the event stream are scored.
-- **New users start with a cold model.** Existing browser history is imported on first
-  run to reduce this, but imported history lacks dwell time and is therefore weaker than
-  live data.
+- **All published benchmark numbers come from one person's browsing** — the author's, across
+  three browsers, measured separately and never merged. Because nothing is collected from
+  users, no larger evaluation is possible. Between-browser results already vary by nearly
+  2×, which is a lower bound on how much they would vary between people.
+- **Tise has no dwell time, and cannot have any.** Chrome's history *database* records how
+  long you spent on a page; the `chrome.history` API does not expose it, and neither does
+  live navigation monitoring. Research run against the database file can measure things the
+  shipped extension can never compute, so every analysis reports both variants and only the
+  achievable one constrains the product.
+- **Predictions about rare events are not measured.** Purchase prediction is included as a
+  demonstration and is labelled unvalidated. Only frequent events that confirm themselves
+  from the event stream are scored.
+- **New users start with a cold model.** Existing browser history is imported on first run
+  to reduce this, but imported history is reconstructed from the history database through an
+  approximation, where live collection observes navigations directly. The size of that
+  difference has not yet been measured.
+
+## Where this is
+
+**The prediction target changed.** `return_24h` — "will you return to this topic within 24
+hours?" — was built, benchmarked and then **retired**, because it turned out to be
+measurable and uninteresting: a ~70% base rate meant a constant answer was already most of
+the way right, and a single browsing session is not a unit anyone cares about.
+
+That work is kept, not deleted. Every report in [`docs/benchmarks/`](docs/benchmarks) stands
+as a superseded result and carries a banner saying so — it is the evidence that justified
+the change, and removing it would remove the reason.
+
+The current target is `block_volume`: *will a topic's activity in the coming weekday or
+weekend block be above that topic's own usual level?* **Nothing about it has been measured
+yet.** It is a hypothesis with an argument behind it, and the measurement that decides it
+comes before any of it is built.
 
 ## Repository layout
 
 ```
-extension/   Chrome MV3 extension — collection and user interface
-service/     Local Python service — features, models, prediction, evaluation
-ml/          Experiments, baselines, benchmark notebooks
-analysis/    One-off analysis scripts
-data/        Local data (never committed)
-docs/        Design history and specifications
+extension/   Chrome MV3 extension — collection, features, training, prediction, UI
+research/    Python research tier — features mirrored, backtests, calibration, evaluation
+analysis/    One-off measurement scripts that write the benchmark reports
+docs/        Benchmarks, design history, privacy policy draft
+tasks/       Plan and task list
+data/        Local data — never committed
 ```
+
+The extension is the product; **`research/` runs only on the author's machine** and is fed
+by the extension's own export file, so the privacy feature and the research pipeline are
+the same mechanism. There is no service to run.
+
+Features are implemented **twice** — TypeScript for the product, Python for research — and a
+parity suite asserts the two agree to 1e-9 against a committed oracle. Without it, every
+published benchmark could describe a model that was never shipped.
 
 ## Documents
 
-- [`DECISIONS.md`](DECISIONS.md) — every non-obvious choice, why it was made, and what
-  was rejected. Includes the audit of the original design documents.
+- [`DECISIONS.md`](DECISIONS.md) — every non-obvious choice, why it was made, and what was
+  rejected. Includes the audit of the original design documents, every correction to a
+  claim made here, and the reasoning behind the target change. It is append-only.
+- [`SPEC.md`](SPEC.md) — data contracts, boundaries, success criteria.
+- [`docs/benchmarks/`](docs/benchmarks) — every published number, each generated by a
+  committed script and regenerable from it.
 - [`docs/design-history/`](docs/design-history) — the original design documents, kept
   unchanged. Superseded, but preserved because the decision log refers to them.
 
 ## Benchmarks
 
-Not yet available. This section will be filled in with measured results as data
-accumulates. No numbers will be published that were not actually measured.
+Available in [`docs/benchmarks/`](docs/benchmarks), and all of them describe the retired
+target — see [Where this is](#where-this-is). Reports that measure the browsing itself
+(session boundaries, domain concentration, how visits reach the extension) are unaffected
+and stand.
+
+**No number is published that a committed script did not produce.** No hand-written
+benchmarks, and no synthetic data used as a benchmark — synthetic data appears only in unit
+tests, where it proves the arithmetic rather than the model.
+
+The most useful thing in there may be the negative results. Confidence intervals withdrew
+the project's own flagship claim; a tournament against XGBoost could not separate it from a
+hand-written logistic regression; and the abstention machinery, working exactly as designed,
+concluded there was not enough evidence to say anything at all.
+
+## Development
+
+```
+cd extension && npm install && npm test && npm run build   # loads unpacked from dist/
+uv sync && uv run pytest                                    # research tier
+uv run pytest -m parity                                     # the suite that matters most
+```
 
 ## Licence
 
-MIT — see [`LICENSE`](LICENSE).
+MIT — see [`LICENSE`](LICENSE). Copyright Akash Navet and Holy Cow Studios Private Limited.

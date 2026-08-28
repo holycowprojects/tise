@@ -28,6 +28,31 @@ Work order: **T19 → T20 → T21 → then back to T14/T15/T17/T18.**
 
 ## Phase 6 — The new target
 
+- [x] **T18b · Make the public artifacts tell the truth after D88** · S · deps: D88
+  - Verify: `uv run pytest` ✓ 629 Python, 338 TypeScript, both linters clean, builds
+  - **`README.md` was pre-alpha-era and wrong five ways** — the repo's front page. Said
+    *"no working code yet"*; listed `service/ Local Python service` and `ml/`, **neither of
+    which exists and the first of which was explicitly rejected** — a reader auditing the
+    privacy claim saw a local service described in the layout; said benchmarks were "not
+    yet available" with twelve reports committed; and stated the duration trap **backwards**
+    (implying live data has dwell time, when the API has none for either source)
+  - **All 12 benchmark reports described a retired target with nothing saying so.** Same
+    defect class as D86/D87 — right numbers, wrong frame — twelve times, in the public
+    artifacts. Banners are now **generated** from `tise_research/reports.py`, never typed:
+    a writer names its target, the module decides. `RETIRED_TARGETS` gains one line per
+    retirement and every report updates on its next regeneration. Typing twelve banners
+    would be twelve literals, which is exactly what went stale in the first place
+  - Three tiers, because over-marking is its own dishonesty: **superseded** (8 reports),
+    **partly superseded** (`history-shape-*`: visits/day, session boundaries and domain
+    concentration stand; the label tables do not), and **untouched** (`import-simulation-*`
+    is target-agnostic and correctly carries no banner)
+  - Regeneration was **pure addition** — 8/12/8 lines added, 0 removed, **no figure moved**,
+    which re-confirms determinism. Only deletion was a stale `--target return_24h` command
+  - **A divergence I introduced an hour after writing D87 about divergence:** SPEC's
+    `Prediction.target` union listed the new targets while `prediction.ts` still ships the
+    old one. Fixed by marking shipped vs target-state rather than by changing TS — the
+    extension still predicts `return_24h` until T21
+
 - [ ] **T19 · Measure all four candidate targets** · M · deps: none — **do this first**
   - No model is fitted and nothing is scored. Purely descriptive, which is why D88 permits
     the data-sufficiency gate to be set *after* it
