@@ -6,7 +6,7 @@
   "minimum_chrome_version": "116",
 
   "permissions": ["webNavigation", "alarms"],
-  "optional_permissions": ["history"],
+  "optional_permissions": ["history", "tabs", "idle"],
 
   "background": {
     "service_worker": "background.js",

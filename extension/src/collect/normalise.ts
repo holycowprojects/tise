@@ -26,6 +26,12 @@ export interface NavigationDetails {
   readonly timeStamp: number;
   readonly transitionType: string;
   readonly transitionQualifiers?: readonly string[];
+  /**
+   * Which tab this navigation happened in. Used only to attribute an attention span to
+   * the right navigation and **never stored** — it is absent from `TiseEvent` and from
+   * `EVENT_FIELDS`, so the privacy test would fail if it ever leaked into a stored row.
+   */
+  readonly tabId?: number;
 }
 
 export type RejectionReason = "subframe" | "redirect" | "not-web";

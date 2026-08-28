@@ -16,15 +16,15 @@ import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 import type { Label } from "../features/labels";
 import type { Prediction } from "../model/prediction";
 import type { FeatureRow } from "../features/vector";
-import type { TiseEvent } from "../types";
+import type { AttentionSpan, TiseEvent } from "../types";
 
 export const DB_NAME = "tise";
 
 /**
- * 2 added the `features` store; 3 added `labels`; 4 added `predictions`. Upgrades are
- * additive; nothing is ever dropped here.
+ * 2 added the `features` store; 3 added `labels`; 4 added `predictions`; 5 added
+ * `attention`. Upgrades are additive; nothing is ever dropped here.
  */
-export const DB_VERSION = 4;
+export const DB_VERSION = 5;
 
 export interface TiseDB extends DBSchema {
   events: {
@@ -83,6 +83,24 @@ export interface TiseDB extends DBSchema {
     value: Prediction;
     indexes: { windowEnd: string; outcome: string; subject: string };
   };
+  /**
+   * Periods of measured attention, one or more per navigation.
+   *
+   * Kept apart from `events` because they have different lifetimes *within* the same
+   * retention window: an event is final when written, while a span is opened, possibly
+   * extended across a tab switch and back, and only closed later. Writing attention into
+   * the event row would mean mutating a row that everything else treats as immutable —
+   * the mistake `labels` was separated from `features` to avoid (D58).
+   *
+   * Unlike `features` and `labels`, spans **do not** outlive raw events. They describe
+   * the browsing rather than what was learned from it, so retention removes them on the
+   * same schedule.
+   */
+  attention: {
+    key: string;
+    value: AttentionSpan;
+    indexes: { eventId: string; endedAt: string };
+  };
 }
 
 let handle: Promise<IDBPDatabase<TiseDB>> | null = null;
@@ -112,6 +130,11 @@ export function openTiseDb(): Promise<IDBPDatabase<TiseDB>> {
         });
         labels.createIndex("windowEnd", "windowEnd");
         labels.createIndex("subject", "subject");
+      }
+      if (!db.objectStoreNames.contains("attention")) {
+        const attention = db.createObjectStore("attention", { keyPath: "spanId" });
+        attention.createIndex("eventId", "eventId");
+        attention.createIndex("endedAt", "endedAt");
       }
       if (!db.objectStoreNames.contains("predictions")) {
         const predictions = db.createObjectStore("predictions", {

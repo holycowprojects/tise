@@ -219,6 +219,23 @@ old one.
 the finding is that this data does not support a model, Tise ships descriptive, and that is
 published as the headline.
 
+- [x] **T-0 · Attention collection** · M — **shipped before T-A on purpose** (D96)
+  - **Data has lead time; model changes do not.** T-D cannot be measured on any corpus, so
+    every day not collecting is data that cannot be recovered. Collection runs now; **no
+    target is adopted and the extension still shows nothing**
+  - `tabs` + `idle` **optional** permissions, consent-gated as `history` is. Attention spans
+    in a new `attention` store at **DB v5**, expiring with raw events (they describe the
+    browsing, not what was learned from it)
+  - **Three rules, each tested:** never invent a span (unknown tab -> record nothing); a
+    zero-length span is the *absence* of a measurement, not a measurement of zero; spans are
+    **capped at 30 min** because an unbounded one is a laptop lid, not a person
+  - `tabId` used to attribute a span and **never stored** - absent from `EVENT_FIELDS`, so
+    the privacy test fails if it ever leaks
+  - **The manifest guard failed and was updated deliberately**, then strengthened: `cookies`,
+    `webRequest`, `scripting`, `storage` and six others are now asserted absent from both lists
+  - **Akash still owes the real-profile check** - reload the build and confirm the `fs_3`
+    migration preserves the row count with `skipped` at 0. One reload covers both
+
 - [ ] **T-A · `visit_engaged`** — "will this visit hold you?" · **do this first**
   - **Label identical to D93's `as_1`** on purpose, so any change is attributable. Only two
     things change: **features** (`as_2`) and **cluster unit** (session)

@@ -3637,3 +3637,63 @@ requiring a prediction bar to be useful; four confidence claims recorded as cont
 they cannot be quoted back at us later; two omissions recorded because they are the
 constraints that have actually decided every result here. T-A through T-D are unchanged, and
 D94's stopping rule still governs.
+
+### D96 — Attention collection ships before the target that needs it, because data has lead time
+
+Akash authorised `tabs` and `idle` with live collection. This ships the collection **now**,
+before T-A is measured and before any target is adopted, for one reason: **model changes have
+no lead time and data collection does.** T-D cannot be measured on any corpus at all — the
+history database records visits, not tabs — so every day not collecting is a day of data that
+cannot be recovered later. Nothing else about the extension changes: it still trains
+`return_24h` and still shows nothing, because no target is adopted and wiring one in before it
+clears its bar is the mistake five entries have been spent avoiding.
+
+**What is measured is better than `visit_duration`, not merely equal to it.** D35 recorded the
+duration trap as permanent and `dwellSeconds` has been `null` since T1. The history file's
+`visit_duration` counts how long a *tab held a URL*, so a tab left open overnight records deep
+engagement that never happened — D93 named exactly that as capable of accounting for its whole
+effect. A span ends when the person looks away.
+
+**Three rules carry the honesty of the mechanism, and each has a test.**
+
+1. **Never invent a span.** Switching to a tab Tise never saw a navigation in records
+   *nothing*. A span with a guessed `eventId` is indistinguishable from a measured one
+   afterwards — D51's principle applied to time instead of features.
+2. **A zero-length span is the absence of a measurement, not a measurement of zero.** Storing
+   one would drag every average toward zero for rows that were never observed, so `closeSpan`
+   returns `null` and `assertStorableSpan` refuses it.
+3. **An unbounded span is a laptop lid, not a person.** Spans are **capped at 30 minutes**.
+   When the worker dies mid-span the reopening code cannot distinguish an hour of reading from
+   an hour of a closed laptop, and a single 14-hour span would outweigh a month of real ones.
+
+**A separate store, not a field on the event.** `attention` is a new store at DB version 5.
+An event is final when written; a span is opened, possibly extended across a tab switch and
+back, and closed later. Putting attention on the event row would mean mutating a row
+everything else treats as immutable — the mistake `labels` was separated from `features` to
+avoid (D58). Unlike `features` and `labels`, spans **do not** outlive raw events: they
+describe the browsing rather than what was learned from it, so retention removes them on the
+same schedule.
+
+**State lives in IndexedDB, not `chrome.storage.session`.** MV3 kills the worker constantly,
+so an in-memory open span would be lost several times an hour and every span silently
+truncated. `chrome.storage.session` would work and needs the **`storage` permission** —
+`db.ts` keeps every cursor in IndexedDB precisely so the manifest stays at the permissions
+D31 justified and not one more, and that reasoning holds here.
+
+**`tabId` is used and never stored.** It attributes a span to the right navigation and is
+discarded with the call. It is absent from `TiseEvent` and from `EVENT_FIELDS`, so the
+existing privacy test fails if it ever reaches a stored row.
+
+**Permission being granted is not consent.** Every listener checks `consentGrantedAt` and the
+paused flag before reading or writing anything. A person can grant `tabs` and still not have
+agreed that Tise may store.
+
+**The manifest guard did its job and was updated deliberately.** `manifest.test.ts` asserted
+`optional_permissions` equals exactly `["history"]` and failed — which is the point of it
+existing (D31: permission creep must be deliberate). It now asserts the new set **and** gains
+a stronger companion: that `cookies`, `webRequest`, `scripting`, `declarativeNetRequest`,
+`browsingData`, `management`, `downloads`, `bookmarks`, `topSites` and `storage` appear in
+neither list. D95 recorded why `cookies` in particular is the wrong trade — its values *are*
+credentials, and it needs host permissions for every site.
+
+356 TypeScript tests, 675 Python, both linters clean, builds.

@@ -49,6 +49,60 @@ export const EVENT_FIELDS = [
   "sessionId",
 ] as const satisfies ReadonlyArray<keyof TiseEvent>;
 
+/**
+ * One period during which a single navigation held the active tab **and the person was
+ * there**. The unit of attention, and the thing `dwellSeconds` could never be.
+ *
+ * D35 recorded the duration trap as permanent: Chrome's history *file* has
+ * `visit_duration`, the `chrome.history` API does not, so `dwellSeconds` is `null` for
+ * live events as well as imported ones. `chrome.tabs` and `chrome.idle` lift that — but
+ * they measure something *better* than `visit_duration`, not merely the same thing:
+ * `visit_duration` counts how long a tab held a URL, so a tab left open overnight records
+ * deep engagement that never happened. A span ends when the person looks away.
+ *
+ * **A span is never invented.** If Tise cannot attribute a period of attention to a
+ * specific navigation it records nothing, because a span with a guessed `eventId` is
+ * indistinguishable from a measured one afterwards.
+ *
+ * Spans reference raw events and **expire with them** (30 days). What survives is the
+ * feature computed from them, which is D11's rule unchanged.
+ */
+export interface AttentionSpan {
+  /** `eventId` + start instant. Stable, so re-recording a span replaces rather than duplicates. */
+  spanId: string;
+  /** The navigation this attention belongs to. Never null, never guessed. */
+  eventId: string;
+  startedAt: string;
+  endedAt: string;
+  /** Seconds the tab was active, the window focused and the person not idle. */
+  activeSeconds: number;
+  endReason: AttentionEndReason;
+}
+
+/**
+ * Why a span closed. Kept because the reasons are not equivalent: `idle` and `blur` mean
+ * the person left, `tab-switch` and `navigated` mean they moved on deliberately, and
+ * `shutdown` means Tise stopped watching and the span is a lower bound rather than a
+ * measurement.
+ */
+export type AttentionEndReason =
+  | "navigated"
+  | "tab-switch"
+  | "tab-closed"
+  | "idle"
+  | "blur"
+  | "shutdown";
+
+/** The complete set of keys a stored span may have. Asserted on every write. */
+export const SPAN_FIELDS = [
+  "spanId",
+  "eventId",
+  "startedAt",
+  "endedAt",
+  "activeSeconds",
+  "endReason",
+] as const satisfies ReadonlyArray<keyof AttentionSpan>;
+
 /** Characters that cannot appear in a registrable domain but do appear in a URL. */
 const URL_STRUCTURE = /[/?#:@\s]/;
 
@@ -73,5 +127,37 @@ export function assertStorable(event: TiseEvent): void {
   }
   if (event.dwellSeconds !== null) {
     throw new Error("dwellSeconds must be null in V1 — see D35");
+  }
+}
+
+/**
+ * Throw if a span carries anything it must not, or claims something it cannot know.
+ *
+ * Runs on every write, like `assertStorable`. The `activeSeconds` checks matter more than
+ * they look: a zero-length span is not a measurement of no attention but the *absence* of
+ * a measurement, and an unbounded one is almost always a laptop lid rather than a person.
+ * Either would enter the data as if it had been observed.
+ */
+export function assertStorableSpan(span: AttentionSpan): void {
+  const unexpected = Object.keys(span).filter(
+    (key) => !(SPAN_FIELDS as readonly string[]).includes(key),
+  );
+  if (unexpected.length > 0) {
+    throw new Error(`refusing to store unexpected fields: ${unexpected.join(", ")}`);
+  }
+  if (!span.eventId) {
+    throw new Error("a span without an eventId is attention attributed to nothing");
+  }
+  if (!span.startedAt.endsWith("Z") || !span.endedAt.endsWith("Z")) {
+    throw new Error("refusing a non-UTC timestamp on a span");
+  }
+  if (!(span.activeSeconds > 0)) {
+    throw new Error(
+      `activeSeconds must be positive, got ${span.activeSeconds}: a zero-length span is ` +
+        "the absence of a measurement, not a measurement of zero attention",
+    );
+  }
+  if (Date.parse(span.endedAt) < Date.parse(span.startedAt)) {
+    throw new Error("refusing a span that ends before it starts");
   }
 }

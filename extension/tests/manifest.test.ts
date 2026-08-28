@@ -28,8 +28,37 @@ describe("manifest", () => {
     expect(JSON.stringify(manifest)).not.toContain("offscreen");
   });
 
-  it("keeps history optional, so install grants no ability to read anything", () => {
-    expect(manifest["optional_permissions"]).toEqual(["history"]);
+  it("keeps every reading capability optional, so install grants none of them", () => {
+    // `tabs` and `idle` were added for attention spans, authorised 2026-08-28. Both are
+    // optional and consent-gated exactly as `history` is: installing Tise still grants
+    // the ability to read nothing at all, which is the property this asserts.
+    expect(manifest["optional_permissions"]).toEqual(["history", "tabs", "idle"]);
+  });
+
+  it("asks for none of the permissions that would read page content or requests", () => {
+    // A separate claim from the one above, and the one that matters most: `tabs` gives
+    // tab lifecycle and URLs, but `cookies` would give credentials, `webRequest` every
+    // request, and `scripting`/`declarativeNetRequest` reach into pages. None is
+    // requested, in either list, and D95 recorded why `cookies` in particular is the
+    // wrong trade — its values *are* credentials and it needs host permissions.
+    const requested = JSON.stringify([
+      manifest["permissions"],
+      manifest["optional_permissions"],
+    ]);
+    for (const forbidden of [
+      "cookies",
+      "webRequest",
+      "scripting",
+      "declarativeNetRequest",
+      "browsingData",
+      "management",
+      "downloads",
+      "bookmarks",
+      "topSites",
+      "storage",
+    ]) {
+      expect(requested).not.toContain(forbidden);
+    }
   });
 
   it("requests no host permissions — observed unnecessary, and the widest warning", () => {

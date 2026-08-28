@@ -11,6 +11,7 @@
  * survives exactly as long as Chrome feels like keeping the worker alive.
  */
 import { collect } from "./collect/collector";
+import { endOpenSpan, registerAttentionListeners } from "./collect/attention";
 import { chromeHistoryApi, runImport } from "./collect/import";
 import {
   enforceRetention,
@@ -53,6 +54,25 @@ function scheduleAlarms(): void {
 
 chrome.runtime.onInstalled.addListener(scheduleAlarms);
 chrome.runtime.onStartup.addListener(scheduleAlarms);
+
+/**
+ * Attention listeners, registered at the top level for the same reason the navigation
+ * listener is: MV3 reads the registration to decide which events wake the worker, so one
+ * added inside a callback would stop firing after the first termination.
+ *
+ * They no-op until the person has consented *and* granted `tabs` and `idle` — the
+ * permission being present is not taken as consent.
+ */
+registerAttentionListeners();
+
+/**
+ * A browser restart leaves whatever span was open unfinished. It is closed as `shutdown`
+ * rather than extended to now: the person may have been away for a week, and the gap is
+ * unobserved rather than long.
+ */
+chrome.runtime.onStartup.addListener(() => {
+  void endOpenSpan("shutdown");
+});
 
 /**
  * Training advances one chunk per alarm, and the alarm keeps firing until the job is

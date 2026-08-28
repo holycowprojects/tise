@@ -16,6 +16,7 @@ import { putEvent } from "../storage/events";
 import { isCollecting, loadSettings } from "../storage/settings";
 import { normaliseNavigation, type NavigationDetails, type RejectionReason } from "./normalise";
 import { advanceSession, type SessionCursor } from "./session";
+import { attentionEnabled, beginSpan } from "./attention";
 
 const CURSOR_KEY = "sessionCursor";
 const REJECTIONS_KEY = "rejections";
@@ -75,6 +76,14 @@ export function collect(details: NavigationDetails): Promise<CollectOutcome> {
     const event: TiseEvent = { ...result.event, sessionId: next.sessionId };
     await putEvent(event);
     await writeMeta(CURSOR_KEY, next);
+
+    // A navigation ends the previous span in that tab and begins a new one. Done after
+    // the event is stored so a span can never reference an event that failed to write.
+    // `tabId` is used here and **never stored** — it identifies which tab the attention
+    // belongs to and is discarded with this call.
+    if (typeof details.tabId === "number" && (await attentionEnabled())) {
+      await beginSpan(event.eventId, details.tabId);
+    }
 
     return { stored: true, event } as const;
   });
