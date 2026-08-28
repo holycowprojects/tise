@@ -3338,3 +3338,80 @@ makes the model better.
 secondary with its own bar — the 33.2% always-the-mode floor — and the one circumstance in
 which it becomes primary. It has 238 labels against this target's 403 and, unlike this one,
 has never been fitted at all. It is the remaining candidate.
+
+### D93 — Attention: the best data this project has had, and still not an established result
+
+Akash's instruction was to reason from the data rather than from a target. Doing that puts
+**dwell** at the top: one label per visit rather than per session or per day, and a median
+split against the category's own recent dwell. `analysis/attention.py` measures it on the
+history file, which records `visit_duration` even though the API does not.
+
+**This is a scouting measurement and cannot adopt anything.** No bar was pre-registered for
+this target, so the model score below says whether the direction earns a pre-registration
+and nothing more. D91's rule stands: a bar chosen after seeing a score is not a bar.
+
+**Two things are better than anything measured before.**
+
+| | `return_24h` | `block_volume` daily | **attention** |
+|---|---:|---:|---:|
+| Labels | 998 | 403 | **10,502** |
+| Base rate | 65-72% | 36-47% | **50.0% / 50.3%** |
+
+**26x the labels of the last target, and the first target whose base rate actually landed on
+50%.** D88 claimed a median split gives that by construction; D90 measured it false for daily
+blocks, where the unit was coarse enough for volume trends to dominate. At visit level the
+trailing window spans hours, and the property finally holds.
+
+**And then the result does not survive the honest comparison.**
+
+| Comparison | Chrome | Edge |
+|---|---|---|
+| vs `category_base_rate` — the nominal bar | +0.0020 [+0.0012, +0.0319] **excludes zero** | +0.0065 [+0.0048, +0.0201] **excludes zero** |
+| vs `global_base_rate` — a constant | +0.0012 [−0.0051, +0.0191] **includes zero** | +0.0055 [−0.0001, +0.0097] **includes zero** |
+
+It would have been easy to publish the first row: *the first time in this project a model has
+separated from its bar, on both corpora.* That sentence is true and it is misleading, which
+is the D86 failure mode exactly.
+
+**`category_base_rate` is the wrong bar for this target, and it is wrong by construction.**
+The label is "above **your own median for this category**", so every category's rate is ~50%
+by definition. Estimating twelve per-category rates that are all the same number adds
+variance and nothing else — which is why the bar scores **worse than a constant** on both
+corpora (0.2508 against 0.2500 on Chrome, 0.2511 against 0.2501 on Edge). Beating it is not
+an achievement; it is beating a noisier version of a constant.
+
+Against the constant, **neither corpus separates.** Edge misses by **0.0001** on the lower
+bound. That is close enough to be worth pursuing and not close enough to claim, and the
+distinction between those two is the whole discipline.
+
+**What did carry weight, and it is the first time.** The largest coefficients on Edge are
+`dwellLevel` (−0.256) and then **`arrivedLink` (−0.212)** and **`arrivedTyped` (−0.141)**.
+`transition` has been collected since T1 and read by **no feature in this project until
+now** — and on its first use it lands among the strongest signals. How you arrived at a page
+conditions how long you stay. That is a genuine conditional, of the kind every previous
+feature set lacked.
+
+**The caveat that could account for all of it.** `visit_duration` measures how long a **tab
+held a URL**, not how long a person looked at it. A tab left open overnight records a long
+duration and no attention whatsoever. So part of what the model is predicting may be "will
+this tab stay open", which is a different and much less interesting question. **`idle` plus
+window focus is what separates the two**, and neither is available without the `tabs`
+permission — which is the decision this page exists to inform, and which is now better
+informed in both directions.
+
+**What this changes.**
+
+- The direction is worth a pre-registration. It is **not** worth a permission request yet,
+  because the honest comparison did not separate.
+- `bs_1` and the block work are superseded as candidates, not deleted.
+- **`transition` should be in every future feature set.** That finding is independent of
+  whether attention survives, and it applies to `next_session_category` immediately.
+- The realistic path to separating from a constant is better labels rather than a better
+  model: `idle` and focus would turn "tab was open" into "person was present", and that is
+  the difference the interval is currently straddling.
+
+**Method note.** Three targets have now been chosen from an argument and measured
+afterwards. This one was chosen by reading the data first — what does it describe, what
+questions does it naturally answer — and it produced 26x the labels and the first balanced
+base rate on the first attempt. That is not proof the approach is better, but it is the only
+target that arrived at a plausible result without a redesign, and it took one session.

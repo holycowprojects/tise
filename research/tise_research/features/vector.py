@@ -147,7 +147,33 @@ _BS1: tuple[str, ...] = (
     "dayOfWeekCos",
 )
 
-FEATURE_SETS: dict[str, tuple[str, ...]] = {"fs_2": _FS2, "fs_3": _FS3, "bs_1": _BS1}
+#: `as_1` — attention (dwell) features, one row per visit. **`full` compat class**: it needs
+#: dwell time, which the `chrome.history` API cannot supply. Research-only unless the
+#: `tabs` permission is added, which is exactly the decision this measurement informs.
+#:
+#: `arrivedTyped` / `arrivedBookmark` / `arrivedLink` are the first use in this project of
+#: the `transition` field, which has been collected since T1 and read by no feature.
+_AS1: tuple[str, ...] = (
+    "dwellLevel",
+    "lastDwellRatio",
+    "meanRatio",
+    "sessionPosition",
+    "isSessionStart",
+    "sameAsPrevious",
+    "hourSin",
+    "hourCos",
+    "isWeekend",
+    "arrivedTyped",
+    "arrivedBookmark",
+    "arrivedLink",
+)
+
+FEATURE_SETS: dict[str, tuple[str, ...]] = {
+    "fs_2": _FS2,
+    "fs_3": _FS3,
+    "bs_1": _BS1,
+    "as_1": _AS1,
+}
 
 FEATURE_NAMES: tuple[str, ...] = FEATURE_SETS[DEFAULT_FEATURE_SET]
 

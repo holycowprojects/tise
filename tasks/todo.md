@@ -166,6 +166,26 @@ Work order: **T19 → T20 → T21 → then back to T14/T15/T17/T18.**
     a target is adopted. Leakage is structural: labels and features emitted in one forward
     pass before the block joins any state, and `test_block_labels.py` asserts it
 
+- [x] **T22b · Attention (dwell) — scouting measurement** · M · deps: T21 (D93)
+  - Reasoning from the data rather than from a target put **dwell** at the top. One label
+    per *visit*: did you stay longer than your recent median for this category?
+  - Verify: `uv run python analysis/attention.py` ✓ — 675 Python, 338 TypeScript, clean.
+    Report at `docs/benchmarks/attention.md`
+  - **10,502 labels** against `block_volume`'s 403 — **26×** — and base rates of **50.0%
+    and 50.3%**, the first target whose median split actually landed on 50%
+  - **But it does not survive the honest comparison.** It separates from
+    `category_base_rate` on both corpora — and that bar is **worse than a constant** here,
+    because a per-category median split makes every category ~50% by construction, so
+    estimating twelve identical rates only adds variance. Against a constant, **neither
+    corpus separates**; Edge misses by **0.0001** on the lower bound
+  - **`transition` carried real weight on its first ever use** — `arrivedLink` −0.212 and
+    `arrivedTyped` −0.141, second and third largest. Collected since T1, read by no feature
+    until now. **It belongs in every future feature set**, independent of this target
+  - **The caveat that could explain all of it:** `visit_duration` measures how long a *tab
+    held a URL*, not attention. A tab left open overnight looks like deep engagement.
+    `idle` + window focus is what separates them — and that needs the `tabs` permission
+  - Worth a pre-registration; **not** worth a permission request yet
+
 - [ ] **T22 · Measure `next_session_category`** · M · deps: T21 — **next**
   - The remaining candidate. 238 labels, **never fitted at all**, code in both languages
     since T10. Bar fixed in D91: beat the **33.2% always-the-mode floor** by a

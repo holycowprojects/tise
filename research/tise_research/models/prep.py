@@ -76,6 +76,9 @@ NULLABLE_BY_SET: dict[str, tuple[str, ...]] = {
     # that is guaranteed non-empty by the minimum-history rule, so a null anywhere else is
     # a bug and `raw_row` raises rather than quietly imputing it.
     "bs_1": ("daysSinceAbove",),
+    # `as_1` has no legitimate absence: a visit is only labelled once its category has
+    # enough dwell history, so every window is non-empty by construction.
+    "as_1": (),
 }
 
 NULLABLE_FEATURES: tuple[str, ...] = NULLABLE_BY_SET[DEFAULT_FEATURE_SET]
