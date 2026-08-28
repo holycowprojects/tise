@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from tise_research.data.chrome_history import DEFAULT_VIEW
 from tise_research.eval.metrics import base_rate, brier_score, log_loss, skill_score
 from tise_research.features.labels import DEFAULT_HORIZON_HOURS, Label
 from tise_research.models.baselines import ALL_BASELINES, Baseline
@@ -309,6 +310,12 @@ def main() -> int:
     parser.add_argument("--timeout-seconds", type=float, default=1800.0)
     parser.add_argument("--out", type=Path, default=Path("docs/benchmarks"))
     parser.add_argument(
+        "--view",
+        default=DEFAULT_VIEW,
+        choices=["shipped", "chosen", "raw"],
+        help="Which corpus (D78). `chosen` reproduces the superseded pre-D78 numbers.",
+    )
+    parser.add_argument(
         "--with-model",
         action="store_true",
         help="Fit logreg_fs2 alongside the baselines and write model.md as well.",
@@ -323,7 +330,9 @@ def main() -> int:
     results: dict[str, BacktestResult] = {}
     evidence = []
     for copy_path in copies:
-        labels = load_labels(copy_path, timeout_seconds=args.timeout_seconds)
+        labels = load_labels(
+            copy_path, timeout_seconds=args.timeout_seconds, view=args.view
+        )
         if len(labels) < args.folds * 2:
             print(f"Skipping {copy_path.stem}: only {len(labels)} labels")
             continue

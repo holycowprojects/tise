@@ -13,10 +13,12 @@ Values here were verified against a real `places.sqlite`, not recalled.
 from datetime import UTC, datetime
 
 import pytest
+from conftest import FIREFOX_REDIRECT_CHAIN, write_firefox_places
 from tise_research.data.firefox_history import (
     is_download,
     is_redirect,
     is_subframe,
+    load_visits,
     unix_micros_to_datetime,
     visit_type_name,
 )
@@ -90,3 +92,38 @@ class TestTransitionNamesAlignWithChromium:
 
         assert visit_type_name(1) == transition_core(0) == "link"
         assert visit_type_name(2) == transition_core(1) == "typed"
+
+
+class TestVisitViews:
+    """Firefox's flag is on the other end of the chain, and the inversion is the same.
+
+    Dropping `redirect_*` types keeps `google.com/url` — plumbing — and discards the page
+    the person landed on. Tise never runs on Firefox, so `shipped` here is not what any
+    product saw; it is the same *definition of a visit*, which is what makes a fold count
+    compared across browsers mean anything (D78).
+    """
+
+    @pytest.fixture
+    def places(self, tmp_path):
+        path = tmp_path / "places.sqlite"
+        write_firefox_places(path, FIREFOX_REDIRECT_CHAIN)
+        return path
+
+    def test_shipped_keeps_the_landing_page(self, places):
+        domains = [visit.domain for visit in load_visits(places, view="shipped")]
+        assert domains == ["zivasuites.com", "example.com"]
+
+    def test_chosen_keeps_the_plumbing_and_drops_the_landing_page(self, places):
+        domains = [visit.domain for visit in load_visits(places, view="chosen")]
+        assert domains == ["google.com", "example.com"]
+
+    def test_raw_keeps_every_hop(self, places):
+        assert len(load_visits(places, view="raw")) == 4
+
+    def test_the_default_is_the_view_that_ships(self, places):
+        assert load_visits(places) == load_visits(places, view="shipped")
+
+    def test_a_visit_redirected_to_but_never_away_from_is_a_landing_page(self, places):
+        """Visit 3 carries `redirect_permanent` and is still where the person ended up."""
+        kept = load_visits(places, view="shipped")
+        assert [visit.transition for visit in kept] == ["redirect_permanent", "typed"]

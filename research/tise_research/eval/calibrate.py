@@ -36,6 +36,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from tise_research.data.chrome_history import DEFAULT_VIEW
 from tise_research.eval.abstain import (
     DEFAULT_TARGET_ACCURACY,
     AbstentionPolicy,
@@ -275,6 +276,12 @@ def main() -> int:
     parser.add_argument("--timeout-seconds", type=float, default=1800.0)
     parser.add_argument("--target-accuracy", type=float, default=DEFAULT_TARGET_ACCURACY)
     parser.add_argument("--out", type=Path, default=Path("docs/benchmarks"))
+    parser.add_argument(
+        "--view",
+        default=DEFAULT_VIEW,
+        choices=["shipped", "chosen", "raw"],
+        help="Which corpus (D78). `chosen` reproduces the superseded pre-D78 numbers.",
+    )
     args = parser.parse_args()
 
     copies = [args.corpus] if args.corpus else sorted(Path("data").glob("history-*.copy"))
@@ -284,12 +291,14 @@ def main() -> int:
 
     results = []
     for copy_path in copies:
-        labels = load_labels(copy_path, timeout_seconds=args.timeout_seconds)
+        labels = load_labels(
+            copy_path, timeout_seconds=args.timeout_seconds, view=args.view
+        )
         if len(labels) < args.folds * 2:
             print(f"Skipping {copy_path.stem}: only {len(labels)} labels")
             continue
         index = FeatureIndex(
-            events=load_events(copy_path),
+            events=load_events(copy_path, view=args.view),
             timeout_seconds=args.timeout_seconds,
             horizon_hours=DEFAULT_HORIZON_HOURS,
         )

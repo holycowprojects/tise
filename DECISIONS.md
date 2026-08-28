@@ -1995,3 +1995,127 @@ of computing them; T12 had a logit clamp no parity test touched; T13 had a whole
 behind an early return. **The count matters as much as the failure** — a break that fails
 nothing is a finding about the tests, and the only way to see it is to break things one at
 a time and count.
+
+---
+
+## T16 — model tournament and benchmark report
+
+### D78 — Chrome's history API hands over redirect chain *ends*, and that was the corpus bug
+
+D65 left one thing open and named it as T16's first job: the research corpus and the
+extension disagreed about 7.7% of events, every published benchmark rested on the research
+side, and three candidate fixes were listed with none chosen. Choosing between them turned
+out to be the wrong task, because the premise underneath all three was wrong.
+
+**What was assumed.** D40 built a 50 ms referrer-gap rule so that an import would drop the
+redirect hops that live collection drops with `transitionQualifiers`. It was scored against
+the file's redirect bits and reached precision 0.931, recall 0.657 on Chrome. D65 then
+observed the shipped rule firing on 0.95% of visits rather than the file's 12.2%, and read
+that as the rule recovering roughly one hop in fourteen.
+
+**What is true.** `chrome.history.search()` returns only visits marked `CHAIN_END` — the
+same filter that makes the history UI show the page you landed on rather than the three
+bounces that got you there. Measured on the Chrome corpus by joining the export's
+`imp_<visitId>` event ids directly against the file's visit ids, so this is an exact join
+and not an inference from totals:
+
+| | in the export |
+|---|---:|
+| chain-end visits | 5,019 of 5,094 (**98.5%**) |
+| everything else | 56 of 646 (**8.7%**) |
+
+521 distinct URLs in the window have no visit in the export at all, and 97.1% of them have
+no chain-end visit. Both symptoms D65 could not explain fall out of that one fact:
+
+- **365 visits the file holds that the import never wrote**, each passing every shipped
+  filter. 99.5% sit on a page that is wholly absent.
+- **220 redirect hops the import kept despite a sub-50 ms gap in the file.** For
+  **100% of them** the referring visit is present in the file and absent from the export.
+  The rule did not misjudge them; it was handed no referrer and, correctly, kept them.
+
+So the heuristic was never recovering one in fourteen. It was being shown a corpus Chrome
+had already filtered, with the referrers it needed to judge the remainder deleted.
+
+**And once Chrome has filtered, the 50 ms rule is net harmful on this evidence.** Replayed
+over the corpus the API actually supplies, it flags **1 true redirect hop and 34 ordinary
+navigations** on Chrome, and **0 and 10** on Edge. D40 tuned that threshold for precision
+deliberately — a false positive deletes a page the person really visited, a false negative
+only leaves a hop in — and against the real input that trade now runs backwards: 44 real
+navigations deleted across two corpora to remove one hop. D40's precision of 0.931 was
+measured against every row in the file, which is not the population the rule ever sees.
+
+Nothing is changed on the strength of that. It is two profiles, the rule is in shipped
+code, and touching collection is a product change rather than a corpus one. It is recorded
+here as the number that decides it, which D40 never had.
+
+**The bits are not complements, and that is the whole problem.** A chain *start* such as
+`google.com/url?...` carries **no redirect bit at all**. Filtering on `REDIRECT_MASK` —
+what the research tier did from T1 until now — therefore keeps the plumbing and discards
+the page the person actually read. D65 guessed the extension's view was "arguably more
+correct". It is not arguable: the extension's view is Chrome's own answer to *where did
+you go*, and the research corpus was the one losing information.
+
+**Decision: three named views, and the default is what ships.**
+
+- `shipped` — chain ends only. **Every benchmark uses this.** A number computed on visits
+  the product cannot be given describes a model that was never run.
+- `chosen` — the pre-D78 filter, kept so the superseded numbers stay *reproducible* rather
+  than merely quoted. `--view chosen` regenerates them.
+- `raw` — every hop, for measuring what the filters do. Never for modelling.
+
+`load_visits`, `load_events`, `load_labels`, the backtest and the calibration run all take
+it, so a benchmark cannot silently be computed on a corpus nobody asked for.
+
+**Firefox gets the same definition, reconstructed.** Firefox has no chain-end bit and puts
+its redirect flag on the *opposite end* of the chain: the page redirected **to** carries
+`redirect_permanent`. Dropping those types therefore discards landing pages too, by a
+different route — the same inversion, arrived at from the other side. A visit nothing
+redirects away from is the chain end, and that is reconstructible from `from_visit`. Tise
+never runs on Firefox, so `shipped` there is not what any product saw; it is the same
+*definition of a visit*, which is what a fold count compared across browsers needs in
+order to mean anything.
+
+**What it changed, including where it changed little.** Simulating both stages —
+`analysis/import_simulation.py` — reproduces the real export to **1.5%** per-domain
+disagreement, against the 7.7% D65 measured, and the residual 72 events is about one day
+of browsing, which is how much older the file copy is than the export. But the effect on
+the headline is small, and saying so is the point of measuring it:
+
+| corpus | events, `chosen` → `shipped` | disagreement | model Brier | folds won |
+|---|---|---:|---|---|
+| Edge (primary) | 5,711 → 5,734 | 1.3% | 0.1119 → **0.1124** (worse) | 2 of 5, unchanged |
+| Chrome | 5,012 → 5,068 | 6.5% | 0.2195 → **0.2099** (better) | 2 of 5 → 3 of 5 |
+| Firefox | 909 → 910 | 3.4% | 0.2263 → **0.2298** (worse) | 4 of 5 → 3 of 5 |
+
+Edge moves least because Edge has the fewest redirect chains — 3.8% of visits against
+Chrome's 12.2%, which D40's own table said and nobody read that way. **The corpus fix did
+not move the model in a consistent direction**: it helps on Chrome, hurts slightly on Edge
+and Firefox, and the fold total is unchanged at **8 of 15**. D28's bar on Edge is identical
+to four decimals (0.1254), the model still clears it there and still loses on Chrome.
+
+**D60's conclusion survives the corpus it was computed on being wrong.** That is a weaker
+result than a fix that rescued the model, and it is what the numbers say. It is worth
+being plain about the shape of it: this entry corrects a real error in how the data was
+read, and the error was not what was holding the model back.
+
+`hoursSinceFirstSeen` still puts 76.8% of Edge test rows outside its fitted range. The
+extrapolation lead is untouched and is still T16's next job.
+
+**Found by breaking it, and it failed nothing.** Four deliberate breaks. Three failed
+between four and seven tests. The fourth — making `load_events` drop the `view` it was
+handed — failed **zero**, because `corpus.py` had no test file at all and every downstream
+test builds its events in memory. That is the single most dangerous shape in this project:
+the one door every published number comes through, able to silently substitute a different
+corpus. Closed by `research/tests/test_corpus.py`; the same break now fails four.
+
+This is the fourth time counting failures has found a hole rather than a bug — T10's
+oracle-reading assertions, T11's untouched horizon boundary, T12's untested logit clamp,
+now T13's early return and T16's missing door. A break that fails nothing is a finding
+about the tests, and the only way to see it is to break one thing at a time and count.
+
+**What this does not settle.** The chain-end filter is inferred from behaviour — 98.5%
+against 8.7% on one corpus — not read out of Chromium's source. It is stated that way in
+`analysis/import_simulation.py` under `KNOWN_DIVERGENCES`, and a browser probe that reads
+`chrome.history.search()` results against the file directly would settle it. Nothing in the
+extension changed on the strength of this: the import's behaviour was already right, and it
+was the corpus that was describing something else.

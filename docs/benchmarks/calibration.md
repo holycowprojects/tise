@@ -65,19 +65,19 @@ Thresholds tried run from 0.50 to 0.99.
 
 ### history-chrome
 
-313 labels, 5 folds scored.
+322 labels, 5 folds scored.
 
 | | Raw | Calibrated |
 |---|---:|---:|
-| Brier | 0.2535 | 0.2168 |
-| ECE (10 bins) | 0.1845 | 0.1113 |
-| Worst bin (MCE) | 0.9284 | 0.8086 |
+| Brier | 0.2421 | 0.2140 |
+| ECE (10 bins) | 0.1802 | 0.1028 |
+| Worst bin (MCE) | 0.9318 | 0.1637 |
 
 Calibration **improved** expected calibration error here.
 
-Shipped rule (lower bound): qualified on **1 of 5** folds and held on the test window in **0 of 1**, answering 14%–14% of cases.
+Shipped rule (lower bound): qualified on **1 of 5** folds and held on the test window in **0 of 1**, answering 23%–23% of cases.
 
-Naive rule (point estimate): qualified on **3 of 5** folds and held on the test window in **1 of 3**, answering 65%–100% of cases.
+Naive rule (point estimate): qualified on **3 of 5** folds and held on the test window in **1 of 3**, answering 28%–100% of cases.
 
 No threshold reaches 90% even as a point estimate on the pooled test window, so this is the model falling short rather than the evidence being thin.
 
@@ -86,37 +86,37 @@ is being pulled toward the base rate; above 1 means it was under-confident.
 
 | Fold | Fit | Calib | Test | Brier raw | Brier cal | ECE raw | ECE cal | Platt `a` | Threshold | Test acc | Test cov | Naive thr | Naive acc |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 0 | 87 | 38 | 26 | 0.1707 | 0.1700 | 0.1727 | 0.1152 | 0.104 | **none** | n/a | n/a | none | n/a |
-| 1 | 113 | 49 | 28 | 0.1994 | 0.0674 | 0.3241 | 0.0903 | 0.308 | **none** | n/a | n/a | 0.84 | 95.0% |
-| 2 | 139 | 60 | 29 | 0.2948 | 0.3204 | 0.3011 | 0.3122 | 0.874 | 0.94 | 50.0% | 13.8% | 0.50 | 58.6% |
-| 3 | 165 | 71 | 26 | 0.2134 | 0.2133 | 0.2257 | 0.1652 | 0.227 | **none** | n/a | n/a | 0.81 | 82.4% |
-| 4 | 191 | 82 | 27 | 0.3838 | 0.3089 | 0.4569 | 0.2552 | 0.226 | **none** | n/a | n/a | none | n/a |
+| 0 | 89 | 39 | 26 | 0.1996 | 0.1744 | 0.2351 | 0.0552 | 0.064 | **none** | n/a | n/a | none | n/a |
+| 1 | 116 | 50 | 30 | 0.1423 | 0.0627 | 0.2616 | 0.0527 | 0.349 | **none** | n/a | n/a | 0.81 | 93.1% |
+| 2 | 142 | 62 | 30 | 0.3490 | 0.3674 | 0.3831 | 0.3353 | 0.763 | 0.95 | 42.9% | 23.3% | 0.50 | 56.7% |
+| 3 | 169 | 73 | 26 | 0.1253 | 0.1424 | 0.1372 | 0.0645 | 0.117 | **none** | n/a | n/a | none | n/a |
+| 4 | 196 | 84 | 29 | 0.3776 | 0.3114 | 0.4246 | 0.2759 | 0.218 | **none** | n/a | n/a | 0.82 | 75.0% |
 
 **Reliability**, pooled over every fold's test window, `unknown` excluded.
 
 | Bin | n | Predicted (raw) | Observed | Predicted (calibrated) | Observed |
 |---|---:|---:|---:|---:|---:|
-| 0.0–0.1 | 2 | 0.072 | 1.000 | n/a | n/a |
-| 0.1–0.2 | 3 | 0.176 | 0.667 | 0.191 | 1.000 |
-| 0.2–0.3 | 8 | 0.252 | 0.625 | n/a | n/a |
-| 0.3–0.4 | 6 | 0.353 | 0.667 | n/a | n/a |
-| 0.4–0.5 | 9 | 0.451 | 0.444 | n/a | n/a |
-| 0.5–0.6 | 5 | 0.560 | 1.000 | 0.558 | 0.333 |
-| 0.6–0.7 | 18 | 0.661 | 0.722 | 0.663 | 0.500 |
-| 0.7–0.8 | 28 | 0.752 | 0.643 | 0.744 | 0.710 |
-| 0.8–0.9 | 23 | 0.841 | 0.652 | 0.856 | 0.780 |
-| 0.9–1.0 | 34 | 0.974 | 0.794 | 0.941 | 0.760 |
+| 0.0–0.1 | 1 | 0.068 | 1.000 | n/a | n/a |
+| 0.1–0.2 | 4 | 0.165 | 0.750 | n/a | n/a |
+| 0.2–0.3 | 4 | 0.263 | 0.500 | n/a | n/a |
+| 0.3–0.4 | 2 | 0.371 | 0.500 | n/a | n/a |
+| 0.4–0.5 | 9 | 0.454 | 0.667 | n/a | n/a |
+| 0.5–0.6 | 9 | 0.532 | 0.667 | 0.559 | 0.667 |
+| 0.6–0.7 | 19 | 0.659 | 0.789 | 0.675 | 0.619 |
+| 0.7–0.8 | 26 | 0.740 | 0.538 | 0.746 | 0.659 |
+| 0.8–0.9 | 26 | 0.852 | 0.731 | 0.852 | 0.756 |
+| 0.9–1.0 | 41 | 0.975 | 0.805 | 0.938 | 0.774 |
 
 **Accuracy against coverage**, pooled, on calibrated probabilities.
 
 | Threshold | Coverage | Answered | Accuracy answered | Accuracy abstained |
 |---:|---:|---:|---:|---:|
-| 0.50 | 100.0% | 136 | 69.1% | n/a |
-| 0.60 | 97.8% | 133 | 69.9% | 33.3% |
-| 0.70 | 78.7% | 107 | 74.8% | 48.3% |
-| 0.80 | 55.9% | 76 | 76.3% | 60.0% |
-| 0.90 | 18.4% | 25 | 76.0% | 67.6% |
-| 0.95 | 5.9% | 8 | 75.0% | 68.8% |
+| 0.50 | 100.0% | 141 | 70.9% | n/a |
+| 0.60 | 97.9% | 138 | 71.0% | 66.7% |
+| 0.70 | 83.0% | 117 | 72.6% | 62.5% |
+| 0.80 | 53.9% | 76 | 76.3% | 64.6% |
+| 0.90 | 22.0% | 31 | 77.4% | 69.1% |
+| 0.95 | 6.4% | 9 | 55.6% | 72.0% |
 
 
 ### history-edge
@@ -125,54 +125,54 @@ is being pulled toward the base rate; above 1 means it was under-confident.
 
 | | Raw | Calibrated |
 |---|---:|---:|
-| Brier | 0.1721 | 0.1207 |
-| ECE (10 bins) | 0.1664 | 0.0541 |
-| Worst bin (MCE) | 0.5120 | 0.9991 |
+| Brier | 0.1854 | 0.1254 |
+| ECE (10 bins) | 0.1799 | 0.0709 |
+| Worst bin (MCE) | 0.5344 | 0.9985 |
 
 Calibration **improved** expected calibration error here.
 
-Shipped rule (lower bound): no threshold qualified on any fold.
+Shipped rule (lower bound): qualified on **1 of 5** folds and held on the test window in **1 of 1**, answering 32%–32% of cases.
 
-Naive rule (point estimate): qualified on **4 of 5** folds and held on the test window in **1 of 4**, answering 80%–100% of cases.
+Naive rule (point estimate): qualified on **4 of 5** folds and held on the test window in **1 of 4**, answering 78%–96% of cases.
 
-Pooled, threshold 0.85 answers 59% of cases at **90.0%** accuracy — above the 90% target as a point estimate. Certifying that margin at 95% confidence would need **more than 12,800 answered rows**; calibration slices here hold 61–133. So the shortfall is the width of the margin, not the model: a threshold that was comfortably above target would certify on a fraction of the data, while one a point above it needs an enormous sample to distinguish from luck.
+Pooled, threshold 0.80 answers 63% of cases at **90.0%** accuracy — above the 90% target as a point estimate. Certifying that margin at 95% confidence would need **more than 12,800 answered rows**; calibration slices here hold 61–133. So the shortfall is the width of the margin, not the model: a threshold that was comfortably above target would certify on a fraction of the data, while one a point above it needs an enormous sample to distinguish from luck.
 
 **Per fold.** `a` is the Platt slope: below 1 means the raw model was over-confident and
 is being pulled toward the base rate; above 1 means it was under-confident.
 
 | Fold | Fit | Calib | Test | Brier raw | Brier cal | ECE raw | ECE cal | Platt `a` | Threshold | Test acc | Test cov | Naive thr | Naive acc |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 0 | 140 | 61 | 55 | 0.3350 | 0.1112 | 0.4528 | 0.1534 | 0.313 | **none** | n/a | n/a | none | n/a |
-| 1 | 182 | 79 | 53 | 0.0994 | 0.1089 | 0.1145 | 0.0525 | 0.550 | **none** | n/a | n/a | 0.61 | 84.9% |
-| 2 | 224 | 97 | 54 | 0.1329 | 0.1322 | 0.1048 | 0.1019 | 0.745 | **none** | n/a | n/a | 0.55 | 84.6% |
-| 3 | 266 | 115 | 55 | 0.1336 | 0.1068 | 0.1259 | 0.0684 | 0.504 | **none** | n/a | n/a | 0.75 | 93.2% |
-| 4 | 308 | 133 | 53 | 0.1558 | 0.1450 | 0.1463 | 0.0656 | 0.365 | **none** | n/a | n/a | 0.75 | 86.0% |
+| 0 | 140 | 61 | 56 | 0.3880 | 0.1313 | 0.4926 | 0.1642 | 0.062 | **none** | n/a | n/a | none | n/a |
+| 1 | 182 | 79 | 53 | 0.0992 | 0.0995 | 0.1177 | 0.0919 | 0.707 | 0.94 | 100.0% | 32.1% | 0.63 | 88.2% |
+| 2 | 224 | 97 | 54 | 0.1214 | 0.1282 | 0.1020 | 0.0873 | 0.703 | **none** | n/a | n/a | 0.59 | 86.3% |
+| 3 | 266 | 115 | 55 | 0.1532 | 0.1236 | 0.1466 | 0.0957 | 0.555 | **none** | n/a | n/a | 0.73 | 93.0% |
+| 4 | 308 | 133 | 53 | 0.1560 | 0.1443 | 0.1425 | 0.0756 | 0.368 | **none** | n/a | n/a | 0.72 | 86.0% |
 
 **Reliability**, pooled over every fold's test window, `unknown` excluded.
 
 | Bin | n | Predicted (raw) | Observed | Predicted (calibrated) | Observed |
 |---|---:|---:|---:|---:|---:|
-| 0.0–0.1 | 5 | 0.051 | 0.400 | 0.001 | 1.000 |
-| 0.1–0.2 | 18 | 0.148 | 0.611 | 0.173 | 0.000 |
-| 0.2–0.3 | 11 | 0.243 | 0.636 | 0.249 | 0.000 |
-| 0.3–0.4 | 14 | 0.345 | 0.857 | 0.354 | 0.625 |
-| 0.4–0.5 | 13 | 0.441 | 0.692 | 0.464 | 0.400 |
-| 0.5–0.6 | 18 | 0.548 | 0.778 | 0.549 | 0.667 |
-| 0.6–0.7 | 17 | 0.659 | 0.882 | 0.662 | 0.722 |
-| 0.7–0.8 | 16 | 0.750 | 0.938 | 0.758 | 0.854 |
-| 0.8–0.9 | 29 | 0.855 | 0.862 | 0.849 | 0.855 |
-| 0.9–1.0 | 129 | 0.976 | 0.907 | 0.947 | 0.916 |
+| 0.0–0.1 | 10 | 0.066 | 0.600 | 0.001 | 1.000 |
+| 0.1–0.2 | 20 | 0.147 | 0.600 | n/a | n/a |
+| 0.2–0.3 | 15 | 0.248 | 0.733 | 0.259 | 0.429 |
+| 0.3–0.4 | 11 | 0.349 | 0.636 | 0.344 | 0.500 |
+| 0.4–0.5 | 14 | 0.448 | 0.643 | 0.423 | 0.400 |
+| 0.5–0.6 | 15 | 0.549 | 0.867 | 0.546 | 0.429 |
+| 0.6–0.7 | 17 | 0.651 | 0.941 | 0.660 | 0.455 |
+| 0.7–0.8 | 13 | 0.763 | 0.923 | 0.733 | 0.862 |
+| 0.8–0.9 | 31 | 0.852 | 0.871 | 0.857 | 0.872 |
+| 0.9–1.0 | 125 | 0.975 | 0.904 | 0.946 | 0.915 |
 
 **Accuracy against coverage**, pooled, on calibrated probabilities.
 
 | Threshold | Coverage | Answered | Accuracy answered | Accuracy abstained |
 |---:|---:|---:|---:|---:|
-| 0.50 | 100.0% | 270 | 85.2% | n/a |
-| 0.60 | 95.9% | 259 | 86.1% | 63.6% |
-| 0.70 | 86.3% | 233 | 88.8% | 62.2% |
-| 0.80 | 70.4% | 190 | 89.5% | 75.0% |
-| 0.90 | 48.9% | 132 | 90.9% | 79.7% |
-| 0.95 | 23.0% | 62 | 93.5% | 82.7% |
+| 0.50 | 100.0% | 271 | 83.8% | n/a |
+| 0.60 | 95.6% | 259 | 85.3% | 50.0% |
+| 0.70 | 89.3% | 242 | 88.0% | 48.3% |
+| 0.80 | 62.7% | 170 | 90.0% | 73.3% |
+| 0.90 | 48.3% | 131 | 90.8% | 77.1% |
+| 0.95 | 22.5% | 61 | 93.4% | 81.0% |
 
 
 ### history-firefox
@@ -181,9 +181,9 @@ is being pulled toward the base rate; above 1 means it was under-confident.
 
 | | Raw | Calibrated |
 |---|---:|---:|
-| Brier | 0.2420 | 0.2000 |
-| ECE (10 bins) | 0.2439 | 0.1254 |
-| Worst bin (MCE) | 0.5414 | 0.2452 |
+| Brier | 0.2493 | 0.2034 |
+| ECE (10 bins) | 0.2401 | 0.1159 |
+| Worst bin (MCE) | 0.5698 | 0.2816 |
 
 Calibration **improved** expected calibration error here.
 
@@ -198,37 +198,37 @@ is being pulled toward the base rate; above 1 means it was under-confident.
 
 | Fold | Fit | Calib | Test | Brier raw | Brier cal | ECE raw | ECE cal | Platt `a` | Threshold | Test acc | Test cov | Naive thr | Naive acc |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 0 | 48 | 21 | 16 | 0.1463 | 0.1463 | 0.1602 | 0.1602 | 1.000 | **none** | n/a | n/a | none | n/a |
-| 1 | 62 | 27 | 17 | 0.1530 | 0.1530 | 0.1701 | 0.1701 | 1.000 | **none** | n/a | n/a | none | n/a |
-| 2 | 76 | 33 | 15 | 0.2721 | 0.2225 | 0.2945 | 0.2370 | 0.510 | **none** | n/a | n/a | 0.71 | 66.7% |
-| 3 | 90 | 39 | 18 | 0.3158 | 0.2592 | 0.3311 | 0.2120 | 0.402 | **none** | n/a | n/a | none | n/a |
-| 4 | 104 | 45 | 17 | 0.3165 | 0.2152 | 0.3406 | 0.1460 | 0.195 | **none** | n/a | n/a | none | n/a |
+| 0 | 48 | 21 | 16 | 0.1447 | 0.1447 | 0.1512 | 0.1512 | 1.000 | **none** | n/a | n/a | none | n/a |
+| 1 | 62 | 27 | 17 | 0.1790 | 0.1790 | 0.1972 | 0.1972 | 1.000 | **none** | n/a | n/a | none | n/a |
+| 2 | 76 | 33 | 15 | 0.2734 | 0.2236 | 0.3051 | 0.1958 | 0.503 | **none** | n/a | n/a | 0.72 | 66.7% |
+| 3 | 90 | 39 | 18 | 0.3126 | 0.2545 | 0.3255 | 0.2824 | 0.408 | **none** | n/a | n/a | none | n/a |
+| 4 | 104 | 45 | 17 | 0.3299 | 0.2113 | 0.3503 | 0.1019 | 0.163 | **none** | n/a | n/a | none | n/a |
 
 **Reliability**, pooled over every fold's test window, `unknown` excluded.
 
 | Bin | n | Predicted (raw) | Observed | Predicted (calibrated) | Observed |
 |---|---:|---:|---:|---:|---:|
-| 0.0–0.1 | 5 | 0.053 | 0.200 | 0.043 | 0.250 |
-| 0.1–0.2 | 1 | 0.101 | 0.000 | 0.101 | 0.000 |
-| 0.2–0.3 | 6 | 0.247 | 0.000 | 0.245 | 0.000 |
-| 0.3–0.4 | 2 | 0.340 | 0.500 | 0.347 | 0.200 |
-| 0.4–0.5 | 2 | 0.459 | 1.000 | 0.461 | 0.500 |
-| 0.5–0.6 | 4 | 0.533 | 0.250 | 0.540 | 0.333 |
-| 0.6–0.7 | 3 | 0.631 | 0.667 | 0.658 | 0.714 |
-| 0.7–0.8 | 4 | 0.755 | 0.250 | 0.748 | 0.688 |
-| 0.8–0.9 | 5 | 0.868 | 0.600 | 0.831 | 0.600 |
-| 0.9–1.0 | 51 | 0.979 | 0.745 | 0.963 | 0.842 |
+| 0.0–0.1 | 5 | 0.055 | 0.200 | 0.046 | 0.250 |
+| 0.1–0.2 | 2 | 0.133 | 0.000 | 0.105 | 0.000 |
+| 0.2–0.3 | 5 | 0.240 | 0.000 | 0.240 | 0.000 |
+| 0.3–0.4 | 2 | 0.342 | 0.500 | 0.338 | 0.200 |
+| 0.4–0.5 | 1 | 0.430 | 1.000 | 0.454 | 0.250 |
+| 0.5–0.6 | 5 | 0.526 | 0.400 | 0.546 | 0.625 |
+| 0.6–0.7 | 3 | 0.628 | 0.667 | 0.655 | 0.611 |
+| 0.7–0.8 | 4 | 0.727 | 0.250 | 0.758 | 0.667 |
+| 0.8–0.9 | 5 | 0.865 | 0.600 | 0.853 | 0.571 |
+| 0.9–1.0 | 51 | 0.978 | 0.725 | 0.970 | 0.882 |
 
 **Accuracy against coverage**, pooled, on calibrated probabilities.
 
 | Threshold | Coverage | Answered | Accuracy answered | Accuracy abstained |
 |---:|---:|---:|---:|---:|
-| 0.50 | 100.0% | 83 | 71.1% | n/a |
-| 0.60 | 88.0% | 73 | 75.3% | 40.0% |
-| 0.70 | 65.1% | 54 | 75.9% | 62.1% |
-| 0.80 | 41.0% | 34 | 76.5% | 67.3% |
-| 0.90 | 27.7% | 23 | 82.6% | 66.7% |
-| 0.95 | 18.1% | 15 | 86.7% | 67.6% |
+| 0.50 | 100.0% | 83 | 72.3% | n/a |
+| 0.60 | 85.5% | 71 | 73.2% | 66.7% |
+| 0.70 | 57.8% | 48 | 77.1% | 65.7% |
+| 0.80 | 34.9% | 29 | 79.3% | 68.5% |
+| 0.90 | 25.3% | 21 | 85.7% | 67.7% |
+| 0.95 | 18.1% | 15 | 86.7% | 69.1% |
 
 
 ## Limitations

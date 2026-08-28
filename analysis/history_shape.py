@@ -169,7 +169,7 @@ def build_public_report(
     tz: tzinfo,
     generated_at: datetime,
     source: Path,
-    redirects_excluded: int,
+    chain_interiors_excluded: int,
     browser: str,
 ) -> str:
     """The committed report. Aggregates only — no domain names, no per-domain counts."""
@@ -265,7 +265,7 @@ per category and therefore more labelled days.
 | Measure | Value |
 |---|---:|
 | Visits (chosen navigations) | {len(visits):,} |
-| Redirect hops excluded | {redirects_excluded:,} |
+| Chain interiors excluded | {chain_interiors_excluded:,} |
 | History span | {span_days:,.1f} days |
 | Distinct registrable domains | {len({v.domain for v in visits}):,} |
 | Days with any browsing | {len(per_day):,} |
@@ -455,19 +455,26 @@ def main() -> int:
     slug = args.browser.strip().lower().replace(" ", "-")
     copy_path = data_dir / f"history-{slug}.copy"
 
-    print(f"Copying {source} -> {copy_path}")
-    print("  (the original is opened read-only and never modified)")
-    copy_history_db(source, copy_path)
+    # Passing an existing `.copy` re-reads it in place. A report has to be regenerable
+    # when a corpus definition changes (D78) without opening a live browser's profile
+    # again — the browser may have moved on, and then the report would describe a
+    # different corpus than the one every other benchmark was computed from.
+    if source.resolve() == copy_path.resolve():
+        print(f"Reading {copy_path} in place (already a copy)")
+    else:
+        print(f"Copying {source} -> {copy_path}")
+        print("  (the original is opened read-only and never modified)")
+        copy_history_db(source, copy_path)
 
     load = reader.load_visits if reader is not None else load_visits
     visits = load(copy_path)
     # Redirect hops are recorded as visits but nobody chose to go there. Counting them
     # is what buried the within-session mode on the first run of this script.
-    with_redirects = load(copy_path, exclude_redirects=False)
-    redirects_excluded = len(with_redirects) - len(visits)
+    everything = load(copy_path, view="raw")
+    excluded = len(everything) - len(visits)
     print(
-        f"Loaded {len(visits):,} chosen navigations "
-        f"({redirects_excluded:,} redirect hops excluded)."
+        f"Loaded {len(visits):,} landing pages "
+        f"({excluded:,} of {len(everything):,} visits excluded as chain interiors)."
     )
     if not visits:
         print("No visits found. Nothing to measure — is this the right profile?")
@@ -484,7 +491,7 @@ def main() -> int:
             tz=tz,
             generated_at=datetime.now().astimezone(),
             source=source,
-            redirects_excluded=redirects_excluded,
+            chain_interiors_excluded=excluded,
             browser=args.browser,
         ),
         encoding="utf-8",

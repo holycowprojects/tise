@@ -11,6 +11,12 @@ Two things about this file bite everyone who touches it:
 **The duration trap.** `visits.visit_duration` exists here and does *not* exist in the
 `chrome.history` extension API. Anything computed from `duration_seconds` belongs to the
 `full` compat class and can never ship. See SPEC.md.
+
+**The redirect trap** (D78). The file holds every hop of a redirect chain; the API hands
+over only the chain's end. So the file and the product disagree about what a visit *is*,
+and reading the file naively builds a corpus the extension could never have collected.
+`view` names which dataset you are asking for, and there is no safe default beyond the
+one that matches what ships.
 """
 
 from __future__ import annotations
@@ -21,22 +27,40 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Literal
 from urllib.parse import urlsplit
 
 from tise_research.categories import load_multi_part_suffixes
 
 __all__ = [
+    "DEFAULT_VIEW",
     "SECONDS_1601_TO_1970",
     "Visit",
+    "VisitView",
     "copy_history_db",
     "datetime_to_webkit",
     "default_history_path",
+    "is_chain_end",
     "is_redirect",
     "load_visits",
     "registrable_domain",
     "transition_core",
     "webkit_to_datetime",
 ]
+
+#: Which dataset a read produces. These are three different corpora, not three settings.
+#:
+#: - ``shipped`` — chain ends only, which is what `chrome.history` hands the extension.
+#:   Every benchmark uses this, because a number computed on visits the product cannot
+#:   see describes a model that was never run.
+#: - ``chosen`` — drops visits carrying a redirect bit. The pre-D78 default, kept so the
+#:   superseded numbers stay reproducible rather than merely quoted. It keeps redirect
+#:   chain *starts*, which are plumbing, and drops the landing pages, which are not.
+#: - ``raw`` — every visit, hops included. For measuring what the filters do, never for
+#:   modelling: T1 found it pushes the median inter-visit gap to about a second.
+VisitView = Literal["shipped", "chosen", "raw"]
+
+DEFAULT_VIEW: VisitView = "shipped"
 
 # 369 years, including 89 leap days, between 1601-01-01 and 1970-01-01.
 SECONDS_1601_TO_1970 = 11_644_473_600
@@ -70,6 +94,18 @@ SUBFRAME_TRANSITIONS = frozenset({"auto_subframe", "manual_subframe"})
 CLIENT_REDIRECT = 0x4000_0000
 SERVER_REDIRECT = 0x8000_0000
 REDIRECT_MASK = CLIENT_REDIRECT | SERVER_REDIRECT
+
+# Chain markers. A redirect chain runs from a CHAIN_START visit to a CHAIN_END one, with
+# the hops in between. **The `chrome.history` API hands over chain ends only** (D78,
+# measured: 98.5% of chain-end visits reached a real export against 8.7% of the rest), so
+# this bit — not the redirect mask — decides what the shipped extension can ever see.
+#
+# The two are not complements. A chain *start* such as `google.com/url?...` carries no
+# redirect bit at all, so filtering on the mask keeps the plumbing and discards the page
+# the person actually landed on. That is backwards, and it was the corpus every published
+# benchmark was computed on until D78.
+CHAIN_START = 0x1000_0000
+CHAIN_END = 0x2000_0000
 
 # --- Public suffix handling ---------------------------------------------------------
 #
@@ -112,6 +148,15 @@ def transition_core(raw: int) -> str:
 def is_redirect(raw: int) -> bool:
     """Whether this visit is a redirect hop rather than a chosen navigation."""
     return bool(raw & REDIRECT_MASK)
+
+
+def is_chain_end(raw: int) -> bool:
+    """Whether this visit ends a redirect chain, and so reaches the history API.
+
+    This is the *product-visible* test. `is_redirect` describes the file; this describes
+    what the extension is given. See D78 and `analysis/import_simulation.py`.
+    """
+    return bool(raw & CHAIN_END)
 
 
 def _is_ip_literal(host: str) -> bool:
@@ -205,17 +250,17 @@ ORDER BY v.visit_time
 def load_visits(
     db_path: Path,
     *,
+    view: VisitView = DEFAULT_VIEW,
     exclude_subframes: bool = True,
-    exclude_redirects: bool = True,
 ) -> list[Visit]:
     """Read every visit from a *copy* of the history database.
 
     Returns visits in chronological order, reduced to registrable domains. Visits whose
     URL is not web browsing (extension pages, `file://`, localhost) are dropped.
 
-    Subframes and redirect hops are excluded by default because neither is a person
-    deciding to go somewhere, and both distort the gap distribution the session boundary
-    is derived from.
+    `view` selects which of three genuinely different datasets this is; see `VisitView`.
+    The default is `shipped`, because a benchmark computed on visits the extension can
+    never be given describes a model that was never run.
     """
     uri = f"file:{db_path.as_posix()}?mode=ro"
     connection = sqlite3.connect(uri, uri=True)
@@ -226,7 +271,9 @@ def load_visits(
             domain = registrable_domain(url)
             if domain is None:
                 continue
-            if exclude_redirects and is_redirect(raw_transition):
+            if view == "shipped" and not is_chain_end(raw_transition):
+                continue
+            if view == "chosen" and is_redirect(raw_transition):
                 continue
             transition = transition_core(raw_transition)
             if exclude_subframes and transition in SUBFRAME_TRANSITIONS:

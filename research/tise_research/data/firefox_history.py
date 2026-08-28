@@ -6,6 +6,12 @@ Firefox is not Chromium and nothing transfers:
   Reusing the Chrome conversion puts every visit in the wrong millennium.
 * Visits are `moz_historyvisits` joined to `moz_places` on `place_id`.
 * Redirects and subframes are distinct `visit_type` values, not bit flags.
+* **The redirect flag sits on the opposite end of the chain.** Chrome marks the hops;
+  Firefox marks the visit that was redirected *to*, so a landing page reached through a
+  301 carries `redirect_permanent`. Dropping those types therefore keeps the plumbing and
+  discards the page the person landed on — the same inversion D78 found in the Chromium
+  reader, arrived at from the other direction. There is no chain-end bit here, so it is
+  reconstructed: a visit is a chain end when no redirect visit points back at it.
 * **There is no duration column at all.** Firefox is `history`-class throughout — which
   makes it, incidentally, an honest preview of what the shipped extension actually sees.
 
@@ -20,7 +26,12 @@ from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from tise_research.data.chrome_history import Visit, registrable_domain
+from tise_research.data.chrome_history import (
+    DEFAULT_VIEW,
+    Visit,
+    VisitView,
+    registrable_domain,
+)
 
 __all__ = [
     "default_places_path",
@@ -117,18 +128,33 @@ def default_places_path() -> Path | None:
 
 
 _VISITS_QUERY = """
-SELECT v.visit_date, v.visit_type, p.url
+SELECT v.id, v.from_visit, v.visit_date, v.visit_type, p.url
 FROM moz_historyvisits AS v
 JOIN moz_places AS p ON p.id = v.place_id
 ORDER BY v.visit_date
 """
 
+_REDIRECT_SOURCES_QUERY = f"""
+SELECT DISTINCT from_visit FROM moz_historyvisits
+WHERE from_visit != 0 AND visit_type IN ({",".join(str(t) for t in sorted(REDIRECT_TYPES))})
+"""
+
+
+def _redirect_sources(connection: sqlite3.Connection) -> set[int]:
+    """Visits that something was redirected away from — every link in a chain but the last.
+
+    Firefox has no chain-end bit, so this is the reconstruction. A visit nothing redirects
+    away from is where the person ended up, which is the only thing the shipped extension
+    would ever be told about on Chromium (D78).
+    """
+    return {row[0] for row in connection.execute(_REDIRECT_SOURCES_QUERY)}
+
 
 def load_visits(
     db_path: Path,
     *,
+    view: VisitView = DEFAULT_VIEW,
     exclude_subframes: bool = True,
-    exclude_redirects: bool = True,
     exclude_downloads: bool = True,
 ) -> list[Visit]:
     """Read every visit from a *copy* of `places.sqlite`.
@@ -136,17 +162,25 @@ def load_visits(
     Returns the same `Visit` objects the Chromium parser produces, with
     `duration_seconds` always None — Firefox does not record it, and neither does the
     `chrome.history` API the extension has to use.
+
+    `view` means what it means in the Chromium reader, so the two corpora stay
+    comparable. Tise does not run on Firefox, so `shipped` here is not what any product
+    saw; it is the same *definition of a visit*, which is what cross-corpus fold counts
+    need in order to mean anything.
     """
     uri = f"file:{db_path.as_posix()}?mode=ro"
     connection = sqlite3.connect(uri, uri=True)
     try:
-        rows: Iterator[tuple[int, int, str]] = connection.execute(_VISITS_QUERY)
+        redirect_sources = _redirect_sources(connection) if view == "shipped" else set()
+        rows: Iterator[tuple[int, int, int, int, str]] = connection.execute(_VISITS_QUERY)
         visits: list[Visit] = []
-        for visit_date, raw_type, url in rows:
+        for visit_id, _from_visit, visit_date, raw_type, url in rows:
             domain = registrable_domain(url)
             if domain is None:
                 continue
-            if exclude_redirects and is_redirect(raw_type):
+            if view == "shipped" and visit_id in redirect_sources:
+                continue
+            if view == "chosen" and is_redirect(raw_type):
                 continue
             if exclude_subframes and is_subframe(raw_type):
                 continue

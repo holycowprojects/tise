@@ -15,6 +15,7 @@ from pathlib import Path
 
 from tise_research.categories import CategoryMap, load_category_map
 from tise_research.data import firefox_history
+from tise_research.data.chrome_history import DEFAULT_VIEW, VisitView
 from tise_research.data.chrome_history import load_visits as load_chromium_visits
 from tise_research.features.events import Event
 from tise_research.features.labels import DEFAULT_HORIZON_HOURS, Label, return_24h_labels
@@ -32,8 +33,14 @@ def load_events(
     *,
     category_map: CategoryMap | None = None,
     overrides: dict[str, str] | None = None,
+    view: VisitView = DEFAULT_VIEW,
 ) -> list[Event]:
-    """Read a history copy and resolve every visit to a categorised event."""
+    """Read a history copy and resolve every visit to a categorised event.
+
+    `view` is passed straight through and decides which corpus this is (D78). Both
+    readers accept the same three names, so a benchmark run across browsers is comparing
+    one definition of a visit rather than two.
+    """
     resolved_map = category_map or load_category_map()
     load = firefox_history.load_visits if _is_firefox(copy_path) else load_chromium_visits
 
@@ -49,7 +56,7 @@ def load_events(
             dwell_seconds=visit.duration_seconds,
             source="import",
         )
-        for index, visit in enumerate(load(copy_path))
+        for index, visit in enumerate(load(copy_path, view=view))
     ]
 
 
@@ -60,9 +67,12 @@ def load_labels(
     horizon_hours: float = DEFAULT_HORIZON_HOURS,
     category_map: CategoryMap | None = None,
     overrides: dict[str, str] | None = None,
+    view: VisitView = DEFAULT_VIEW,
 ) -> list[Label]:
     """Read a history copy and produce `return_24h` labels."""
-    events = load_events(copy_path, category_map=category_map, overrides=overrides)
+    events = load_events(
+        copy_path, category_map=category_map, overrides=overrides, view=view
+    )
     return return_24h_labels(
         events, timeout_seconds=timeout_seconds, horizon_hours=horizon_hours
     )

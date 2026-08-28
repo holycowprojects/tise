@@ -285,6 +285,8 @@ working and committable.
 
 - [ ] **T16 · Model tournament and benchmark report** · M · deps: T13
   - Identical folds for every model; report the XGBoost-vs-shipped gap; one documented failure
+  - **Still to do:** confidence intervals; the cumulative-feature transform (chosen blind);
+    the tournament itself. The corpus sub-task below is done and every benchmark re-run
   - Verify: `uv run pytest research/tests/test_baseline_gate.py`
   - **Confidence intervals are the gate on every T11 claim.** "Wins 2 of 5 folds" on ~55
     test labels a fold may be indistinguishable from noise, and until intervals exist that
@@ -292,9 +294,20 @@ working and committable.
   - **Cumulative features extrapolate** — 77.5% of Edge test rows sit outside the fitted
     range of `hoursSinceFirstSeen`. Any transform must be chosen without looking at the
     current scores, or it is fitted to the test set (D60)
-  - **Corpus comparability is broken and the benchmarks depend on it** (D65). The research
-    view and the extension disagree on 7.7% of events — matching totals hid it. Decide
-    one view, re-run every number in `docs/benchmarks/`, do not argue it
+  - [x] **Corpus comparability — settled and re-run** (D78). Not a choice between three
+    fixes: the premise was wrong. **`chrome.history` returns only redirect-chain *ends***
+    — 98.5% of chain-end visits reached a real export against 8.7% of everything else,
+    measured by joining the export's `imp_<visitId>` ids to the file's visit ids. So the
+    research tier's `REDIRECT_MASK` filter kept chain *starts* (`google.com/url`, which
+    carry no redirect bit) and threw away landing pages. Three named views now, default
+    `shipped`; Firefox reconstructs the same definition from `from_visit`. Simulating
+    both stages reproduces the real export to **1.5%**, against 7.7%
+  - **The corpus fix did not rescue the model, and that is the result.** Chrome improves
+    (0.2195 → 0.2099, 2→3 folds), Edge and Firefox get slightly worse, fold total
+    unchanged at 8 of 15, D28's Edge bar identical to 4dp. D60 survives intact
+  - **A break that failed nothing, again** (D78): `load_events` could drop the `view` it
+    was handed and no test noticed — `corpus.py` had no test file at all. That is the one
+    door every published number comes through. `research/tests/test_corpus.py` closes it
 
 - [ ] **T17 · CI** · S · deps: T10
   - Both suites on push/PR; parity failure blocks; secret scanning + dependency audit
