@@ -38,7 +38,7 @@ import { FEATURE_NAMES, type FeatureName, type FeatureRow } from "../features/ve
  */
 export const NULLABLE_FEATURES = [
   "hoursSinceLastSeen",
-  "hoursSinceFirstSeen",
+  "firstSeenSaturation",
   "categoryShare30d",
   "priorReturnRate",
 ] as const satisfies readonly FeatureName[];

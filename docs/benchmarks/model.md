@@ -33,10 +33,10 @@ By point estimate alone, which is the weaker reading:
 
 - **Below the bar on:** history-edge, history-firefox
 - **Above the bar on:** history-chrome
-- Across every corpus the model wins **8 of 15 folds** — a model
+- Across every corpus the model wins **10 of 15 folds** — a model
   with no skill at all wins 7 or so by construction.
 
-**Read the second line before the first.** A pooled Brier rewards the *size* of a win, not its consistency, so a model can clear the bar while losing more folds than it wins. On **history-edge** it clears the bar while winning only 2 of 5 folds. The per-fold tables below are the honest picture.
+The pooled score and the fold count agree on every corpus here, which is the case where a single Brier is worth quoting. It is not guaranteed to stay that way, so both are reported.
 
 ## The pattern, and what is measured about it
 
@@ -60,21 +60,21 @@ to the test set. That work is T16.
 
 322 labels, base rate 71.4%, 5 folds.
 
-**Not established.** The point estimate is worse than the bar, and the 95% interval includes zero, so this corpus cannot tell the model and `category_base_rate` apart. Separating it from zero at this effect size would take roughly **1,167 test rows** against the 141 here — and only if the estimate survives collecting them.
+**Not established.** The point estimate is worse than the bar, and the 95% interval includes zero, so this corpus cannot tell the model and `category_base_rate` apart. Separating it from zero at this effect size would take roughly **4,710 test rows** against the 141 here — and only if the estimate survives collecting them.
 
 | Paired Brier difference (bar − model), positive favours the model | 95% interval |
 |---|---|
-| resampling **rows** (assumes labels are independent — they are not) | -0.0133 [-0.0438, +0.0163] |
-| resampling **categories** (12 clusters, the defensible bound) | -0.0133 [-0.0608, +0.0156] |
+| resampling **rows** (assumes labels are independent — they are not) | -0.0060 [-0.0372, +0.0239] |
+| resampling **categories** (12 clusters, the defensible bound) | -0.0060 [-0.0466, +0.0230] |
 
 A model no better than the bar wins **3 of 5** folds or more with probability **0.50**, so the fold count is not evidence here either.
 
-Point estimate: **does not clear the bar**, 0.2096 against 0.1963. It wins 3 of 5 folds once `unknown` is excluded from both sides.
+Point estimate: **does not clear the bar**, 0.2024 against 0.1963. It wins 3 of 5 folds once `unknown` is excluded from both sides.
 
 | Model | Brier | Log loss | Skill vs base rate |
 |---|---:|---:|---:|
 | `category_base_rate` *(the bar)* | 0.1963 | 0.5854 | +0.090 |
-| `logreg_fs2` **(the model)** | 0.2096 | 0.7472 | +0.029 |
+| `logreg_fs3` **(the model)** | 0.2024 | 0.6970 | +0.062 |
 | `global_base_rate` | 0.2158 | 0.6254 | +0.000 |
 | `time_of_day` | 0.2240 | 0.6427 | -0.038 |
 | `majority_class` | 0.2908 | 4.0173 | -0.348 |
@@ -86,13 +86,13 @@ Pooled over every fold's test predictions, `unknown` excluded (D27).
 
 | Fold | Train | Test | `logreg_fs2` | `category_base_rate` | Winner |
 |---:|---:|---:|---:|---:|---|
-| 0 | 128 | 26 | 0.1414 | 0.1469 | model |
-| 1 | 166 | 30 | 0.0738 | 0.0941 | model |
-| 2 | 204 | 30 | 0.3508 | 0.2806 | **baseline** |
-| 3 | 242 | 26 | 0.1367 | 0.1590 | model |
-| 4 | 280 | 29 | 0.3305 | 0.2927 | **baseline** |
+| 0 | 128 | 26 | 0.1397 | 0.1469 | model |
+| 1 | 166 | 30 | 0.0682 | 0.0941 | model |
+| 2 | 204 | 30 | 0.3323 | 0.2806 | **baseline** |
+| 3 | 242 | 26 | 0.1466 | 0.1590 | model |
+| 4 | 280 | 29 | 0.3129 | 0.2927 | **baseline** |
 
-Worst gradient norm at the end of any fold's fit: `4.06e-06`. That is small but
+Worst gradient norm at the end of any fold's fit: `8.56e-06`. That is small but
 it is not zero, so "converged" is the wrong word — see `convergence-budget.md`, which
 measures what a five-times-longer fit does to these numbers. A poor score here is the
 model being wrong, not unfinished.
@@ -101,32 +101,32 @@ model being wrong, not unfinished.
 
 | Feature | Test rows outside the training range |
 |---|---:|
-| `hoursSinceFirstSeen` | 67.5% |
-| `priorSessionCount` | 24.2% |
+| `firstSeenSaturation` | 67.5% |
 | `eventCount7d` | 19.1% |
 | `eventCount30d` | 12.4% |
 | `sessionCount7d` | 9.8% |
 | `hourOfDay` | 5.2% |
+| `sessionEventCount` | 4.6% |
 
 
 ### history-edge
 
 503 labels, base rate 69.2%, 5 folds.
 
-**Not established.** The point estimate is better than the bar, and the 95% interval includes zero, so this corpus cannot tell the model and `category_base_rate` apart. Separating it from zero at this effect size would take roughly **1,151 test rows** against the 271 here — and only if the estimate survives collecting them.
+**Not established.** The point estimate is better than the bar, and the 95% interval includes zero, so this corpus cannot tell the model and `category_base_rate` apart. Separating it from zero at this effect size would take roughly **1,687 test rows** against the 271 here — and only if the estimate survives collecting them.
 
 | Paired Brier difference (bar − model), positive favours the model | 95% interval |
 |---|---|
-| resampling **rows** (assumes labels are independent — they are not) | +0.0130 [-0.0071, +0.0319] |
-| resampling **categories** (12 clusters, the defensible bound) | +0.0130 [-0.0138, +0.0397] |
+| resampling **rows** (assumes labels are independent — they are not) | +0.0124 [-0.0085, +0.0318] |
+| resampling **categories** (12 clusters, the defensible bound) | +0.0124 [-0.0210, +0.0410] |
 
-A model no better than the bar wins **2 of 5** folds or more with probability **0.81**, so the fold count is not evidence here either.
+A model no better than the bar wins **3 of 5** folds or more with probability **0.50**, so the fold count is not evidence here either.
 
-Point estimate: **clears the bar**, 0.1124 against 0.1254. It wins 2 of 5 folds once `unknown` is excluded from both sides.
+Point estimate: **clears the bar**, 0.1129 against 0.1254. It wins 3 of 5 folds once `unknown` is excluded from both sides.
 
 | Model | Brier | Log loss | Skill vs base rate |
 |---|---:|---:|---:|
-| `logreg_fs2` **(the model)** | 0.1124 | 0.4015 | +0.410 |
+| `logreg_fs3` **(the model)** | 0.1129 | 0.3911 | +0.407 |
 | `category_base_rate` *(the bar)* | 0.1254 | 0.4141 | +0.342 |
 | `majority_class` | 0.1661 | 2.2941 | +0.128 |
 | `time_of_day` | 0.1871 | 0.5632 | +0.017 |
@@ -139,13 +139,13 @@ Pooled over every fold's test predictions, `unknown` excluded (D27).
 
 | Fold | Train | Test | `logreg_fs2` | `category_base_rate` | Winner |
 |---:|---:|---:|---:|---:|---|
-| 0 | 201 | 56 | 0.0655 | 0.1535 | model |
-| 1 | 261 | 53 | 0.0749 | 0.1233 | model |
-| 2 | 321 | 54 | 0.1241 | 0.1203 | **baseline** |
-| 3 | 381 | 55 | 0.1537 | 0.0909 | **baseline** |
-| 4 | 441 | 53 | 0.1446 | 0.1385 | **baseline** |
+| 0 | 201 | 56 | 0.0643 | 0.1535 | model |
+| 1 | 261 | 53 | 0.0745 | 0.1233 | model |
+| 2 | 321 | 54 | 0.1268 | 0.1203 | **baseline** |
+| 3 | 381 | 55 | 0.1621 | 0.0909 | **baseline** |
+| 4 | 441 | 53 | 0.1377 | 0.1385 | model |
 
-Worst gradient norm at the end of any fold's fit: `2.41e-05`. That is small but
+Worst gradient norm at the end of any fold's fit: `3.64e-05`. That is small but
 it is not zero, so "converged" is the wrong word — see `convergence-budget.md`, which
 measures what a five-times-longer fit does to these numbers. A poor score here is the
 model being wrong, not unfinished.
@@ -154,8 +154,8 @@ model being wrong, not unfinished.
 
 | Feature | Test rows outside the training range |
 |---|---:|
-| `hoursSinceFirstSeen` | 76.8% |
-| `priorSessionCount` | 42.1% |
+| `firstSeenSaturation` | 76.8% |
+| `priorSessionRate` | 38.7% |
 | `eventCount30d` | 30.1% |
 | `priorReturnRate` | 13.2% |
 | `sessionCount7d` | 10.6% |
@@ -166,20 +166,20 @@ model being wrong, not unfinished.
 
 173 labels, base rate 64.2%, 5 folds.
 
-**Not established.** The point estimate is better than the bar, and the 95% interval includes zero, so this corpus cannot tell the model and `category_base_rate` apart. Separating it from zero at this effect size would take roughly **1,343 test rows** against the 83 here — and only if the estimate survives collecting them.
+**Not established.** The point estimate is better than the bar, and the 95% interval includes zero, so this corpus cannot tell the model and `category_base_rate` apart. Separating it from zero at this effect size would take roughly **808 test rows** against the 83 here — and only if the estimate survives collecting them.
 
 | Paired Brier difference (bar − model), positive favours the model | 95% interval |
 |---|---|
-| resampling **rows** (assumes labels are independent — they are not) | +0.0259 [-0.0302, +0.0837] |
-| resampling **categories** (10 clusters, the defensible bound) | +0.0259 [-0.0220, +0.1865] |
+| resampling **rows** (assumes labels are independent — they are not) | +0.0347 [-0.0203, +0.0918] |
+| resampling **categories** (10 clusters, the defensible bound) | +0.0347 [-0.0119, +0.2049] |
 
-A model no better than the bar wins **3 of 5** folds or more with probability **0.50**, so the fold count is not evidence here either.
+A model no better than the bar wins **4 of 5** folds or more with probability **0.19**, so the fold count is not evidence here either.
 
-Point estimate: **clears the bar**, 0.2219 against 0.2478. It wins 3 of 5 folds once `unknown` is excluded from both sides.
+Point estimate: **clears the bar**, 0.2131 against 0.2478. It wins 4 of 5 folds once `unknown` is excluded from both sides.
 
 | Model | Brier | Log loss | Skill vs base rate |
 |---|---:|---:|---:|
-| `logreg_fs2` **(the model)** | 0.2219 | 0.6789 | +0.137 |
+| `logreg_fs3` **(the model)** | 0.2131 | 0.6385 | +0.171 |
 | `category_base_rate` *(the bar)* | 0.2478 | 0.6983 | +0.036 |
 | `global_base_rate` | 0.2571 | 0.7106 | +0.000 |
 | `time_of_day` | 0.2575 | 0.7140 | -0.002 |
@@ -192,13 +192,13 @@ Pooled over every fold's test predictions, `unknown` excluded (D27).
 
 | Fold | Train | Test | `logreg_fs2` | `category_base_rate` | Winner |
 |---:|---:|---:|---:|---:|---|
-| 0 | 69 | 16 | 0.1668 | 0.2685 | model |
-| 1 | 89 | 17 | 0.1872 | 0.1719 | **baseline** |
-| 2 | 109 | 15 | 0.2357 | 0.2697 | model |
-| 3 | 129 | 18 | 0.2697 | 0.2994 | model |
-| 4 | 149 | 17 | 0.2455 | 0.2303 | **baseline** |
+| 0 | 69 | 16 | 0.1466 | 0.2685 | model |
+| 1 | 89 | 17 | 0.1859 | 0.1719 | **baseline** |
+| 2 | 109 | 15 | 0.2326 | 0.2697 | model |
+| 3 | 129 | 18 | 0.2753 | 0.2994 | model |
+| 4 | 149 | 17 | 0.2196 | 0.2303 | model |
 
-Worst gradient norm at the end of any fold's fit: `1.08e-06`. That is small but
+Worst gradient norm at the end of any fold's fit: `3.50e-06`. That is small but
 it is not zero, so "converged" is the wrong word — see `convergence-budget.md`, which
 measures what a five-times-longer fit does to these numbers. A poor score here is the
 model being wrong, not unfinished.
@@ -207,12 +207,12 @@ model being wrong, not unfinished.
 
 | Feature | Test rows outside the training range |
 |---|---:|
-| `hoursSinceFirstSeen` | 75.0% |
-| `priorSessionCount` | 30.8% |
+| `firstSeenSaturation` | 75.0% |
 | `eventCount30d` | 27.9% |
 | `hourOfDay` | 5.8% |
 | `hoursSinceLastSeen` | 2.9% |
 | `sessionCount7d` | 1.9% |
+| `priorSessionRate` | 1.9% |
 
 
 ## Limitations

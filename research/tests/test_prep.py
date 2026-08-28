@@ -9,7 +9,12 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from tise_research.features.vector import FEATURE_NAMES, FEATURE_SETS, FeatureRow
+from tise_research.features.vector import (
+    DEFAULT_FEATURE_SET,
+    FEATURE_NAMES,
+    FEATURE_SETS,
+    FeatureRow,
+)
 from tise_research.models.prep import (
     MISSING_SUFFIX,
     NULLABLE_FEATURES,
@@ -22,17 +27,32 @@ from tise_research.models.prep import (
 WINDOW_END = datetime(2026, 6, 1, tzinfo=UTC)
 
 
-def row(**overrides: float | None) -> FeatureRow:
-    """A feature row with every value at 1.0 unless named."""
-    values: dict[str, float | None] = dict.fromkeys(FEATURE_NAMES, 1.0)
+def build_row(feature_set: str, **overrides: float | None) -> FeatureRow:
+    """A feature row for a named set, every value 1.0 unless overridden.
+
+    The set is a parameter and the values follow from it. An earlier version filled from
+    `FEATURE_NAMES` while hardcoding `"fs_2"`, which was consistent only for as long as
+    the default never moved — and produced ten failures the moment it did.
+    """
+    values: dict[str, float | None] = dict.fromkeys(FEATURE_SETS[feature_set], 1.0)
     values.update(overrides)
     return FeatureRow(
         subject="video",
         window_end=WINDOW_END,
-        feature_set="fs_2",
+        feature_set=feature_set,
         compat="history",
         values=values,
     )
+
+
+def row(**overrides: float | None) -> FeatureRow:
+    """A row in whatever set currently ships."""
+    return build_row(DEFAULT_FEATURE_SET, **overrides)
+
+
+def fs2_row(**overrides: float | None) -> FeatureRow:
+    """An explicitly `fs_2` row, for the tests that need two sets to disagree."""
+    return build_row("fs_2", **overrides)
 
 
 class TestDesignColumns:
@@ -138,16 +158,8 @@ class TestLeakage:
 
 
 def fs3_row(**overrides: float | None) -> FeatureRow:
-    """An `fs_3` row, every value 1.0 unless named."""
-    values: dict[str, float | None] = dict.fromkeys(FEATURE_SETS["fs_3"], 1.0)
-    values.update(overrides)
-    return FeatureRow(
-        subject="video",
-        window_end=WINDOW_END,
-        feature_set="fs_3",
-        compat="history",
-        values=values,
-    )
+    """An explicitly `fs_3` row."""
+    return build_row("fs_3", **overrides)
 
 
 class TestTheFeatureSetTravelsWithTheRow:
@@ -196,9 +208,9 @@ class TestTheFeatureSetTravelsWithTheRow:
         """Two sets in one window means one of them is being read through the other's
         column order, and every coefficient after the first difference is mislabelled."""
         with pytest.raises(ValueError, match="mixed feature sets"):
-            fit_preprocessor([row(), fs3_row()])
+            fit_preprocessor([fs2_row(), fs3_row()])
 
     def test_an_fs2_row_cannot_be_transformed_by_an_fs3_preprocessor(self) -> None:
         fitted = fit_preprocessor([fs3_row(), fs3_row(priorSessionRate=0.5)])
         with pytest.raises(ValueError, match="fitted on"):
-            fitted.transform(row())
+            fitted.transform(fs2_row())

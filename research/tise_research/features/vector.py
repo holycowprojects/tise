@@ -56,7 +56,7 @@ __all__ = [
 #: Bumped whenever a feature is added, removed, or changes meaning. fs_1 was one feature;
 #: fs_2 is the full V1 set; fs_3 replaces the two features that grow with the calendar
 #: (D81). `fs_2` is what the extension ships until that is decided.
-DEFAULT_FEATURE_SET = "fs_2"
+DEFAULT_FEATURE_SET = "fs_3"
 FEATURE_SET = DEFAULT_FEATURE_SET
 
 #: Hours at which `firstSeenSaturation` reaches 0.5. Seven days, matching the 7-day

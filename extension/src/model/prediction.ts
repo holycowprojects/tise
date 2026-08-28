@@ -18,7 +18,13 @@
  * to do that?" will answer to be agreeable, and a benchmark built on agreeable answers
  * measures politeness.
  */
-import type { FeatureName, FeatureRow } from "../features/vector";
+import {
+  FIRST_SEEN_SCALE_HOURS,
+  PRIOR_SESSION_RATE_SCALE,
+  unsaturate,
+  type FeatureName,
+  type FeatureRow,
+} from "../features/vector";
 
 /**
  * `pending` — the window is still open.
@@ -130,6 +136,28 @@ function plural(count: number, one: string, many: string): string {
  * true but is not evidence *for* anything, and a list padded with absences reads as though
  * the model knew more than it did.
  */
+/**
+ * Recover the raw prior-session count from an `fs_3` row.
+ *
+ * `priorSessionRate` saturates `count / max(observedDays, 1)`, and `firstSeenSaturation`
+ * saturates the hours. Both are invertible, so the count is arithmetic rather than an
+ * estimate — and returning it keeps the evidence line able to say what a rate rests on,
+ * which is the difference between honest evidence and an overstated one.
+ *
+ * Null when the category was never seen before the window, which is when there are no
+ * prior sessions to count.
+ */
+export function priorSessionsFrom(row: FeatureRow): number | null {
+  const saturatedRate = row.values.priorSessionRate;
+  const saturatedHours = row.values.firstSeenSaturation;
+  if (saturatedRate === null || saturatedHours === null) return null;
+
+  const hours = unsaturate(saturatedHours, FIRST_SEEN_SCALE_HOURS);
+  const perDay = unsaturate(saturatedRate, PRIOR_SESSION_RATE_SCALE);
+  if (!Number.isFinite(hours) || !Number.isFinite(perDay)) return null;
+  return Math.round(perDay * Math.max(hours / 24, 1));
+}
+
 export function evidenceFor(row: FeatureRow): string[] {
   const value = (name: FeatureName): number | null => row.values[name];
   const lines: string[] = [];
@@ -161,8 +189,12 @@ export function evidenceFor(row: FeatureRow): string[] {
   // The strongest feature in the set (D52), so it is named explicitly along with how much
   // it rests on. A rate built on two sessions has to read differently from one built on
   // forty, or the evidence overstates itself.
+  //
+  // `fs_3` stores a saturated rate rather than the raw count (D82), so the count is
+  // recovered by inverting the two transforms. That is arithmetic on values the row
+  // already holds, not a reconstruction: it is exactly what `fs_2` used to store.
   const rate = value("priorReturnRate");
-  const priors = value("priorSessionCount");
+  const priors = priorSessionsFrom(row);
   if (rate !== null && priors !== null && priors > 0) {
     lines.push(
       `returned within a day after ${(rate * 100).toFixed(0)}% of the last ` +

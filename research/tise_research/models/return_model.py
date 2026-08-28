@@ -43,14 +43,22 @@ from tise_research.models.logreg import (
 )
 from tise_research.models.prep import Preprocessor, design_columns, fit_preprocessor
 
-__all__ = ["MODEL_NAME", "FeatureIndex", "ReturnModel", "make_return_model_fitter"]
-
-MODEL_NAME = "logreg_fs2"
+__all__ = [
+    "MODEL_NAME",
+    "FeatureIndex",
+    "ReturnModel",
+    "make_return_model_fitter",
+    "model_name",
+]
 
 
 def model_name(feature_set: str) -> str:
     """`logreg_fs2`, `logreg_fs3`. The set is in the name so a table cannot hide it."""
     return f"logreg_{feature_set.replace('_', '')}"
+
+
+#: The shipped model's name, which follows the shipped feature set (D82).
+MODEL_NAME = model_name(DEFAULT_FEATURE_SET)
 
 
 @dataclass(slots=True)

@@ -11,7 +11,12 @@
  * that makes MV3 killing the worker survivable rather than merely tolerable.
  */
 import { describe, expect, it } from "vitest";
-import { FEATURE_NAMES, type FeatureName, type FeatureRow } from "../src/features/vector";
+import {
+  FEATURE_NAMES,
+  FEATURE_SET,
+  type FeatureName,
+  type FeatureRow,
+} from "../src/features/vector";
 import {
   DEFAULT_SPEC,
   initialState,
@@ -50,7 +55,7 @@ function row(overrides: Partial<Record<FeatureName, number | null>> = {}): Featu
   return {
     subject: "video",
     windowEnd: WINDOW_END,
-    featureSet: "fs_2",
+    featureSet: FEATURE_SET,
     compat: "history",
     values: { ...values, ...overrides },
   };

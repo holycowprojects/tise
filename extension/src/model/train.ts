@@ -22,6 +22,7 @@
  */
 import { return24hLabels, type Label } from "../features/labels";
 import { computeFeatures, FEATURE_SET, type FeatureRow } from "../features/vector";
+import { migrateFeatureRows } from "./migrate";
 import { allEvents } from "../storage/events";
 import { allFeatureRows, putFeatureRows } from "../storage/features";
 import { allLabels, putLabels } from "../storage/labels";
@@ -133,13 +134,20 @@ export interface ChunkOutcome {
  * Events that have already expired are not revisited — their rows and labels were written
  * when they still existed and stay in the stores (D11). This adds to what is there; it
  * never prunes it.
+ *
+ * **The feature-set migration runs here**, before anything is recomputed, because this is
+ * the one function every path into the dataset passes through. Hooking the two callers
+ * instead would mean remembering at every future call site, and the failure would be
+ * silent: training would quietly see only the rows young enough to recompute. See D83.
  */
 export async function refreshDataset(options: {
   timeoutSeconds: number;
   horizonHours: number;
-}): Promise<{ rows: number; labels: number }> {
+}): Promise<{ rows: number; labels: number; migrated: number }> {
+  const { migrated } = await migrateFeatureRows();
+
   const events = await allEvents();
-  if (events.length === 0) return { rows: 0, labels: 0 };
+  if (events.length === 0) return { rows: 0, labels: 0, migrated };
 
   const labels: Label[] = return24hLabels(
     events,
@@ -152,7 +160,7 @@ export async function refreshDataset(options: {
 
   await putFeatureRows(rows);
   await putLabels(labels);
-  return { rows: rows.length, labels: labels.length };
+  return { rows: rows.length, labels: labels.length, migrated };
 }
 
 async function readTrainingSet(cutoff: string | null): Promise<{

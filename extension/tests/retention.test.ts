@@ -15,7 +15,7 @@ import {
   type Settings,
 } from "../src/storage/settings";
 import { allFeatureRows, countFeatureRows, putFeatureRows } from "../src/storage/features";
-import type { FeatureRow } from "../src/features/vector";
+import { FEATURE_SET, type FeatureRow } from "../src/features/vector";
 import type { TiseEvent } from "../src/types";
 
 const NOW = Date.parse("2026-08-26T12:00:00.000Z");
@@ -128,7 +128,7 @@ describe("feature rows outlive raw events (D11)", () => {
   const row = {
     subject: "video",
     windowEnd: new Date(NOW - 400 * DAY).toISOString(),
-    featureSet: "fs_2",
+    featureSet: FEATURE_SET,
     compat: "history" as const,
     values: { hoursSinceLastSeen: 1.5 },
   } as unknown as FeatureRow;

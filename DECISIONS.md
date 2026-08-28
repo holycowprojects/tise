@@ -2445,3 +2445,93 @@ Making `fs_3` the shipped set changes the `FeatureRow` schema, which is on the a
 list, and it requires the TypeScript mirror, a regenerated parity oracle, and every
 benchmark re-run on `fs_3`. None of that is done here. The research tier computes both sets;
 the product still computes one.
+
+### D83 — Shipping `fs_3`, and the migration that keeps D11's promise across a version bump
+
+Akash authorised the schema change. `fs_3` is now what the extension computes, stores and
+trains on, in both languages.
+
+**The thing that nearly went wrong.** Training filters stored rows to the current feature
+set, and `refreshDataset` can only recompute a row if the events behind it still exist. Raw
+events expire after thirty days; derived rows do not, and that asymmetry **is** the privacy
+design (D11) — a person keeps the model learned from their browsing without keeping the
+browsing. So a naive version bump would have stranded every row older than the retention
+window in `fs_2`, silently, and restarted the model from the last month of browsing. Nothing
+would have reported it: a smaller training set is not an error, it is just quietly worse.
+
+**Why a migration is possible here.** `fs_3`'s two features are pure arithmetic transforms
+of values `fs_2` already stored:
+
+    firstSeenSaturation = h / (h + 168)                     from hoursSinceFirstSeen
+    priorSessionRate    = r / (r + 1),  r = c / max(h/24,1) from both stored values
+
+So the conversion needs no events at all, and `migrate.test.ts` asserts the strong form
+rather than the convenient one: a migrated row is **identical** to the row `computeFeatures`
+would have written, checked across every label of a fortnight's corpus. Anything less would
+mean training on two subtly different definitions of one feature.
+
+That this works is luck the design earned rather than luck it was handed — D81 made the two
+features transforms of existing ones for simplicity, and this is the second thing that
+choice bought after `feature_transform.py`'s single-pass comparison.
+
+**It runs inside `refreshDataset`**, which is the one function every path into the dataset
+passes through. Hooking the two callers instead would mean remembering at every future call
+site, and the failure would be silent. Same reasoning as D72 hooking `saveSettings`.
+
+**Old rows are kept.** They are the only record of what the previous model was trained on,
+they cost little, and deleting them would make the migration irreversible for no gain. A
+recomputed `fs_3` row is never overwritten by a migrated one: rows built from events are
+authoritative over arithmetic on older rows.
+
+**The evidence line survives, by inverting the transform.** `prediction.ts` said "returned
+within a day after 70% of the last 40 sessions", and the count that qualifies the rate is no
+longer a feature. Saturation is invertible, so `priorSessionsFrom` recovers it exactly —
+this is arithmetic on values the row already holds, not a reconstruction, and a test checks
+the round-trip at several ages and counts. The qualification matters: a rate built on two
+sessions has to read differently from one built on forty, or the evidence overstates itself.
+
+**The parity suite bit, which is the whole reason it exists.** Changing TypeScript to `fs_3`
+against an `fs_2` oracle failed 15 tests immediately. Regenerating the oracle moved exactly
+the sections it should — `featureNames`, `featureSet`, `features`, `model` — and left
+`labels`, `sessions`, `resolutions` and `summary` byte-identical, which is checkable
+evidence that the change did what it claimed and nothing else.
+
+**What shipped `fs_3` scores.** Still nothing distinguishable from the bar, as expected —
+D82's improvement was `fs_3` over `fs_2`, not over `category_base_rate`:
+
+| corpus | Brier, `fs_2` → `fs_3` | vs bar, 95% (categories) | folds |
+|---|---|---|---|
+| Chrome | 0.2096 → 0.2024 | −0.0060 [−0.0466, +0.0230] | 3 of 5 |
+| Edge | 0.1124 → 0.1129 | +0.0124 [−0.0210, +0.0410] | 3 of 5 |
+| Firefox | 0.2219 → 0.2131 | +0.0347 [−0.0119, +0.2049] | 4 of 5 |
+
+Fold wins go from 8 of 15 to **10 of 15**. Every interval still includes zero, so the
+headline is unchanged and remains the honest one.
+
+**Calibration moved in two directions and is reported both ways.** `fs_3` is markedly better
+calibrated *before* Platt — Edge ECE 0.1803 → **0.1144**, Firefox 0.2480 → **0.1774** — and
+the Platt step then has less to do. After calibration Edge improves slightly (0.0706 →
+0.0678) while Chrome and Firefox get worse (0.1030 → 0.1133, 0.1066 → 0.1592). There are no
+intervals on ECE, so none of that is established, and it is recorded rather than explained.
+
+**A warning for the next feature set, which is the durable part of this entry.** This
+migration works because these particular features were derivable from stored ones. **A
+future feature needing anything not already in the row cannot be migrated this way**, and
+the honest options there are to recompute what the retention window still covers and say
+plainly what was lost. Post-launch that would silently reset every user's long-term training
+history. **The feature set should be frozen before the Web Store listing**, and if it is
+ever changed afterwards the release notes have to say what it costs.
+
+**Found by breaking it.** Four breaks, two of which initially failed nothing: migration
+overwriting freshly computed rows, and `refreshDataset` no longer migrating at all. The
+second was a genuine hole — nothing tested the choke point — and is now covered by two
+tests, including one asserting migration happens *with no events at all*, which is the case
+the whole mechanism exists for.
+
+**A methodology note, because it produced a false reading.** The first was not a hole: a
+shell-escaping accident in the break command had written NUL bytes into two template
+literals instead of applying the edit, so the "break" never applied and the suite passed for
+the wrong reason. Both occurrences were corrupted identically, so the key still matched
+itself and nothing failed. **A break that appears to fail nothing must be confirmed to have
+actually applied** — otherwise the technique reports a hole in the tests when the truth is a
+hole in the tooling.

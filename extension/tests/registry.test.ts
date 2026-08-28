@@ -27,13 +27,23 @@ import {
   type CoverageGap,
 } from "../src/storage/coverage";
 import { saveSettings } from "../src/storage/settings";
-import { assertStorablePrediction, evidenceFor, PREDICTION_FIELDS } from "../src/model/prediction";
+import {
+  assertStorablePrediction,
+  evidenceFor,
+  PREDICTION_FIELDS,
+  priorSessionsFrom,
+} from "../src/model/prediction";
 import type { Prediction } from "../src/model/prediction";
 import { resolveAll, resolveOutcome, type ResolutionContext } from "../src/model/resolve";
 import { updateRegistry } from "../src/model/registry";
 import { refreshDataset, runTrainingChunk } from "../src/model/train";
 import type { FeatureRow } from "../src/features/vector";
-import { FEATURE_NAMES } from "../src/features/vector";
+import {
+  FEATURE_NAMES,
+  FEATURE_SET,
+  firstSeenSaturation,
+  priorSessionRate,
+} from "../src/features/vector";
 import type { TiseEvent } from "../src/types";
 
 const HOUR = 3_600_000;
@@ -65,9 +75,9 @@ function prediction(overrides: Partial<Prediction> = {}): Prediction {
     windowStart,
     windowEnd: new Date(START + 24 * HOUR).toISOString(),
     abstained: false,
-    modelName: "logreg_fs2",
+    modelName: "logreg_fs3",
     modelVersion: "cal_1@2026-06-01T00:00:00.000Z",
-    featureSet: "fs_2",
+    featureSet: FEATURE_SET,
     dataCutoff: windowStart,
     evidence: ["seen on 3 days in the last week"],
     outcome: "pending",
@@ -446,7 +456,7 @@ describe("the whole loop, with a real trained model", () => {
     for (const stored of await allPredictions()) {
       expect(stored.modelName).toBe("logreg_fs2");
       expect(stored.modelVersion).toMatch(/^cal_1@/);
-      expect(stored.featureSet).toBe("fs_2");
+      expect(stored.featureSet).toBe(FEATURE_SET);
       expect(stored.dataCutoff).toBe(stored.windowStart);
     }
   });
@@ -477,7 +487,7 @@ describe("evidence", () => {
     return {
       subject: "video",
       windowEnd: new Date(START).toISOString(),
-      featureSet: "fs_2",
+      featureSet: FEATURE_SET,
       compat: "history",
       values: { ...base, ...values } as FeatureRow["values"],
     };
@@ -497,8 +507,39 @@ describe("evidence", () => {
 
   it("says how much the return rate rests on", () => {
     // A rate built on two sessions must read differently from one built on forty (D52).
-    const lines = evidenceFor(row({ priorReturnRate: 0.5, priorSessionCount: 2 }));
+    //
+    // `fs_3` stores a saturated rate, so the count is recovered by inverting both
+    // transforms. Building the row through the same functions the extension uses makes
+    // this a round-trip test as well: two sessions in, "2 sessions" out.
+    const lines = evidenceFor(
+      row({
+        priorReturnRate: 0.5,
+        firstSeenSaturation: firstSeenSaturation(7 * 24),
+        priorSessionRate: priorSessionRate(2, 7 * 24),
+      }),
+    );
     expect(lines.some((line) => line.includes("2 sessions"))).toBe(true);
+  });
+
+  it("recovers the prior session count exactly, across a range of them", () => {
+    // The inverse has to be exact rather than approximate, because the number it produces
+    // is shown to a person as evidence. Checked at several ages and counts, since the two
+    // transforms compose and an error in either would show up as an off-by-a-bit.
+    for (const hours of [24, 168, 24 * 90]) {
+      for (const count of [1, 2, 7, 40]) {
+        const recovered = priorSessionsFrom(
+          row({
+            firstSeenSaturation: firstSeenSaturation(hours),
+            priorSessionRate: priorSessionRate(count, hours),
+          }),
+        );
+        expect(recovered).toBe(count);
+      }
+    }
+  });
+
+  it("has no session count to report when the category was never seen", () => {
+    expect(priorSessionsFrom(row({ firstSeenSaturation: null }))).toBeNull();
   });
 
   it("gets singulars right, because evidence a person reads should read properly", () => {

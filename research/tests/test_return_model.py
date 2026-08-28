@@ -14,12 +14,14 @@ import pytest
 from tise_research.eval.metrics import brier_score
 from tise_research.features.events import Event
 from tise_research.features.labels import return_24h_labels
+from tise_research.features.vector import DEFAULT_FEATURE_SET
 from tise_research.models.baselines import fit_category_base_rate
 from tise_research.models.prep import design_columns
 from tise_research.models.return_model import (
     FeatureIndex,
     fit_return_model,
     make_return_model_fitter,
+    model_name,
 )
 
 TIMEOUT = 1800.0
@@ -162,4 +164,7 @@ class TestFeatureIndex:
         fit = make_return_model_fitter(index_for(events))
         model = fit(labels_for(events))
         assert callable(model.predict)
-        assert model.name == "logreg_fs2"
+        # The name follows the feature set, so a table can never show two sets under one
+        # label — which is exactly what a tournament comparing them would otherwise do.
+        assert model.name == model_name(DEFAULT_FEATURE_SET)
+        assert model.name == "logreg_fs3"

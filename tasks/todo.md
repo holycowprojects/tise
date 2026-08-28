@@ -286,8 +286,18 @@ working and committable.
 
 - [ ] **T16 · Model tournament and benchmark report** · M · deps: T13
   - Identical folds for every model; report the XGBoost-vs-shipped gap; one documented failure
-  - **Still to do:** the tournament itself, and shipping `fs_3` (a `FeatureRow` schema
-    change — ask first). Corpus, intervals and the feature transform are done
+  - **Still to do:** the tournament itself. Corpus, intervals, the feature transform and
+    **shipping `fs_3`** are done
+  - [x] **`fs_3` ships** (D83, Akash authorised). Both languages, oracle regenerated, and
+    the parity suite bit on the way — 15 failures against an `fs_2` oracle, then exactly
+    the four expected sections moved and `labels`/`sessions`/`resolutions` stayed
+    byte-identical. Fold wins 8 → **10 of 15**; every interval vs the bar still includes
+    zero, so the headline is unchanged
+  - **A feature-set change would have silently reset the model** — training filters to the
+    current set and `refreshDataset` can only recompute rows whose events survive. A
+    lossless migration was possible only because `fs_3`'s features are arithmetic on
+    stored `fs_2` values. **Freeze the feature set before the Web Store listing**: the next
+    change may not be migratable, and post-launch it resets every user's history
   - [x] **Cumulative features — transformed, and it worked** (D81 pre-registration, D82
     result). `hoursSinceFirstSeen` → `firstSeenSaturation` = `h/(h+168)`;
     `priorSessionCount` → `priorSessionRate` = sessions/day, `r/(r+1)`. Both scales

@@ -17,7 +17,7 @@ import { allFeatureRows, countFeatureRows, putFeatureRows } from "../src/storage
 import { allLabels, countLabels, putLabels } from "../src/storage/labels";
 import { enforceRetention } from "../src/storage/retention";
 import { DEFAULT_SETTINGS } from "../src/storage/settings";
-import { computeFeatures } from "../src/features/vector";
+import { computeFeatures, FEATURE_SET } from "../src/features/vector";
 import { return24hLabels } from "../src/features/labels";
 import { joinStored } from "../src/model/dataset";
 import { DEFAULT_SPEC, train } from "../src/model/logreg";
@@ -125,7 +125,7 @@ describe("turning browsing into training data", () => {
   });
 
   it("does nothing at all when there is no browsing yet", async () => {
-    expect(await refreshDataset(OPTIONS)).toEqual({ rows: 0, labels: 0 });
+    expect(await refreshDataset(OPTIONS)).toEqual({ rows: 0, labels: 0, migrated: 0 });
     expect(await countFeatureRows()).toBe(0);
   });
 
@@ -231,7 +231,7 @@ describe("chunked training", () => {
     }
 
     const model = await readModel();
-    expect(model?.featureSet).toBe("fs_2");
+    expect(model?.featureSet).toBe(FEATURE_SET);
     expect(model?.rowCount).toBe(await countLabels());
     expect(model?.positiveCount).toBeGreaterThan(0);
     expect(model?.positiveCount).toBeLessThan(model?.rowCount ?? 0);
