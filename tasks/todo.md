@@ -193,8 +193,15 @@ Work order: **T19 → T20 → T21 → then back to T14/T15/T17/T18.**
 **Akash's direction: Tise predicts all four.** D94 fixed every definition, bar, cluster unit
 and adoption rule **before implementation**. Nothing has been fitted to any of them.
 
-**Akash authorised the `tabs` permission and live collection** for T-D. `idle` was *not*
-explicitly authorised — ask before adding it.
+**Akash authorised `tabs` **and** `idle`, with live collection.** Both are optional
+permissions, consent-gated exactly as `history` already is.
+
+**`idle` fixes labels, not the model, which is worth more.** It turns "the tab was open" into
+"the person was present" — the caveat D93 named as able to account for its whole effect,
+since `visit_duration` records a tab left open overnight as deep engagement. It also replaces
+the 30-minute session timeout, a *declared guess* since D17 because T1 looked for an
+empirical trough in the gap distribution and **found none**. Every session-derived feature in
+the project rests on that guess.
 
 **The change that applies to all four:** every interval this project has published was
 resampled over **9–12 clusters**, because the subject has always been the category. D93's
