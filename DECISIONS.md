@@ -2535,3 +2535,91 @@ the wrong reason. Both occurrences were corrupted identically, so the key still 
 itself and nothing failed. **A break that appears to fail nothing must be confirmed to have
 actually applied** — otherwise the technique reports a hole in the tests when the truth is a
 hole in the tooling.
+
+### D84 — Pre-registering the tournament, before the challenger exists
+
+T16's last deliverable is the XGBoost-versus-shipped gap. It needs pre-registering for a
+reason that is the *mirror* of D81's, not a repeat of it. D81's risk was choosing a fix
+after seeing the scores. Here the scores are not the free parameter — **the challenger's
+strength is**, and I control it.
+
+XGBoost has dozens of hyperparameters. Tune them and report the best configuration, and
+the published gap is a maximum over many draws; on the 271 Edge test rows that maximum is
+mostly noise. Leave them at library defaults against training windows of **201 to 441
+rows** (`model.md`, Edge), and the challenger overfits, loses, and the shipped model wins
+against an opponent I quietly weakened. **Both failures produce a table indistinguishable
+from an honest one**, which is exactly the situation pre-registration exists for.
+
+**What this tournament can and cannot decide, stated before the result.** The extension
+trains in the browser, with a hand-written optimiser (D54) and one runtime dependency.
+XGBoost cannot ship at any score. So this is **not a model selection.** It measures what
+the shipping constraint costs, expressed as an interval. Writing that down now stops the
+result being written up afterwards as though a decision hung on it.
+
+**The challenger.** `xgboost`, pinned, in the research tier's **dev group only** — the
+tier whose `pyproject.toml` already says it "runs on the author's machine only; never
+shipped". It never enters the parity contract, has no TypeScript twin, and every table it
+appears in labels it research-only. Two configurations, both declared now, neither searched:
+
+1. **`xgb_small` — the primary.** `max_depth=3`, `n_estimators=100`, `learning_rate=0.05`,
+   `subsample=0.8`, `colsample_bytree=0.8`, `min_child_weight=5`, `reg_lambda=1.0`.
+   Library defaults assume ~10⁵ rows; these folds train on a few hundred. Depth 3 with
+   `min_child_weight=5` is the ordinary small-data posture — every leaf holds at least 5 of
+   ~300 rows. It is primary because it is the **stronger** challenger by argument, and the
+   shipped model should face the best opponent I can specify without searching for one.
+2. **`xgb_default` — secondary.** Library defaults, untouched: what a reviewer gets out of
+   the box. Reported so that a loss cannot be blamed on my configuring XGBoost badly, nor a
+   win credited to my configuring it well.
+
+**No hyperparameter search will be run in T16.** If one ever is, it gets its own entry
+saying so, and every number after it is a number from a search.
+
+**Determinism.** `random_state=0`, `n_jobs=1`, `tree_method="exact"`, and the resolved
+library version printed in the report. SPEC.md invariant 3 wants a committed script behind
+every number; a number that moves between runs of that script does not satisfy it.
+
+**One deliberate asymmetry, named now rather than discovered later.** The challenger is
+fitted through the same `extra_models` hook, on the same `Fold` objects, from the same
+`fs_3` `FeatureIndex` — so the rows are identical. But it is given **nulls as `NaN` and
+uses XGBoost's own missing-direction learning**, rather than the mean-imputation in
+`prep.py` that the linear model needs. Standardisation would have been neutral (tree splits
+are invariant to a monotone per-column transform); imputation is not. The fair challenger is
+the one a competent practitioner would build, and they would pass `NaN`. The consequence is
+registered too: **any gap measured here includes whatever the better missing handling is
+worth**, and the report prints the null counts so a reader can judge how much of it that
+could be.
+
+**Predictions, recorded now.**
+
+1. **`xgb_default` scores worse than the shipped model on at least one corpus** by point
+   estimate, from overfitting a few hundred rows with depth-6 trees.
+2. **`xgb_small` beats the shipped model on at least one corpus** by point estimate. Trees
+   split on the category directly and can represent interactions that 18 linear columns
+   cannot.
+3. **No paired interval between `xgb_small` and the shipped model excludes zero on Edge.**
+   This one is stated carefully rather than by reflex, because D82 caught the reflex out:
+   interval width is a property of the comparison, and `fs_2` versus `fs_3` separated easily
+   *because* they shared 12 of 14 features and their per-row differences were tiny. A tree
+   ensemble and a linear fit share no structure, so their per-row differences should be
+   large and variable and the interval wide. **This is the prediction most likely to be
+   wrong, and the one worth being wrong about.**
+
+**The adoption rule, fixed now.**
+
+- Whatever the result, **`logreg_fs3` remains what ships.** There is no outcome of this
+  tournament that changes the extension in T16.
+- The result opens a follow-up task **only if** `xgb_small`'s paired interval against the
+  shipped model excludes zero **in the challenger's favour, under the subject-cluster unit,
+  on Edge**. Point estimates do not qualify, and fold counts especially do not — D80 settled
+  that they were never evidence.
+- If it fires, the follow-up is scoped as *investigate a shippable nonlinear model* and
+  nothing further. A shallow tree is a sequence of comparisons and could in principle be
+  written in TypeScript; a win here would be evidence worth costing, not a mandate.
+- **The number reported as "the gap" is the interval, not the point estimate.**
+
+**The failure case, chosen by rule so it cannot be shopped for.** T16 also owes one
+documented failure. It is the single pooled Edge test row with the **largest squared error**
+from the shipped model, `unknown` excluded: its category, its feature vector, the
+probability given, the outcome, and the evidence line the UI would have shown. Selected by
+`max`, not by hunting for a good story — and if the worst row turns out to be dull, the dull
+one is what gets published.
