@@ -22,6 +22,10 @@ packages = ["research/tise_research"]
 
 [tool.pytest.ini_options]
 testpaths = ["research/tests"]
+# `analysis/` is scripts rather than an installed package, but the ones that write a
+# committed report carry real logic — D86's monotone verdict is a published structural
+# claim — and untested logic behind a published number is the thing this repo is about.
+pythonpath = ["."]
 markers = [
     "parity: TypeScript/Python feature parity. CI-blocking from T17.",
 ]

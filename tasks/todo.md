@@ -318,8 +318,21 @@ working and committable.
   - **The documented failure is not dull.** Edge `video`, Saturday 2026-08-08: 373 events
     in 7 days, seen all 7, 51.5% of 30-day activity, 89.3% prior return rate, last seen
     **4 minutes** earlier. Tise said **99.1%**; the person did not return. Squared error
-    0.9831 of 1.0. **A missing feature, not a calibration failure** — `dayOfWeek` is a
-    plain integer, so one coefficient must express "Saturday", and Platt cannot reach that
+    0.9831 of 1.0. **A mis-encoded feature, not a calibration failure**, and Platt cannot
+    reach it
+  - **D85 explained that row as a weekend effect and the explanation was wrong** (D86).
+    Measured: Edge Saturday returns at **74.6% against 71.6% overall** — an *above*-average
+    day. A causal claim with no number behind it is invariant 3's failure wearing prose,
+    and prose fails no test. The conclusion survived; the argument for it did not
+  - **The replacement is measured and stronger.** Day-of-week is **non-monotone on all
+    three corpora** — Chrome 29.2-point spread, Edge 21.1, Firefox 18.5, peaks disagreeing
+    — and one linear coefficient on an integer 0–6 cannot represent that in either
+    direction. `docs/benchmarks/day-of-week.md`. **Nothing was changed and no feature was
+    added**; a `sin`/`cos` pair would be a losslessly migratable `fs_4`, needing D81-style
+    pre-registration first
+  - **The width ladder was not pre-registered** (D86) — built after the intervals were
+    seen, so it lacks the standing of the three predictions. It does replicate: monotone
+    on all three corpora, which it was not constructed on
   - `xgboost` 3.4.1 + `scikit-learn` 1.9.0, **dev group only**, research tier, no TS twin,
     not in the parity contract. Both authorised
   - **Two latent bugs found on the way**, neither affecting a published number: `model.md`

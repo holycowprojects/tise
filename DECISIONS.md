@@ -2711,3 +2711,62 @@ through. Separately, `backtest.py --with-model` passed `--view` to `load_labels`
 `load_events`, so a non-default view would have labelled from one corpus and computed
 features from another; the default path is unaffected, which is why nothing published was
 built that way.
+
+### D86 — D85 explained the failure case with a story, and the story is wrong
+
+D85 documented the shipped model's worst row and then explained it: *"The thing that appears
+to have happened is a weekend."* That sentence was never measured. `analysis/day_of_week.py`
+measures it, and it is wrong.
+
+**On Edge — the corpus that row came from — Saturday returns at 74.6% against a 71.6%
+overall rate.** It is an *above*-average day, +3.0 points. The failure happened on one of
+the better days for returning, not a worse one. Saturday is not consistently anything
+either: Chrome −9.0 points, Firefox −7.3, Edge +3.0. There is no weekend effect here to
+point at.
+
+**How this got written.** It is the failure SPEC.md invariant 3 exists to prevent, wearing
+prose. The invariant is habitually read as being about figures — do not publish a number a
+committed script did not produce — and a *causal claim* with no number behind it is the same
+defect: a plausible narrative attached to a single row, in the entry that documents that row.
+Nothing failed, because prose fails nothing. This is the fourth time in the project that the
+break-it discipline's blind spot has been the same one: **it only protects claims that are
+code.** D78 and D79 were mechanisms inferred rather than read; this is an explanation
+invented rather than measured.
+
+**What survives is better than what it replaced.** The pattern is real, substantial, and
+**non-monotone on all three corpora**:
+
+| Corpus | Highest | Lowest | Spread |
+|---|---|---|---:|
+| history-chrome | Friday 81.4% | Sunday 52.2% | **29.2 points** |
+| history-edge | Monday 79.5% | Sunday 58.5% | **21.1 points** |
+| history-firefox | Wednesday 76.2% | Saturday 57.7% | **18.5 points** |
+
+The peaks disagree across corpora and none of the three orderings rises or falls with the
+calendar. `dayOfWeek` enters `fs_3` as a plain integer 0–6 carrying **one linear
+coefficient**, and no such coefficient can represent a non-monotone pattern in either
+direction. So D85's conclusion — *a mis-encoded feature, not a calibration failure, and
+Platt cannot reach it* — **holds, for a measured reason instead of a story.** The claim
+survived; the argument for it did not, and the replacement is the stronger one.
+
+**This changes nothing and is not a decision to add cyclic encoding.** `return_model.py`
+states the position: that change is made against a measured number with the plain version
+beside it, or it is tuning against an intuition. This is the measurement. Two things should
+be weighed before anyone acts on it — and neither is settled here:
+
+- T16 recorded that the feature set should be **frozen before the Web Store listing**, and
+  adding a feature now runs against that. But a `sin`/`cos` pair over `dayOfWeek` is
+  arithmetic on a value already stored in every `FeatureRow`, so it is **losslessly
+  migratable exactly as `fs_3` was** — it is in the cheap class, not the expensive one.
+- D80's finding applies to it as much as to anything else: a 21-point spread in base rate is
+  not a promise of a 21-point improvement in Brier, and any `fs_4` would need pre-registering
+  the way D81 did before a single fold was scored.
+
+**A second, smaller caveat on D85, recorded here rather than left implicit.** The width
+ladder was **not pre-registered**. It was built after the intervals were seen, so it does not
+have the standing of the three predictions above it in that entry and should not be read
+beside them as though it did. What it has instead is replication: it was constructed on Edge
+and the generator computes it independently on the other two, where it is **monotone as
+well** — factors of 3.0 on Chrome, 6.7 on Edge, 5.4 on Firefox. A post-hoc pattern that
+holds on two corpora it was not built from is worth more than one that does not, and still
+less than one that was predicted.
