@@ -28,7 +28,11 @@ from datetime import datetime
 
 from tise_research.features.events import Event
 from tise_research.features.labels import Label
-from tise_research.features.vector import FeatureRow, compute_features
+from tise_research.features.vector import (
+    DEFAULT_FEATURE_SET,
+    FeatureRow,
+    compute_features,
+)
 from tise_research.models.baselines import Baseline
 from tise_research.models.logreg import (
     DEFAULT_SPEC,
@@ -42,6 +46,11 @@ from tise_research.models.prep import Preprocessor, design_columns, fit_preproce
 __all__ = ["MODEL_NAME", "FeatureIndex", "ReturnModel", "make_return_model_fitter"]
 
 MODEL_NAME = "logreg_fs2"
+
+
+def model_name(feature_set: str) -> str:
+    """`logreg_fs2`, `logreg_fs3`. The set is in the name so a table cannot hide it."""
+    return f"logreg_{feature_set.replace('_', '')}"
 
 
 @dataclass(slots=True)
@@ -62,6 +71,9 @@ class FeatureIndex:
     events: Sequence[Event]
     timeout_seconds: float
     horizon_hours: float
+    #: Which feature set the rows describe. Part of the cache identity, not a display
+    #: label: two indexes over the same events with different sets hold different rows.
+    feature_set: str = DEFAULT_FEATURE_SET
     _cache: dict[tuple[str, datetime], FeatureRow] = field(default_factory=dict)
 
     def row_for(self, label: Label) -> FeatureRow:
@@ -74,6 +86,7 @@ class FeatureIndex:
                 window_end=label.window_end,
                 timeout_seconds=self.timeout_seconds,
                 horizon_hours=self.horizon_hours,
+                feature_set=self.feature_set,
             )
             self._cache[key] = cached
         return cached
@@ -106,16 +119,22 @@ def fit_return_model(
     *,
     index: FeatureIndex,
     spec: LogRegSpec = DEFAULT_SPEC,
-    name: str = MODEL_NAME,
+    name: str | None = None,
 ) -> ReturnModel:
     """Fit on one training window. Nothing at or after its end may be in `labels`."""
+    resolved = name if name is not None else model_name(index.feature_set)
     rows = index.rows_for(labels)
     preprocessor = fit_preprocessor(rows)
     matrix = preprocessor.matrix(rows)
     outcomes = [label.outcome for label in labels]
-    state = train(matrix, outcomes, spec=spec, n_columns=len(design_columns()))
+    state = train(
+        matrix,
+        outcomes,
+        spec=spec,
+        n_columns=len(design_columns(index.feature_set)),
+    )
     return ReturnModel(
-        name=name,
+        name=resolved,
         preprocessor=preprocessor,
         state=state,
         spec=spec,

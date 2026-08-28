@@ -31,7 +31,11 @@ from tise_research.features.vector import (
     COMPAT,
     FEATURE_NAMES,
     FEATURE_SET,
+    FEATURE_SETS,
+    FIRST_SEEN_SCALE_HOURS,
+    PRIOR_SESSION_RATE_SCALE,
     compute_features,
+    saturate,
 )
 
 TIMEOUT = 1800.0
@@ -219,9 +223,16 @@ class TestVector:
         assert row.feature_set == FEATURE_SET
 
     def test_every_feature_is_history_class(self) -> None:
-        """D35 left the `full` class empty. The mechanism stays; the class is empty."""
+        """D35 left the `full` class empty. The mechanism stays; the class is empty.
+
+        Checked across **every** feature set, not just the shipped one: a new set whose
+        features had no declared compat class would be a set that could silently smuggle
+        in something the extension cannot compute.
+        """
         assert set(COMPAT.values()) == {"history"}
-        assert len(COMPAT) == len(FEATURE_NAMES)
+        for feature_set, names in FEATURE_SETS.items():
+            undeclared = set(names) - set(COMPAT)
+            assert not undeclared, f"{feature_set} has undeclared features: {undeclared}"
 
     def test_the_whole_vector_is_leakage_safe(self) -> None:
         events = [event("video", at(1, 9), "a"), event("dev", at(1, 9, 30), "b")]
@@ -288,3 +299,127 @@ class TestTheFixtureIsWorthTrusting:
             if len(values) == 1:
                 constant.append(name)
         assert not constant, f"these features never vary in the fixture: {constant}"
+
+
+class TestBoundedReplacements:
+    """`fs_3`'s two features (D81). The properties, not the values.
+
+    Each is tested for the thing it was introduced to guarantee — boundedness — rather
+    than for a particular number, because the numbers follow from declared scales that
+    could reasonably change while the guarantee must not.
+    """
+
+    def test_saturate_is_bounded_however_large_the_input(self) -> None:
+        for value in (0.0, 1.0, 168.0, 1e6, 1e12):
+            assert 0.0 <= saturate(value, FIRST_SEEN_SCALE_HOURS) < 1.0
+
+    def test_saturate_reaches_one_half_at_its_scale(self) -> None:
+        """The scale is the half-way point, which is what makes it interpretable."""
+        assert saturate(FIRST_SEEN_SCALE_HOURS, FIRST_SEEN_SCALE_HOURS) == 0.5
+        assert saturate(PRIOR_SESSION_RATE_SCALE, PRIOR_SESSION_RATE_SCALE) == 0.5
+
+    def test_saturate_is_monotonic(self) -> None:
+        """The ordering `hoursSinceFirstSeen` carried has to survive the transform."""
+        values = [saturate(v, 168.0) for v in (0.0, 10.0, 100.0, 1_000.0, 10_000.0)]
+        assert values == sorted(values)
+
+    def test_saturate_refuses_a_negative(self) -> None:
+        """Negative hours mean a leakage guard failed upstream. Do not smooth it over."""
+        with pytest.raises(ValueError, match="negative"):
+            saturate(-1.0, 168.0)
+
+    def build(self) -> list[Event]:
+        return [
+            event("video", at(1, 9), "a"),
+            event("video", at(2, 8), "b"),
+            event("video", at(5, 9), "c"),
+        ]
+
+    def row(self, events, window_end, feature_set="fs_3"):
+        return compute_features(
+            events,
+            "video",
+            window_end=window_end,
+            timeout_seconds=TIMEOUT,
+            horizon_hours=HORIZON,
+            feature_set=feature_set,
+        )
+
+    def test_fs3_replaces_exactly_two_features_and_keeps_their_positions(self) -> None:
+        fs2, fs3 = FEATURE_SETS["fs_2"], FEATURE_SETS["fs_3"]
+        assert len(fs2) == len(fs3)
+        differing = [(a, b) for a, b in zip(fs2, fs3, strict=True) if a != b]
+        assert differing == [
+            ("hoursSinceFirstSeen", "firstSeenSaturation"),
+            ("priorSessionCount", "priorSessionRate"),
+        ]
+
+    def test_an_unseen_category_leaves_saturation_absent_not_zero(self) -> None:
+        """Never seen is an absence. Zero would say "seen just now", which is a claim."""
+        row = self.row([event("dev", at(1, 9), "x")], at(2))
+        assert row.values["firstSeenSaturation"] is None
+
+    def test_the_rate_is_zero_rather_than_absent_when_nothing_has_resolved(self) -> None:
+        """No prior sessions is a measured zero, unlike never having been seen."""
+        row = self.row(self.build(), at(1, 10))
+        assert row.values["priorSessionRate"] == 0.0
+
+    def test_the_rate_denominator_has_a_one_day_floor(self) -> None:
+        """Without it, a category first seen an hour ago reports sessions per hour.
+
+        The floor needs a **short horizon** to bind at all, and that is worth knowing:
+        a prior session only counts once `session_end + horizon <= window_end`, so at the
+        default 24-hour horizon at least a day has always been observed by the time the
+        count is non-zero, and the floor can never be reached. Removing it failed zero
+        tests until this one used a horizon that reaches it.
+        """
+        events = [event("video", at(1, 9), "a"), event("video", at(1, 9, 20), "b")]
+        row = compute_features(
+            events,
+            "video",
+            window_end=at(1, 10, 30),
+            timeout_seconds=TIMEOUT,
+            horizon_hours=1.0,
+            feature_set="fs_3",
+        )
+        # One resolved session, 1.5 hours observed. Without the floor the rate would be
+        # ~16 sessions a day and saturate to 0.94; with it the rate is 1 a day.
+        assert row.values["priorSessionRate"] == 0.5
+
+    def test_the_floor_cannot_bind_at_the_default_horizon(self) -> None:
+        """Stated as a test so the guard above is not mistaken for a live code path."""
+        events = [event("video", at(1, 9), "a"), event("video", at(1, 9, 20), "b")]
+        row = self.row(events, at(1, 10, 30))
+        assert row.values["priorSessionRate"] == 0.0  # nothing has resolved yet
+
+    def test_both_replacements_are_bounded_on_real_looking_input(self) -> None:
+        for window_end in (at(2), at(5), at(9), at(30)):
+            row = self.row(self.build(), window_end)
+            saturation = row.values["firstSeenSaturation"]
+            assert saturation is None or 0.0 <= saturation < 1.0
+            assert 0.0 <= row.values["priorSessionRate"] < 1.0
+
+    def test_fs3_is_still_leakage_safe(self) -> None:
+        """The whole-vector guard from `fs_2`, re-run against the new features."""
+        events = self.build()
+        window_end = at(2, 9)
+        before = self.row(events, window_end)
+        after = self.row([*events, event("video", at(3, 9), "z")], window_end)
+        assert before.values == after.values
+
+    def test_the_two_sets_agree_on_every_shared_feature(self) -> None:
+        """`fs_3` changes two features and must not perturb the other twelve."""
+        events = self.build()
+        fs2 = self.row(events, at(5), feature_set="fs_2")
+        fs3 = self.row(events, at(5), feature_set="fs_3")
+        shared = set(fs2.values) & set(fs3.values)
+        assert len(shared) == 12
+        for name in shared:
+            assert fs2.values[name] == fs3.values[name]
+
+    def test_the_row_records_which_set_produced_it(self) -> None:
+        assert self.row(self.build(), at(5)).feature_set == "fs_3"
+
+    def test_an_unknown_feature_set_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="unknown feature set"):
+            self.row(self.build(), at(5), feature_set="fs_99")

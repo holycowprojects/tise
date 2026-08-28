@@ -39,17 +39,56 @@ from tise_research.features.frequency import (
 from tise_research.features.priors import prior_return_rate, prior_session_count
 from tise_research.features.recency import hours_since_first_seen, hours_since_last_seen
 
-__all__ = ["FEATURE_NAMES", "FEATURE_SET", "CompatClass", "FeatureRow", "compute_features"]
+__all__ = [
+    "DEFAULT_FEATURE_SET",
+    "FEATURE_NAMES",
+    "FEATURE_SET",
+    "FEATURE_SETS",
+    "FIRST_SEEN_SCALE_HOURS",
+    "PRIOR_SESSION_RATE_SCALE",
+    "CompatClass",
+    "FeatureRow",
+    "compute_features",
+    "feature_names",
+    "saturate",
+]
 
 #: Bumped whenever a feature is added, removed, or changes meaning. fs_1 was one feature;
-#: fs_2 is the full V1 set.
-FEATURE_SET = "fs_2"
+#: fs_2 is the full V1 set; fs_3 replaces the two features that grow with the calendar
+#: (D81). `fs_2` is what the extension ships until that is decided.
+DEFAULT_FEATURE_SET = "fs_2"
+FEATURE_SET = DEFAULT_FEATURE_SET
+
+#: Hours at which `firstSeenSaturation` reaches 0.5. Seven days, matching the 7-day
+#: windows already in the set, so there is one notion of "recent" rather than two.
+#: Declared, not fitted — see D81.
+FIRST_SEEN_SCALE_HOURS = 168.0
+
+#: Sessions per day at which `priorSessionRate` reaches 0.5. One a day is the natural unit
+#: of a daily habit. Declared, not fitted.
+PRIOR_SESSION_RATE_SCALE = 1.0
+
+
+def saturate(value: float, scale: float) -> float:
+    """Map [0, inf) onto [0, 1), reaching 0.5 at `scale`.
+
+    The point is the bound, not the shape. A feature that can only grow lets a test row
+    land arbitrarily far outside the range its coefficient was fitted on; a feature in
+    [0, 1) cannot. See D81 for why the two features this is applied to had to go.
+    """
+    if value < 0.0:
+        raise ValueError(f"refusing to saturate a negative value: {value}")
+    return value / (value + scale)
 
 CompatClass = Literal["history", "full"]
 
 #: Ordered, and the order is part of the contract: it is the column order of any matrix
 #: built from these rows, and a silent reordering would swap two coefficients.
-FEATURE_NAMES: tuple[str, ...] = (
+#:
+#: `fs_3` differs in exactly two positions, and keeps them: replacing a feature in place
+#: rather than appending keeps the two sets comparable column by column, which is what
+#: makes a coefficient from one readable next to the other.
+_FS2: tuple[str, ...] = (
     "hoursSinceLastSeen",
     "hoursSinceFirstSeen",
     "eventCount7d",
@@ -66,8 +105,37 @@ FEATURE_NAMES: tuple[str, ...] = (
     "dayOfWeek",
 )
 
+_FS3: tuple[str, ...] = tuple(
+    {
+        "hoursSinceFirstSeen": "firstSeenSaturation",
+        "priorSessionCount": "priorSessionRate",
+    }.get(name, name)
+    for name in _FS2
+)
+
+FEATURE_SETS: dict[str, tuple[str, ...]] = {"fs_2": _FS2, "fs_3": _FS3}
+
+FEATURE_NAMES: tuple[str, ...] = FEATURE_SETS[DEFAULT_FEATURE_SET]
+
+
+def feature_names(feature_set: str) -> tuple[str, ...]:
+    """The ordered names of a feature set, or a loud failure.
+
+    Guessing at an unknown name would produce a design matrix of the wrong width and a
+    model whose coefficients mean something other than their labels.
+    """
+    try:
+        return FEATURE_SETS[feature_set]
+    except KeyError:
+        raise ValueError(
+            f"unknown feature set {feature_set!r}; known: {sorted(FEATURE_SETS)}"
+        ) from None
+
+
 #: Every one of them, by D35. See the module docstring.
-COMPAT: dict[str, CompatClass] = {name: "history" for name in FEATURE_NAMES}
+COMPAT: dict[str, CompatClass] = {
+    name: "history" for names in FEATURE_SETS.values() for name in names
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,13 +159,19 @@ def compute_features(
     window_end: datetime,
     timeout_seconds: float,
     horizon_hours: float,
+    feature_set: str = DEFAULT_FEATURE_SET,
 ) -> FeatureRow:
     """Every feature for one (category, window_end) pair.
 
     Nothing here reads an event at or after `window_end` except the session-context
     functions, which take events *up to and including* it — that instant is the end of
     the session being described, not the future. See `context.py`.
+
+    Both feature sets are computed and the requested one is selected, because `fs_3`'s two
+    features are pure transforms of `fs_2`'s and recomputing the traversals to get them
+    would be the same work twice with two chances to disagree.
     """
+    names = feature_names(feature_set)
     values: dict[str, float | None] = {
         "hoursSinceLastSeen": hours_since_last_seen(
             events, category, window_end=window_end
@@ -159,15 +233,34 @@ def compute_features(
         "dayOfWeek": float(day_of_week(window_end)),
     }
 
-    missing = set(FEATURE_NAMES) - set(values)
-    extra = set(values) - set(FEATURE_NAMES)
-    if missing or extra:
-        raise AssertionError(f"feature set mismatch: missing={missing} extra={extra}")
+    # --- fs_3: bounded replacements for the two features that grow with the calendar ---
+    #
+    # `firstSeenSaturation` stays None exactly when `hoursSinceFirstSeen` is None — the
+    # category has not been seen before `window_end` — because "never seen" is an absence,
+    # not a saturation of zero, and the missing-indicator column is what carries it.
+    hours_first = values["hoursSinceFirstSeen"]
+    values["firstSeenSaturation"] = (
+        None if hours_first is None else saturate(hours_first, FIRST_SEEN_SCALE_HOURS)
+    )
+
+    # `priorSessionRate` is never None: with no prior sessions the rate is zero, which is a
+    # measured zero rather than an absence. The one-day floor on the denominator stops a
+    # category first seen an hour ago from reporting a rate of twenty-four a day.
+    observed_days = 0.0 if hours_first is None else hours_first / 24.0
+    prior_sessions = values["priorSessionCount"]
+    assert prior_sessions is not None  # a count, never absent
+    values["priorSessionRate"] = saturate(
+        prior_sessions / max(observed_days, 1.0), PRIOR_SESSION_RATE_SCALE
+    )
+
+    missing = set(names) - set(values)
+    if missing:
+        raise AssertionError(f"feature set {feature_set} is missing: {missing}")
 
     return FeatureRow(
         subject=category,
         window_end=window_end,
-        feature_set=FEATURE_SET,
+        feature_set=feature_set,
         compat="history",
-        values=values,
+        values={name: values[name] for name in names},
     )

@@ -286,8 +286,23 @@ working and committable.
 
 - [ ] **T16 · Model tournament and benchmark report** · M · deps: T13
   - Identical folds for every model; report the XGBoost-vs-shipped gap; one documented failure
-  - **Still to do:** the cumulative-feature transform (chosen blind), and the tournament
-    itself. The corpus sub-task and confidence intervals are done, every benchmark re-run
+  - **Still to do:** the tournament itself, and shipping `fs_3` (a `FeatureRow` schema
+    change — ask first). Corpus, intervals and the feature transform are done
+  - [x] **Cumulative features — transformed, and it worked** (D81 pre-registration, D82
+    result). `hoursSinceFirstSeen` → `firstSeenSaturation` = `h/(h+168)`;
+    `priorSessionCount` → `priorSessionRate` = sessions/day, `r/(r+1)`. Both scales
+    declared from existing windows, not fitted. **Pre-registered before implementation**,
+    so "chosen without looking at the numbers" is provable from git rather than asserted
+  - **Worst excursion beyond the fitted range collapses** on every corpus: Chrome
+    0.25→0.03 and 0.33→0.04, Edge 0.12→0.01 and 0.42→0.10, Firefox 0.55→0.11 and 0.36→0.02
+  - **`fs_3` is the project's first established result** — Chrome +0.0072 [+0.0032,
+    +0.0179] and Firefox +0.0088 [+0.0028, +0.0232] both exclude zero. **Against my own
+    pre-registered prediction that it would not.** Not established on Edge, the primary
+    corpus, where the point estimate marginally favours `fs_2`
+  - **An interval's width is a property of the comparison, not the sample.** The same 141
+    Chrome rows that cannot separate the model from the baseline separate `fs_2` from
+    `fs_3` easily, because the two share 12 of 14 features and their paired differences
+    are tiny. Corrects a natural misreading of D80
   - Verify: `uv run pytest research/tests/test_baseline_gate.py`
   - [x] **Confidence intervals — done, and the headline did not survive them** (D80).
     Every 95% interval on the paired Brier difference **includes zero, on every corpus,

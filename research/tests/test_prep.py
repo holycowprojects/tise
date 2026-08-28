@@ -9,12 +9,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from tise_research.features.vector import FEATURE_NAMES, FeatureRow
+from tise_research.features.vector import FEATURE_NAMES, FEATURE_SETS, FeatureRow
 from tise_research.models.prep import (
     MISSING_SUFFIX,
     NULLABLE_FEATURES,
     design_columns,
     fit_preprocessor,
+    nullable_features,
     raw_row,
 )
 
@@ -134,3 +135,70 @@ class TestLeakage:
         alone = fitted.transform(rows[0])
         together = fitted.matrix(rows)[0]
         assert alone == together
+
+
+def fs3_row(**overrides: float | None) -> FeatureRow:
+    """An `fs_3` row, every value 1.0 unless named."""
+    values: dict[str, float | None] = dict.fromkeys(FEATURE_SETS["fs_3"], 1.0)
+    values.update(overrides)
+    return FeatureRow(
+        subject="video",
+        window_end=WINDOW_END,
+        feature_set="fs_3",
+        compat="history",
+        values=values,
+    )
+
+
+class TestTheFeatureSetTravelsWithTheRow:
+    """The pipeline on `fs_3`, not just the features (D82).
+
+    Written because three deliberate breaks in this area failed **zero** tests: nothing
+    fitted a preprocessor on `fs_3` rows at all. The features had tests; the machinery
+    that turns them into a design matrix did not.
+    """
+
+    def test_columns_come_from_the_requested_set(self) -> None:
+        columns = design_columns("fs_3")
+        assert "firstSeenSaturation" in columns
+        assert "priorSessionRate" in columns
+        assert "hoursSinceFirstSeen" not in columns
+        assert "priorSessionCount" not in columns
+
+    def test_both_sets_produce_the_same_number_of_columns(self) -> None:
+        """`fs_3` replaces two features in place, so the matrix keeps its width."""
+        assert len(design_columns("fs_2")) == len(design_columns("fs_3"))
+
+    def test_the_indicator_columns_follow_the_set(self) -> None:
+        columns = design_columns("fs_3")
+        assert f"firstSeenSaturation{MISSING_SUFFIX}" in columns
+        # A measured zero rate is not an absence, so it gets no indicator.
+        assert f"priorSessionRate{MISSING_SUFFIX}" not in columns
+
+    def test_an_unknown_set_has_no_nullable_list_and_says_so(self) -> None:
+        """Falling back to another set's list builds a matrix of the wrong shape."""
+        with pytest.raises(ValueError, match="no nullable list"):
+            nullable_features("fs_99")
+
+    def test_a_preprocessor_fits_on_fs3_rows(self) -> None:
+        fitted = fit_preprocessor([fs3_row(), fs3_row(priorSessionRate=0.5)])
+        assert fitted.columns == design_columns("fs_3")
+        assert len(fitted.transform(fs3_row())) == len(design_columns("fs_3"))
+
+    def test_an_absent_saturation_is_imputed_and_flagged(self) -> None:
+        fitted = fit_preprocessor(
+            [fs3_row(firstSeenSaturation=0.4), fs3_row(firstSeenSaturation=0.6)]
+        )
+        index = fitted.columns.index(f"firstSeenSaturation{MISSING_SUFFIX}")
+        assert fitted.transform(fs3_row(firstSeenSaturation=None))[index] != 0.0
+
+    def test_fitting_across_mixed_feature_sets_is_refused(self) -> None:
+        """Two sets in one window means one of them is being read through the other's
+        column order, and every coefficient after the first difference is mislabelled."""
+        with pytest.raises(ValueError, match="mixed feature sets"):
+            fit_preprocessor([row(), fs3_row()])
+
+    def test_an_fs2_row_cannot_be_transformed_by_an_fs3_preprocessor(self) -> None:
+        fitted = fit_preprocessor([fs3_row(), fs3_row(priorSessionRate=0.5)])
+        with pytest.raises(ValueError, match="fitted on"):
+            fitted.transform(row())

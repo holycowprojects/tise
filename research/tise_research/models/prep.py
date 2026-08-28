@@ -34,12 +34,18 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from tise_research.features.vector import FEATURE_NAMES, FeatureRow
+from tise_research.features.vector import (
+    DEFAULT_FEATURE_SET,
+    FeatureRow,
+    feature_names,
+)
 
 __all__ = [
     "DESIGN_COLUMNS",
     "MISSING_SUFFIX",
+    "NULLABLE_BY_SET",
     "NULLABLE_FEATURES",
+    "nullable_features",
     "Preprocessor",
     "design_columns",
     "fit_preprocessor",
@@ -49,24 +55,45 @@ __all__ = [
 #: The features that `compute_features` can legitimately return `None` for. Anything not
 #: listed here is `None` only if something is wrong, and `raw_row` raises rather than
 #: silently imputing it.
-NULLABLE_FEATURES: tuple[str, ...] = (
-    "hoursSinceLastSeen",
-    "hoursSinceFirstSeen",
-    "categoryShare30d",
-    "priorReturnRate",
-)
+#: Per feature set, because `fs_3` replaced one nullable feature and one non-nullable one.
+#: `priorSessionRate` is deliberately **not** nullable: with no prior sessions the rate is a
+#: measured zero, not an absence, and giving it an indicator column would say otherwise.
+NULLABLE_BY_SET: dict[str, tuple[str, ...]] = {
+    "fs_2": (
+        "hoursSinceLastSeen",
+        "hoursSinceFirstSeen",
+        "categoryShare30d",
+        "priorReturnRate",
+    ),
+    "fs_3": (
+        "hoursSinceLastSeen",
+        "firstSeenSaturation",
+        "categoryShare30d",
+        "priorReturnRate",
+    ),
+}
+
+NULLABLE_FEATURES: tuple[str, ...] = NULLABLE_BY_SET[DEFAULT_FEATURE_SET]
+
+
+def nullable_features(feature_set: str) -> tuple[str, ...]:
+    try:
+        return NULLABLE_BY_SET[feature_set]
+    except KeyError:
+        raise ValueError(f"no nullable list declared for {feature_set!r}") from None
 
 MISSING_SUFFIX = "__missing"
 
 
-def design_columns() -> tuple[str, ...]:
+def design_columns(feature_set: str = DEFAULT_FEATURE_SET) -> tuple[str, ...]:
     """Column order of the design matrix. The order is the contract, as in `vector.py`.
 
-    Features first in `FEATURE_NAMES` order, then one indicator per nullable feature in
-    `NULLABLE_FEATURES` order. A silent reordering here would swap two coefficients and
-    nothing else would notice.
+    Features first in feature-set order, then one indicator per nullable feature. A silent
+    reordering here would swap two coefficients and nothing else would notice.
     """
-    return FEATURE_NAMES + tuple(name + MISSING_SUFFIX for name in NULLABLE_FEATURES)
+    return feature_names(feature_set) + tuple(
+        name + MISSING_SUFFIX for name in nullable_features(feature_set)
+    )
 
 
 DESIGN_COLUMNS: tuple[str, ...] = design_columns()
@@ -82,23 +109,23 @@ def raw_row(row: FeatureRow) -> tuple[list[float | None], list[float]]:
 
     Imputation is not applied here: this is the shape before a training window exists.
     """
-    missing = set(FEATURE_NAMES) - set(row.values)
+    names = feature_names(row.feature_set)
+    nullable = nullable_features(row.feature_set)
+    missing = set(names) - set(row.values)
     if missing:
         raise ValueError(f"feature row is missing {sorted(missing)}")
 
     values: list[float | None] = []
-    for name in FEATURE_NAMES:
+    for name in names:
         value = row.values[name]
-        if value is None and name not in NULLABLE_FEATURES:
+        if value is None and name not in nullable:
             raise ValueError(
                 f"{name} is None, and it is not declared nullable. Either the feature "
                 "changed meaning or a bug produced it; imputing it would hide both."
             )
         values.append(None if value is None else float(value))
 
-    indicators = [
-        1.0 if row.values[name] is None else 0.0 for name in NULLABLE_FEATURES
-    ]
+    indicators = [1.0 if row.values[name] is None else 0.0 for name in nullable]
     return values, indicators
 
 
@@ -106,17 +133,30 @@ def raw_row(row: FeatureRow) -> tuple[list[float | None], list[float]]:
 class Preprocessor:
     """Fitted imputation and standardisation. Part of the model, not a pre-step.
 
-    `fills` are the training means of the observed values, in `FEATURE_NAMES` order.
+    `fills` are the training means of the observed values, in feature-set order.
     `means` and `scales` cover all eighteen design columns.
+
+    `feature_set` is carried because **the widths do not distinguish the sets**: `fs_2` and
+    `fs_3` both produce eighteen columns, so `zip(strict=True)` cannot catch a row from the
+    wrong set. Without this check an `fs_2` row transforms cleanly through an `fs_3`
+    preprocessor and every coefficient after the first differing column is applied to the
+    wrong feature, silently. Found by a test written for D82.
     """
 
     columns: tuple[str, ...]
     fills: tuple[float, ...]
     means: tuple[float, ...]
     scales: tuple[float, ...]
+    feature_set: str = DEFAULT_FEATURE_SET
 
     def transform(self, row: FeatureRow) -> list[float]:
         """One row, imputed and standardised, ready to be multiplied by a weight vector."""
+        if row.feature_set != self.feature_set:
+            raise ValueError(
+                f"row is {row.feature_set} and this preprocessor was fitted on "
+                f"{self.feature_set}; the column counts match, so nothing downstream "
+                "would notice."
+            )
         values, indicators = raw_row(row)
         filled = [
             fill if value is None else value
@@ -144,21 +184,31 @@ def fit_preprocessor(rows: Sequence[FeatureRow]) -> Preprocessor:
     varies in training carries no information, and the model should not be able to fit a
     coefficient to it.
     """
-    columns = design_columns()
+    # The feature set comes off the rows, never from a module constant: fitting on `fs_3`
+    # rows against `fs_2` columns would build a matrix of the wrong width, and the failure
+    # would surface as a coefficient meaning something other than its label.
+    feature_set = rows[0].feature_set if rows else DEFAULT_FEATURE_SET
+    mixed = {row.feature_set for row in rows}
+    if len(mixed) > 1:
+        raise ValueError(f"refusing to fit across mixed feature sets: {sorted(mixed)}")
+
+    columns = design_columns(feature_set)
+    names = feature_names(feature_set)
     if not rows:
         zeros = tuple(0.0 for _ in columns)
         ones = tuple(1.0 for _ in columns)
         return Preprocessor(
             columns=columns,
-            fills=tuple(0.0 for _ in FEATURE_NAMES),
+            fills=tuple(0.0 for _ in names),
             means=zeros,
             scales=ones,
+            feature_set=feature_set,
         )
 
     split = [raw_row(row) for row in rows]
 
     fills: list[float] = []
-    for index, _name in enumerate(FEATURE_NAMES):
+    for index, _name in enumerate(names):
         observed = [values[index] for values, _ in split if values[index] is not None]
         fills.append(_mean(observed))
 
@@ -187,4 +237,5 @@ def fit_preprocessor(rows: Sequence[FeatureRow]) -> Preprocessor:
         fills=tuple(fills),
         means=tuple(means),
         scales=tuple(scales),
+        feature_set=feature_set,
     )

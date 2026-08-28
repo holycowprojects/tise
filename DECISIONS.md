@@ -2347,3 +2347,101 @@ established that this corpus cannot demonstrate "better" for a difference of thi
 a rule requiring it would be a rule that can never fire honestly. If `fs_3` scores worse by
 point estimate while its interval includes zero, it is still adopted, and that sentence is
 written here rather than after the fact.
+
+### D82 — The transform works, and the prediction I got wrong is the useful part
+
+D81 was committed before `fs_3` existed. Three predictions were recorded there. Two held
+and one was wrong, and the wrong one taught more than the two that held.
+
+**Prediction 1 — the share of out-of-range rows would not fall. Held, exactly.**
+
+For `firstSeenSaturation` the share is not merely similar but **identical to the digit**:
+67.5% on Chrome, 76.8% on Edge, 75.0% on Firefox, before and after. That is a mathematical
+certainty rather than a coincidence — saturation is strictly monotone, so it preserves
+ordering, so precisely the same rows fall outside precisely the same rank boundaries. Share
+-outside was *incapable* of detecting this change. Had the mechanism metric not been fixed
+in advance, the obvious table would have shown a transform doing nothing at all.
+
+`priorSessionRate` is not a monotone transform of `priorSessionCount` — it divides by
+observed days — so its share did move, 24.2% → 4.1% on Chrome and 30.8% → 1.9% on Firefox.
+
+**Prediction 2 — the size of the excursion would fall. Held, on every corpus.**
+
+Worst excursion, in units of the training range's own width:
+
+| corpus | `hoursSinceFirstSeen` → `firstSeenSaturation` | `priorSessionCount` → `priorSessionRate` |
+|---|---|---|
+| Chrome | 0.25 → **0.03** | 0.33 → **0.04** |
+| Edge | 0.12 → **0.01** | 0.42 → **0.10** |
+| Firefox | 0.55 → **0.11** | 0.36 → **0.02** |
+
+The other twelve features are unchanged, and `feature-transform.md` prints them so that is
+checkable rather than asserted.
+
+**Prediction 3 — `fs_3` would not be distinguishable from `fs_2`. Wrong on two corpora.**
+
+| corpus | `fs_2` − `fs_3`, positive favours `fs_3` | 95% (categories) | |
+|---|---:|---|---|
+| Chrome | +0.0072 | [+0.0032, +0.0179] | **excludes zero** |
+| Edge | −0.0006 | [−0.0083, +0.0024] | includes zero |
+| Firefox | +0.0088 | [+0.0028, +0.0232] | **excludes zero** |
+
+**This is the first established result in the project** — the first interval that excludes
+zero — and it arrived against my own recorded prediction, which is the only reason it is
+worth much.
+
+**Why this does not contradict D80, and the lesson.** D80 found that 141 Chrome test rows
+could not separate the model from `category_base_rate`. The *same 141 rows* separate `fs_2`
+from `fs_3` comfortably. Nothing about the sample changed; the **comparison** changed.
+`fs_2` and `fs_3` share twelve of fourteen features, so the two models make almost the same
+error on almost every row, the paired differences are small and tightly concentrated, and
+the standard error of their mean is correspondingly tiny. Against a structurally different
+predictor the paired differences are large and scattered, and the same rows buy far less.
+
+**An interval's width is a property of the comparison, not just of the sample size.** D80's
+">12,800 rows" and "1,151 rows" are answers to the questions those comparisons asked, and
+neither is a general statement about what this corpus can resolve. That is the correction
+this entry makes to a natural misreading of D80 — including one I was about to make, since
+prediction 3 was exactly that misreading written down in advance.
+
+**Two things this result is not.** The intervals are 95% and three corpora were tested, so
+roughly a one-in-seven chance of at least one spurious exclusion; two exclusions in the same
+direction is a good deal stronger than one, and it is still three corpora from one person.
+And the improvement is **not demonstrated on Edge**, which is the primary corpus (D20) and
+where the point estimate very slightly favours `fs_2`. "Better on two of three, undecided on
+the one that matters most" is the honest summary.
+
+**The adoption rule fires: `fs_3` is adopted.** D81 required the mechanism to improve and
+the score not to be worse; the mechanism improved everywhere and the score is better on two
+corpora and undecided on the third. Adoption was never conditional on beating `fs_2`, and it
+is worth noting that had prediction 3 held, `fs_3` would have been adopted anyway on the
+argument alone — which is exactly why the rule was fixed in advance.
+
+**Found by breaking it: three of five breaks failed nothing, and one was a real bug.**
+
+- **`Preprocessor.transform` did not check the feature set, and could not have.** `fs_2` and
+  `fs_3` both produce eighteen columns, so `zip(strict=True)` passes and an `fs_2` row
+  transforms cleanly through an `fs_3` preprocessor — every coefficient after the first
+  differing column applied to the wrong feature, silently, with no error anywhere. The
+  widths matching is exactly what made `fs_3` a clean in-place replacement, and it is what
+  removed the only guard that existed. `Preprocessor` now carries its feature set.
+- **Nothing fitted a model on `fs_3` rows at all.** The features had tests; the machinery
+  turning them into a design matrix did not, so breaking the nullable-list lookup and the
+  mixed-set guard both failed zero tests.
+- **A test named for the one-day floor did not exercise the floor**, and its own comment
+  said so — "the floor is not what is binding here" — which I wrote and did not act on.
+  Removing the floor failed nothing. Investigating why produced a small result worth
+  keeping: **at the default 24-hour horizon the floor is unreachable**, because a prior
+  session only counts once `session_end + horizon <= window_end`, so a day has always
+  elapsed by the time the count is non-zero. It is a guard for short horizons, now tested
+  with one, and a second test pins that it cannot bind at the default.
+
+That is the sixth, seventh and eighth hole this method has found. The recurring shape is
+now clear enough to name: **the tests follow the code that was interesting to write.** The
+features were interesting, so they were tested; the plumbing that carries them was not.
+
+**What adoption still needs, and has not had.** `fs_2` remains what the extension ships.
+Making `fs_3` the shipped set changes the `FeatureRow` schema, which is on the ask-first
+list, and it requires the TypeScript mirror, a regenerated parity oracle, and every
+benchmark re-run on `fs_3`. None of that is done here. The research tier computes both sets;
+the product still computes one.
