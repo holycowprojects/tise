@@ -56,15 +56,14 @@ class TestBoundaries:
             key = block_key_for(MONDAY + timedelta(days=offset), UTC)
             assert key.kind == "weekend", offset
 
-    def test_the_weekend_shares_its_week_with_the_weekday_block(self) -> None:
-        # ISO weeks start Monday, so Mon-Fri and the Sat/Sun after it are one week. If
-        # they were not, Friday night would predict the *previous* weekend.
+    def test_the_weekend_follows_the_weekday_block_of_the_same_week(self) -> None:
+        # Mon-Fri and the Sat/Sun after it are one week. If they were not, Friday night
+        # would predict the *previous* weekend.
         weekday = block_key_for(MONDAY, UTC)
         weekend = block_key_for(MONDAY + timedelta(days=5), UTC)
-        assert (weekday.iso_year, weekday.iso_week) == (
-            weekend.iso_year,
-            weekend.iso_week,
-        )
+        assert weekday.start == MONDAY.date()
+        assert weekend.start == MONDAY.date() + timedelta(days=5)
+        assert weekday < weekend
 
     def test_the_boundary_moves_with_the_timezone(self) -> None:
         # Friday 20:30 UTC is Saturday 02:00 in Kolkata. The same instant belongs to
@@ -78,8 +77,8 @@ class TestBoundaries:
             block_key_for(datetime(2026, 6, 1, 12, 0), UTC)
 
     def test_keys_sort_into_calendar_order_with_weekday_first(self) -> None:
-        weekday = BlockKey(2026, 23, "weekday")
-        weekend = BlockKey(2026, 23, "weekend")
+        weekday = BlockKey(MONDAY.date(), "weekday")
+        weekend = BlockKey(MONDAY.date() + timedelta(days=5), "weekend")
         assert sorted([weekend, weekday]) == [weekday, weekend]
 
 
@@ -137,10 +136,37 @@ class TestCompleteBlocks:
         assert any(not block.events for block in trimmed)
 
 
+class TestDailyBlocks:
+    def test_every_calendar_day_is_its_own_block(self) -> None:
+        events = [event(MONDAY + timedelta(days=day)) for day in range(4)]
+        blocks = blocks_from_events(events, tz=UTC, granularity="day")
+        assert len(blocks) == 4
+        assert {block.kind for block in blocks} == {"day"}
+
+    def test_a_silent_day_becomes_a_zero_block(self) -> None:
+        # The same rule as a silent week, and it matters more here: daily counts are
+        # zero far more often, so getting this wrong would distort every median.
+        events = [event(MONDAY), event(MONDAY + timedelta(days=3))]
+        blocks = blocks_from_events(events, tz=UTC, granularity="day")
+        assert [len(block.events) for block in blocks] == [1, 0, 0, 1]
+
+    def test_the_day_boundary_is_local_too(self) -> None:
+        instant = datetime(2026, 6, 5, 20, 30, tzinfo=UTC)
+        assert block_key_for(instant, UTC, "day").start.day == 5
+        assert block_key_for(instant, KOLKATA, "day").start.day == 6
+
+    def test_daily_blocks_produce_far_more_of_them(self) -> None:
+        # The whole reason to consider daily: same browsing, many more questions.
+        events = [event(MONDAY + timedelta(days=day)) for day in range(28)]
+        weekly = blocks_from_events(events, tz=UTC, granularity="week")
+        daily = blocks_from_events(events, tz=UTC, granularity="day")
+        assert len(daily) > 3 * len(weekly)
+
+
 class TestCounts:
     def test_counts_events_per_category(self) -> None:
         block = Block(
-            key=BlockKey(2026, 23, "weekday"),
+            key=BlockKey(MONDAY.date(), "weekday"),
             events=(event(MONDAY), event(MONDAY, "dev"), event(MONDAY)),
             first_at=MONDAY,
             last_at=MONDAY,

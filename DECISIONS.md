@@ -3062,3 +3062,68 @@ dropping it removes a true zero from the median, pushes every later median up, a
 label a person would have found informative. Fixing it moved Edge's weekend labels from 7 to
 14 — the finding above is the number *after* the fix. It was noticed because the label yield
 was implausibly low, not because a test failed, and `test_blocks.py` now covers it.
+
+### D90 — A day is the right block, and the question that produced it was one sentence long
+
+D89 concluded that `block_volume` fails on label supply. Akash's response was a question:
+*"Let each day be a block? instead of weekday and weekend?"* Measured, it changes the answer.
+
+| Corpus | Weekly labels | **Daily labels** | Qualifying topics |
+|---|---:|---:|---:|
+| history-chrome | 1 | **124** | 7 |
+| history-edge | 47 | **196** | 6 |
+| history-firefox | 0 | **83** | 4 |
+| **total** | **48** | **403** | |
+
+**Every corpus now produces labels, including the two that produced none.** Firefox went
+from never reaching the starting line to 83. The total is an **8x increase from identical
+browsing** — no new data, only a smaller unit.
+
+**The mechanism is the one D89 identified.** A weekly block converts months of browsing into
+a handful of numbers per topic, and a trailing median consumes most of them before the first
+label exists. A day is the smallest unit that still has a "usual", so the same history buys
+five to seven times as many questions.
+
+**The risk I named did not materialise, and I had the reason backwards.** Before running it I
+expected daily counts to be zero-inflated — a topic seen three days a week has a daily
+history like `[2, 0, 0, 3, 0, 1, 0]`, whose median is 0, which is exactly D88's known flaw.
+Measured, the **median-zero rate is 0.0% on all three corpora**. The qualifying rule handles
+it: a topic present in at least half its prior blocks necessarily has a median of at least 1,
+so the rule that was written for the weekly case already excludes the failure case at daily
+granularity. Four to seven topics survive per corpus, which is enough for a card.
+
+**The 50/50 property still does not hold, and it now misses in the other direction.** Base
+rates are **36.3% Chrome, 39.3% Edge, 47.0% Firefox** under `>`, against 57-61% for weekly.
+Ties are 2.4-3.6% and cannot account for it. So D88's central claim remains false at daily
+granularity — the target is simply no longer *saturated*, which is a weaker and more
+achievable property than being balanced.
+
+**The share variant is closer to balanced on every corpus**: 41.1%, 44.4%, 49.4% against
+36.3%, 39.3%, 47.0%. That is three corpora agreeing in the same direction rather than the
+single 50.0% that D89 correctly refused to read anything into. It is now the better-supported
+of the two framings, though "better" here means 41-49% rather than 50%.
+
+**What this does not do.** It does not make `block_volume` correct — it makes it *viable*,
+which it was not. The trend contamination is smaller because a ten-block trailing window now
+spans ten days rather than seventy, but Chrome still trends 3.38x across its span and the
+retention hypothesis from D89 is untested either way. Nothing has been scored. No model has
+been fitted to any of this.
+
+**Where it leaves T20.** Two candidates now have a measured claim, and they are close enough
+that the choice is a real one rather than a formality:
+
+| | Labels | Balance |
+|---|---:|---|
+| `block_volume`, daily | **403** | 36-47%, or 41-49% on shares |
+| `next_session_category` | 238 | 33.2% floor against a 44.5% mode |
+
+D89 named `next_session_category` as the only candidate passing both tests. That sentence is
+now out of date: daily `block_volume` passes both as well, and on more labels. T20
+pre-registers between them, with both measured, and the argument for either is now a
+comparison rather than an assertion.
+
+**The method note, which is the part worth keeping.** D88 chose weekday/weekend blocks from
+an argument about how people experience a week. It was a good argument and it was wrong, and
+one question about the block size recovered the target D89 had just declared dead. The
+measurement had been built by then, so answering it cost an hour — the same machinery, one
+parameter. **Build the measurement before the conviction, and a change of mind is cheap.**

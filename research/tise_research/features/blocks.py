@@ -32,38 +32,49 @@ from tise_research.features.events import Event
 
 __all__ = [
     "BLOCK_TYPES",
+    "BLOCK_TYPES_BY_GRANULARITY",
     "Block",
     "BlockKey",
     "BlockType",
+    "Granularity",
     "block_key_for",
     "blocks_from_events",
     "category_counts",
     "complete_blocks",
 ]
 
-BlockType = Literal["weekday", "weekend"]
+BlockType = Literal["weekday", "weekend", "day"]
+Granularity = Literal["week", "day"]
 
-#: Ordered so reports iterate the two types the same way everywhere.
-BLOCK_TYPES: tuple[BlockType, ...] = ("weekday", "weekend")
+#: Which block types each granularity produces. Reports iterate these in order.
+BLOCK_TYPES_BY_GRANULARITY: dict[Granularity, tuple[BlockType, ...]] = {
+    "week": ("weekday", "weekend"),
+    "day": ("day",),
+}
+
+#: The weekly pair, kept as a name because most callers still mean exactly these two.
+BLOCK_TYPES: tuple[BlockType, ...] = BLOCK_TYPES_BY_GRANULARITY["week"]
 
 #: Days in each block, used to decide whether a block was fully observed.
-BLOCK_LENGTH_DAYS: dict[BlockType, int] = {"weekday": 5, "weekend": 2}
+BLOCK_LENGTH_DAYS: dict[BlockType, int] = {"weekday": 5, "weekend": 2, "day": 1}
 
 
 @dataclass(frozen=True, slots=True, order=True)
 class BlockKey:
-    """Identity of one block. Ordered, so sorting gives calendar order.
+    """Identity of one block: the calendar day it starts on, and what kind it is.
 
-    `iso_year` before `iso_week` before `kind` puts a week's weekday block ahead of its
-    weekend block, which is the order the prediction loop runs in.
+    Keyed on the **start date** rather than an ISO week number, so one scheme covers a
+    Monday-to-Friday block, a weekend, and a single day without special cases. Ordering by
+    `(start, kind)` gives calendar order for free, and within a week the weekday block
+    (starting Monday) sorts ahead of the weekend block (starting Saturday) — which is the
+    order the prediction loop runs in.
     """
 
-    iso_year: int
-    iso_week: int
+    start: date
     kind: BlockType
 
     def __str__(self) -> str:
-        return f"{self.iso_year}-W{self.iso_week:02d}-{self.kind}"
+        return f"{self.start.isoformat()}-{self.kind}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,7 +96,9 @@ class Block:
         return len({event.occurred_at.date() for event in self.events})
 
 
-def block_key_for(moment: datetime, tz: tzinfo) -> BlockKey:
+def block_key_for(
+    moment: datetime, tz: tzinfo, granularity: Granularity = "week"
+) -> BlockKey:
     """Which block a moment belongs to, in `tz`.
 
     Raises on a naive datetime rather than assuming UTC. `Event` already refuses naive
@@ -96,32 +109,37 @@ def block_key_for(moment: datetime, tz: tzinfo) -> BlockKey:
             "naive datetime has no block: a block boundary is local, so the timezone "
             "has to be known rather than assumed"
         )
-    local = moment.astimezone(tz)
-    iso_year, iso_week, iso_weekday = local.date().isocalendar()
-    # isocalendar() numbers Monday 1 through Sunday 7.
-    kind: BlockType = "weekday" if iso_weekday <= 5 else "weekend"
-    return BlockKey(iso_year=iso_year, iso_week=iso_week, kind=kind)
+    local = moment.astimezone(tz).date()
+    if granularity == "day":
+        return BlockKey(start=local, kind="day")
+
+    iso_weekday = local.isocalendar()[2]  # Monday 1 through Sunday 7.
+    if iso_weekday <= 5:
+        return BlockKey(start=local - timedelta(days=iso_weekday - 1), kind="weekday")
+    return BlockKey(start=local - timedelta(days=iso_weekday - 6), kind="weekend")
 
 
-def _week_keys(first: BlockKey, last: BlockKey, tz: tzinfo) -> list[BlockKey]:
+def _span_keys(first: BlockKey, last: BlockKey) -> list[BlockKey]:
     """Every block key from `first` to `last` inclusive, of `first`'s kind.
 
-    Walks actual Mondays rather than incrementing a week number, so the 52/53-week years
-    and the week straddling New Year are handled by the calendar instead of by arithmetic.
+    Walks real calendar dates rather than incrementing a week number, so 52/53-week years
+    and the week straddling New Year are handled by the calendar rather than by arithmetic.
     """
-    start = date.fromisocalendar(first.iso_year, first.iso_week, 1)
-    end = date.fromisocalendar(last.iso_year, last.iso_week, 1)
+    step = timedelta(days=1 if first.kind == "day" else 7)
     keys: list[BlockKey] = []
-    current = start
-    while current <= end:
-        iso_year, iso_week, _ = current.isocalendar()
-        keys.append(BlockKey(iso_year=iso_year, iso_week=iso_week, kind=first.kind))
-        current += timedelta(days=7)
+    current = first.start
+    while current <= last.start:
+        keys.append(BlockKey(start=current, kind=first.kind))
+        current += step
     return keys
 
 
 def blocks_from_events(
-    events: Iterable[Event], *, tz: tzinfo, fill_gaps: bool = True
+    events: Iterable[Event],
+    *,
+    tz: tzinfo,
+    granularity: Granularity = "week",
+    fill_gaps: bool = True,
 ) -> list[Block]:
     """Group events into blocks, in calendar order.
 
@@ -138,14 +156,14 @@ def blocks_from_events(
     """
     grouped: dict[BlockKey, list[Event]] = defaultdict(list)
     for event in events:
-        grouped[block_key_for(event.occurred_at, tz)].append(event)
+        grouped[block_key_for(event.occurred_at, tz, granularity)].append(event)
 
     keys = set(grouped)
     if fill_gaps and grouped:
-        for kind in BLOCK_TYPES:
+        for kind in BLOCK_TYPES_BY_GRANULARITY[granularity]:
             of_kind = sorted(key for key in grouped if key.kind == kind)
             if len(of_kind) >= 2:
-                keys |= set(_week_keys(of_kind[0], of_kind[-1], tz))
+                keys |= set(_span_keys(of_kind[0], of_kind[-1]))
 
     blocks: list[Block] = []
     for key in sorted(keys):
@@ -154,12 +172,8 @@ def blocks_from_events(
             first_at, last_at = items[0].occurred_at, items[-1].occurred_at
         else:
             # An empty block still needs a position in time, for novelty's lookback and
-            # for ordering. Use the block's own calendar start.
-            monday = date.fromisocalendar(key.iso_year, key.iso_week, 1)
-            offset = 0 if key.kind == "weekday" else 5
-            first_at = last_at = datetime.combine(
-                monday + timedelta(days=offset), time.min, tzinfo=tz
-            )
+            # for ordering. Its own calendar start is the honest choice.
+            first_at = last_at = datetime.combine(key.start, time.min, tzinfo=tz)
         blocks.append(
             Block(key=key, events=tuple(items), first_at=first_at, last_at=last_at)
         )
@@ -179,7 +193,7 @@ def complete_blocks(blocks: Sequence[Block], *, tz: tzinfo) -> list[Block]:
     other direction.
     """
     kept: list[Block] = []
-    for kind in BLOCK_TYPES:
+    for kind in {block.kind for block in blocks}:
         of_kind = [block for block in blocks if block.kind == kind]
         if len(of_kind) <= 2:
             # Nothing survives trimming both ends. Return none of this type rather than

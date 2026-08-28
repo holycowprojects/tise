@@ -79,6 +79,10 @@ class CorpusMeasurement:
     #: with only a handful of blocks the minimum-history rule may be doing all the work,
     #: and that has to be visible rather than inferred.
     prior_sweep: dict[str, dict[int, int]]
+    #: The same target at **daily** granularity. Weekly blocks turn months of browsing
+    #: into a handful of numbers; a day is the smallest unit that still has a "usual".
+    daily: BlockVolumeStats
+    daily_blocks: int
 
 
 def _pct(value: float | None, spec: str = ".1%") -> str:
@@ -89,6 +93,9 @@ def measure(copy_path: Path, *, tz: tzinfo, view: str) -> CorpusMeasurement:
     events = load_events(copy_path, view=view)
     every_block = blocks_from_events(events, tz=tz)
     blocks: list[Block] = complete_blocks(every_block, tz=tz)
+    daily_blocks: list[Block] = complete_blocks(
+        blocks_from_events(events, tz=tz, granularity="day"), tz=tz
+    )
 
     sessions = [
         sorted({event.category for event in session.events})
@@ -121,6 +128,8 @@ def measure(copy_path: Path, *, tz: tzinfo, view: str) -> CorpusMeasurement:
             }
             for kind in BLOCK_TYPES
         },
+        daily=block_volume_stats(daily_blocks, kind="day"),
+        daily_blocks=len(daily_blocks),
     )
 
 
@@ -131,8 +140,10 @@ def _volume_section(item: CorpusMeasurement) -> str:
         "Volume trend |",
         "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
-    for kind in BLOCK_TYPES:
-        stats = item.volume[kind]
+    for kind, stats in [
+        *((kind, item.volume[kind]) for kind in BLOCK_TYPES),
+        ("**day**", item.daily),
+    ]:
         rows.append(
             f"| {kind} | {stats.blocks} | {stats.labels} | "
             f"{_pct(stats.base_rate_strict)} | {_pct(stats.base_rate_inclusive)} | "

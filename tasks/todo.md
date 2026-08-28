@@ -98,12 +98,29 @@ Work order: **T19 → T20 → T21 → then back to T14/T15/T17/T18.**
     `docs/benchmarks/candidate-targets.md`
   - **Not to be done here:** choosing the target. That is T20, after these numbers exist
 
-- [ ] **T20 · Pre-register the target** · S · deps: T19 — **next, and now unblocked**
-  - T19 removed `block_volume` from the running. **Nothing has been chosen in its place** —
-    that is this task, and D89 is what it chooses from
-  - The candidate with a measured claim is `next_session_category`: the largest label supply
-    by 5×, a non-zero floor-to-mode gap, and code already written in both languages. That is
-    a statement about what to pre-register, **not** a finding that it works
+- [x] **T19b · A day as the block, measured** · S · deps: T19 — **Akash's question** (D90)
+  - *"Let each day be a block? instead of weekday and weekend?"* — measured, it reverses
+    D89's conclusion. Labels **48 → 403** from identical browsing, and **every corpus now
+    produces some**: Chrome 1 → **124**, Edge 47 → **196**, Firefox 0 → **83**
+  - **The zero-inflation risk I named did not materialise, and I had it backwards.** Daily
+    counts are zero far more often, but the qualifying rule already excludes exactly those
+    topics — present in ≥half the prior blocks implies a median ≥1. **Median-zero is 0.0%
+    on all three corpora**; 4–7 topics survive per corpus
+  - **Still not 50/50, and now missing low** — 36.3% / 39.3% / 47.0% against weekly's
+    57–61%. Ties are 2.4–3.6% and cannot explain it. The target is no longer *saturated*,
+    which is weaker than balanced but is the property that matters
+  - **Shares are closer to balanced on all three** — 41.1% / 44.4% / 49.4%. Three corpora
+    agreeing, unlike the single 50.0% D89 refused to read anything into
+  - `block_volume` is **viable**, not correct. Nothing scored, no model fitted
+
+- [ ] **T20 · Pre-register the target** · S · deps: T19, T19b — **next**
+  - **Two candidates now have a measured claim**, and the choice is real:
+    `block_volume` daily (**403** labels, 36–47% or 41–49% on shares) against
+    `next_session_category` (**238** labels, 33.2% floor vs 44.5% mode)
+  - D89's "the only candidate passing both tests" is **out of date** — D90 supersedes it
+  - Pre-register argument, definition, predictions and adoption rule **before** any model
+    is fitted (D81's discipline). D88 splits the gate: data sufficiency from T19/T19b,
+    performance registered in advance
   - D81's discipline. Argument, exact definition, predictions and adoption rule committed
     **before** any model is fitted — git holds the order
   - Sets the **performance** bar. The **data-sufficiency** gate is set from T19 (D88 splits
