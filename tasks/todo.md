@@ -186,7 +186,70 @@ Work order: **T19 → T20 → T21 → then back to T14/T15/T17/T18.**
     `idle` + window focus is what separates them — and that needs the `tabs` permission
   - Worth a pre-registration; **not** worth a permission request yet
 
-- [ ] **T22 · Measure `next_session_category`** · M · deps: T21 — **next**
+---
+
+## ▶ START HERE — Phase 7, four targets pre-registered (D94)
+
+**Akash's direction: Tise predicts all four.** D94 fixed every definition, bar, cluster unit
+and adoption rule **before implementation**. Nothing has been fitted to any of them.
+
+**Akash authorised the `tabs` permission and live collection** for T-D. `idle` was *not*
+explicitly authorised — ask before adding it.
+
+**The change that applies to all four:** every interval this project has published was
+resampled over **9–12 clusters**, because the subject has always been the category. D93's
+Edge run had 2,805 test rows and an interval built from **11 things**. Width scales with
+1/√clusters, so nothing here could ever resolve a small effect. D94 declares **session**
+clustering, with category reported alongside — and records that it was proposed *after*
+seeing D93 fail, which is why it is registered ahead of the run rather than applied to the
+old one.
+
+**Stopping rule, fixed in D94:** if none of T-A, T-B or T-C separates from its declared bar,
+the finding is that this data does not support a model, Tise ships descriptive, and that is
+published as the headline.
+
+- [ ] **T-A · `visit_engaged`** — "will this visit hold you?" · **do this first**
+  - **Label identical to D93's `as_1`** on purpose, so any change is attributable. Only two
+    things change: **features** (`as_2`) and **cluster unit** (session)
+  - `as_2` = `as_1` + `domainVisits`, `domainShare`, `isDailyDomain`, `domainDwellLevel`,
+    `prevSameDomain`, `prevDwellRatio`. **`domain` is stored since T1 and read by zero
+    features** — this is its first use
+  - **Bar: a constant** (`global_base_rate`). D93 established `category_base_rate` is worse
+    than a constant here, because a per-category median split makes every category ~50%
+  - **Adoption:** session-clustered interval vs the constant excludes zero in the model's
+    favour on Edge. D93 missed by **0.0001** with neither domain nor sequence features and
+    with 11 clusters
+  - **Next concrete step:** register `as_2` in `vector.py` + `prep.py` (`NULLABLE_BY_SET`
+    entry `"as_2": ()`), extend `attention.py` to compute it, thread the real session id
+    onto the label so session clustering is possible, then run
+  - Note: `attention.py` currently sets `session_id=event.event_id`. That needs to become
+    the actual session id. It does not change the label's meaning (outcome, subject,
+    window_end are untouched), and D94's "identical label" claim still holds
+
+- [ ] **T-B · `browsing_next_hour`** — "will you be here?"
+  - **Subject is the hour-of-day bucket**, so `category_base_rate` becomes the per-hour rate
+    automatically and needs no new baseline code
+  - **Bar is the rhythm, not a flat rate** — beating a flat rate would be trivial
+  - Cluster unit: calendar day. D94 predicts this one **fails** its bar
+
+- [ ] **T-C · `next_category`** — "what comes next?"
+  - Multiclass, **top-1 accuracy** against T19's **33.2% always-the-mode floor** — explicitly
+    *not* the 44.5% per-category mode, which is in-sample
+  - **Within-session** transitions as well as between; D94 predicts >1,500 labels per corpus
+  - Needs new plumbing: `run_backtest` is binary, so accuracy folds + a bootstrap on the
+    accuracy difference
+
+- [ ] **T-D · `tab_return`** — "will you come back to this tab?"
+  - **`tabs` permission authorised.** Not measurable on any corpus — the history database
+    records visits, not tabs — so this needs live collection and starts accumulating from
+    the day it ships
+  - Work: optional `tabs` permission in the manifest, consent-gated exactly as `history` is;
+    tab activation/deactivation collection; then wait for data
+
+---
+
+- [ ] **T22 · Measure `next_session_category`** · M · deps: T21 — **superseded by T-C**,
+      which subsumes it and adds within-session transitions
   - The remaining candidate. 238 labels, **never fitted at all**, code in both languages
     since T10. Bar fixed in D91: beat the **33.2% always-the-mode floor** by a
     subject-clustered interval excluding zero — *not* the 44.5% per-category mode, which is
