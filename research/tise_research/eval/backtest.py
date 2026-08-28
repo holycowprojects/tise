@@ -362,7 +362,12 @@ def main() -> int:
             )
 
             index = FeatureIndex(
-                events=load_events(copy_path),
+                # The view has to match the one the labels came from. Without it,
+                # `--view chosen` labels from one corpus and computes features from
+                # another, and D78 exists because that distinction changes the numbers.
+                # The default path is unaffected — both default to `shipped` — so no
+                # published number was ever built this way.
+                events=load_events(copy_path, view=args.view),
                 timeout_seconds=args.timeout_seconds,
                 horizon_hours=DEFAULT_HORIZON_HOURS,
             )

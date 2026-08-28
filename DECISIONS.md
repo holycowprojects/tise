@@ -2623,3 +2623,91 @@ from the shipped model, `unknown` excluded: its category, its feature vector, th
 probability given, the outcome, and the evidence line the UI would have shown. Selected by
 `max`, not by hunting for a good story — and if the worst row turns out to be dull, the dull
 one is what gets published.
+
+### D85 — The tournament: every prediction held, and the width ladder is the real finding
+
+D84 registered three predictions and an adoption rule before any of this code existed.
+`docs/benchmarks/tournament.md` has the tables; this is what they mean.
+
+**Prediction 1 held, harder than predicted.** `xgb_default` scores worse than the shipped
+model on **all three** corpora, not the one the prediction asked for: Chrome 0.2256 against
+0.2024, Edge 0.1287 against 0.1129, Firefox 0.2437 against 0.2131. Out of the box it also
+loses to `category_base_rate` on Chrome and Firefox, and on Chrome it loses to
+`global_base_rate` — **a constant beats it**. That is the whole reason `xgb_small` is the
+primary and this one is the reference: reported alone, this row would have been a straw man
+dressed as a result.
+
+**Prediction 2 held, and only just.** `xgb_small` beats the shipped model on exactly one
+corpus — Edge, 0.1084 against 0.1129 — and loses on Chrome (0.2141 against 0.2024) and
+Firefox (0.2260 against 0.2131). Point estimates favour what ships, 2 corpora to 1.
+
+**Prediction 3 held.** `xgb_small` against the shipped model on Edge, subject-clustered:
+**+0.0045 [−0.0082, +0.0362]**. Rows: +0.0045 [−0.0086, +0.0187]. Both include zero, as do
+all twelve intervals on the page.
+
+**The adoption rule does not fire, on any corpus, for either challenger.** `logreg_fs3`
+remains what ships — which D84 fixed in advance, so nothing about that was contingent.
+
+**What this licenses, and what it does not.** Not "the shipped model is as good as
+XGBoost". The claim is "271 test rows cannot tell them apart" — D80's finding about the
+model and its bar, reached again one level up. The sentence that can go in the README is
+that the in-browser constraint has **not been shown to cost anything measurable on this
+data**: weaker than "costs nothing", stronger than silence.
+
+**The finding I did not predict.** D82 argued that an interval's width is a property of the
+comparison rather than of the sample, correcting a natural misreading of D80. That was an
+argument. The tournament makes it a measurement, because three comparisons now run over the
+**same 271 Edge rows**, in the same unit, from one backtest:
+
+| Shipped model against | What they share | Point | 95% width |
+|---|---|---:|---:|
+| `logreg_fs2` | 12 of 14 features | +0.0006 | **0.0060** |
+| `xgb_small` | all 18 input columns, different model class | +0.0045 | **0.0273** |
+| `category_base_rate` | nothing but the category | −0.0124 | **0.0404** |
+
+**Monotone in shared structure, a factor of 6.7 end to end, with the sample held exactly
+fixed.** Sample size explains none of it. `fs_2` versus `fs_3` differs from the bar
+comparison by more than the bar comparison differs from zero.
+
+It also confirms the *mechanism* registered for prediction 3, not only its conclusion. The
+prediction was that the interval would be too wide to exclude zero, and it is: at the
+narrowest rung's width a point estimate of +0.0045 would have sat clear of zero, and at
+0.0273 it does not. The reasoning that produced the prediction is the reasoning the data
+supports — which is worth recording precisely because D79 and D82 are entries where it was
+not.
+
+**The documented failure, chosen by `max` as registered.** Edge, category `video`, window
+ending Saturday 2026-08-08. Every feature that could say *this continues* was at its
+ceiling: 373 events in 7 days, seen on all 7 of them, 27 sessions, 51.5% of all 30-day
+activity, prior return rate 89.3%, and last seen **four minutes** before the window closed.
+Tise said **99.1%**. The person did not come back. Squared error **0.9831** out of a
+possible 1.0000.
+
+The interesting part is what the feature set cannot say. The thing that appears to have
+happened is a weekend, and `dayOfWeek` sits in `fs_3` as a plain integer — deliberately, per
+`return_model.py`, until a cyclic encoding is measured rather than assumed — so a single
+linear coefficient must express "Saturday" as being five-sevenths of the way from Monday to
+Sunday. **This is a missing feature, not a calibration failure**, and Platt cannot reach it.
+It would not have been displayed: D70 found Tise abstains from everything on this data. That
+is the abstention machinery working, though it is not evidence about *this* row — a model
+that abstains from everything abstains from the good ones too.
+
+**The asymmetry D84 registered turns out to be negligible where it mattered.** The
+challenger gets native missing handling and the shipped model gets mean imputation, so any
+gap could have been partly that. On Edge only **0.4%** of pooled rows carry a null
+(`priorReturnRate`); Chrome 1.4%, Firefox 3.6%. It cannot account for the Edge difference.
+
+**Dependencies:** `xgboost` 3.4.1 and `scikit-learn` 1.9.0, **dev group only** — the research
+tier that `pyproject.toml` already declares is never shipped. No TypeScript twin, not in the
+parity contract, and every table labels them research-only. Both authorised by Akash;
+scikit-learn is required by `XGBClassifier`, and D84 had already committed to "library
+defaults, what a reviewer gets out of the box", which is that wrapper.
+
+**Two latent bugs found on the way, neither affecting a published number.** `model.md` named
+`fs_2` throughout after D83 shipped `fs_3` — string literals in the report writer where the
+figures beside them were dynamic — and `model_report.py` had **no test file at all**, the
+same hole D78 found in `corpus.py`, in the one file every claim about the model passes
+through. Separately, `backtest.py --with-model` passed `--view` to `load_labels` but not to
+`load_events`, so a non-default view would have labelled from one corpus and computed
+features from another; the default path is unaffected, which is why nothing published was
+built that way.

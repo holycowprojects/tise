@@ -294,10 +294,39 @@ working and committable.
 
 ## Phase 5 — Publish
 
-- [ ] **T16 · Model tournament and benchmark report** · M · deps: T13
+- [x] **T16 · Model tournament and benchmark report** · M · deps: T13
   - Identical folds for every model; report the XGBoost-vs-shipped gap; one documented failure
-  - **Still to do:** the tournament itself. Corpus, intervals, the feature transform and
-    **shipping `fs_3`** are done
+  - Verify: `uv run python -m tise_research.eval.tournament` ✓ — 606 Python, 333 TypeScript,
+    both linters clean. Report at `docs/benchmarks/tournament.md`
+  - [x] **The tournament — every pre-registered prediction held** (D84 pre-registration,
+    D85 result). `xgb_default` loses on all three corpora and on Chrome loses to a
+    *constant*; `xgb_small` wins on Edge alone (0.1084 vs 0.1129) and loses on the other
+    two. **The adoption rule fires nowhere** — all twelve intervals include zero — so
+    `logreg_fs3` remains what ships, as D84 fixed in advance
+  - **The pre-registered trap here was the mirror of D81's.** Not which fix to choose after
+    seeing scores, but **how strong to make the opponent**: tuned, a challenger reports a
+    maximum over draws that is mostly noise at 271 rows; at library defaults on a few
+    hundred rows it overfits and loses to an opponent quietly weakened. Both produce a
+    table that looks honest. Two declared configurations, **no search anywhere in T16**
+  - **What it licenses:** not "as good as XGBoost" — "271 test rows cannot tell them
+    apart". D80's finding one level up. The in-browser constraint has **not been shown to
+    cost anything measurable on this data**
+  - **The width ladder is the finding I did not predict.** D82 *argued* interval width is a
+    property of the comparison; three comparisons over the **same 271 Edge rows** now
+    measure it — `logreg_fs2` 0.0060, `xgb_small` 0.0273, `category_base_rate` 0.0404.
+    **Monotone in shared structure, 6.7x end to end, sample held exactly fixed**
+  - **The documented failure is not dull.** Edge `video`, Saturday 2026-08-08: 373 events
+    in 7 days, seen all 7, 51.5% of 30-day activity, 89.3% prior return rate, last seen
+    **4 minutes** earlier. Tise said **99.1%**; the person did not return. Squared error
+    0.9831 of 1.0. **A missing feature, not a calibration failure** — `dayOfWeek` is a
+    plain integer, so one coefficient must express "Saturday", and Platt cannot reach that
+  - `xgboost` 3.4.1 + `scikit-learn` 1.9.0, **dev group only**, research tier, no TS twin,
+    not in the parity contract. Both authorised
+  - **Two latent bugs found on the way**, neither affecting a published number: `model.md`
+    named `fs_2` after D83 shipped `fs_3` (literals beside dynamic figures) and
+    `model_report.py` had **no test file at all** — D78's `corpus.py` hole, in the file
+    every model claim passes through; and `backtest.py --with-model` gave `--view` to
+    `load_labels` but not `load_events`
   - [x] **`fs_3` ships** (D83, Akash authorised). Both languages, oracle regenerated, and
     the parity suite bit on the way — 15 failures against an `fs_2` oracle, then exactly
     the four expected sections moved and `labels`/`sessions`/`resolutions` stayed
