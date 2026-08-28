@@ -1,7 +1,10 @@
 # Spec: Tise V1
 
-**Status:** draft, awaiting review. Nothing here is built.
-**Decisions this spec implements:** D1–D14 in [`DECISIONS.md`](DECISIONS.md).
+**Status:** built and working, not released. The extension collects, imports, trains,
+predicts, expires and exports; 675 Python and 338 TypeScript tests pass. **No prediction
+target is adopted** — two have been retired and four are pre-registered and unfitted.
+**Decisions this spec implements:** D1–D95 in [`DECISIONS.md`](DECISIONS.md), which is
+authoritative wherever this file disagrees with it.
 
 ---
 
@@ -224,7 +227,7 @@ interface Prediction {
   createdAt: string;
   // Shipped today (extension/src/model/prediction.ts): "return_24h" | "next_session_category".
   // The union below is the T21 target state; the TS type changes when T21 lands, not before.
-  target: "block_volume" | "novelty" | "dormancy" | "next_session_category";
+  target: "visit_engaged" | "browsing_next_hour" | "next_category" | "tab_return";
   subject: string;          // the topic or category being predicted about
   probability: number;      // calibrated, 0..1
   windowStart: string;
@@ -248,27 +251,48 @@ the contradiction recorded in the audit.
 
 ## Prediction Targets
 
-### T1 — `block_volume` (primary, **not yet measured**)
+**Two targets have been retired. Four are pre-registered and none is fitted.** The
+authoritative list is D94 in `DECISIONS.md`; this section summarises it.
 
-> Will topic *X*'s activity in the next block be above *X*'s own trailing median for
-> blocks of that type?
+### T-A — `visit_engaged` (primary, **pre-registered, not fitted**)
 
-Blocks are `weekday` (Mon–Fri) and `weekend` (Sat–Sun), fixed for V1. Friday night
-predicts the weekend; Sunday night predicts the week. One labelled example per
-(qualifying topic, block). Resolves automatically at block end.
+> At the moment a page opens: will dwell exceed the median dwell for this category over its
+> trailing 20 visits?
 
-**A median split has a base rate of 50% by construction, for every user.** That is the
-point of it: `return_24h` silently inherited one person's ~70% base rate as a premise, and
-a user who browsed differently would have received a near-saturated or near-empty target
-with nothing in the design noticing.
+One label **per visit** — the finest unit the data contains. D93 measured **10,502 labels**
+at a **50.0% base rate**, the first target whose median split actually landed on 50%, and it
+**missed separating from a constant by 0.0001**.
 
-**Qualifying rule.** A topic gets a volume card only if it appeared in at least half the
-prior blocks. Below that its median is 0, "more than 0" collapses into "will it appear at
-all", and the 50% property is lost. Rarer topics route to T4 instead.
+**`full` compat class:** it needs dwell time, which the `chrome.history` API cannot supply.
+The `tabs` permission (authorised) makes it shippable; `idle` (authorised) fixes its
+**labels**, since `visit_duration` records a tab left open overnight as deep engagement.
 
-**Status: pre-registration pending.** No label yield, base rate or cluster measurement
-exists yet. See D88 — the target is pre-registered only after that measurement, and may
-still be replaced by T3 or T4.
+**Bar: a constant.** D93 established that `category_base_rate` is *worse* than a constant
+here, because a per-category median split makes every category ~50% by construction.
+
+### T-B — `browsing_next_hour` · T-C — `next_category` · T-D — `tab_return`
+
+Pre-registered in D94 with definitions, bars, cluster units and adoption rules fixed before
+implementation. T-D needs live tab data and cannot be measured on any existing corpus.
+
+### T-E — session intent clustering · T-F — domain association rules
+
+Descriptive candidates from D95. Neither needs to clear a prediction bar to be useful.
+
+### The cluster unit changed for all of them (D94)
+
+Every interval this project published was resampled over **9–12 subject clusters**, because
+the subject was always the category. Width scales with 1/√clusters, so no comparison here
+could resolve a small effect regardless of data volume. D94 declares **session** clustering
+with the category unit reported alongside.
+
+### T1-superseded — `block_volume` (retired as product target, D92)
+
+> Will topic *X*'s activity in the next block exceed *X*'s own trailing median?
+
+Retired because the model **lost to a single constant** on all three corpora, and
+`same_as_last` was far worse still — so "above your usual" is close to **independent day to
+day**. Its per-topic *rate* survives as a shippable card without a model; the model does not.
 
 ### T1-superseded — `return_24h` (retired as product target, D88)
 
@@ -494,14 +518,15 @@ Testable conditions for "V1 is done":
 4. `deleteAll()` leaves zero rows; export validates against the published schema.
 5. Parity suite passes: TS and Python features identical on the shared fixture.
 6. Leakage test passes.
-7. `block_volume` clears its data-sufficiency gate on real browsing. **The gate is not yet
-   set** — D88 fixes it after the measurement, because it is calibrated to what is
-   achievable and no score exists to bias it. T1's original "≥300 in 8 weeks" is retired
-   with the target it belonged to.
+7. The adopted target clears its data-sufficiency gate on real browsing. **D94 fixes each
+   target's gate before it is fitted.** T1's original "≥300 in 8 weeks" was retired with
+   `return_24h`, and `block_volume`'s with D92.
 8. A reliability curve exists from those outcomes, with Brier score and ECE reported.
-9. The shipped model beats all three baselines on `block_volume`, or ships with a written
-   explanation of why it does not. **The performance bar is pre-registered before any
-   model is fitted** (D88), the way D81 did it.
+9. The shipped model beats all three baselines on the adopted target, or ships with a
+   written explanation of why it does not. **Every performance bar is pre-registered before
+   any model is fitted** (D91, D94). D94 also fixes the **stopping rule**: if no target
+   separates from its declared bar, Tise ships descriptive and that is published as the
+   headline.
 10. An accuracy-versus-coverage curve is published. It is a result, not a gate — D88
     replaced abstention with showing every prediction alongside its denominator.
 11. Every number in the README traces to a committed script.

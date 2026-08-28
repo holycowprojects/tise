@@ -7,22 +7,26 @@ working and committable.
 
 ---
 
-## ⚠ The target changed (D88) — read before picking anything up
+## ⚠ Read this first — the target has changed twice
 
-**`return_24h` is retired as the product target.** T1–T17 below were all built for it and
-are left ticked and unedited: they are the evidence trail that justifies the change, not a
-backlog to redo. The machinery they produced — collection, sessions, features, parity,
-prediction, resolution, export, migration — is **reused**, not rewritten.
+**Go to [START HERE](#-start-here--phase-7-four-targets-pre-registered-d94) below (Phase 7).**
+Everything above it is history, kept because it is the evidence trail.
 
-**The new target is `block_volume`** — will a topic's activity in the next weekday or
-weekend block exceed that topic's own trailing median? A median split is 50/50 by
-construction for every user, which is the direct answer to why `return_24h` could not be
-separated from its baseline.
+- **`return_24h` retired** as the product target (D88) — measurable, and not a question
+  anyone cares about.
+- **`block_volume` retired too** (D92) — it produced labels but the model lost to *a single
+  constant*, and `same_as_last` was far worse, so "above your usual" is close to independent
+  day to day.
+- **Now: four targets pre-registered in D94** (T-A…T-D), plus two descriptive candidates from
+  D95 (T-E, T-F). **Nothing has been fitted to any of them.**
 
-**Nothing about it has been measured.** T19 is the gate, and until it runs, `block_volume`
-is a hypothesis with a good argument behind it and no numbers.
+T1–T21 below are left ticked and unedited. The machinery they produced — collection,
+sessions, features, parity, prediction, resolution, export, migration — is **reused**, not
+rewritten. Do not redo them, and do not quote their numbers as current: the generated
+reports in `docs/benchmarks/` carry superseded banners for the same reason.
 
-Work order: **T19 → T20 → T21 → then back to T14/T15/T17/T18.**
+Work order: **T-A → T-B → T-C → T-D**, with T-E/T-F available any time (both descriptive,
+neither needs to clear a prediction bar).
 
 ---
 
@@ -193,7 +197,7 @@ Work order: **T19 → T20 → T21 → then back to T14/T15/T17/T18.**
 **Akash's direction: Tise predicts all four.** D94 fixed every definition, bar, cluster unit
 and adoption rule **before implementation**. Nothing has been fitted to any of them.
 
-**Akash authorised `tabs` **and** `idle`, with live collection.** Both are optional
+**Akash authorised both `tabs` and `idle`, with live collection.** Both are optional
 permissions, consent-gated exactly as `history` already is.
 
 **`idle` fixes labels, not the model, which is worth more.** It turns "the tab was open" into
