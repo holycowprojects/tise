@@ -265,6 +265,16 @@ working and committable.
     because every test stopped at an early return. Fixed with an end-to-end group
   - Owed: the two manual checks — satisfy a prediction by browsing, and let one expire
 
+- [ ] **Owed verification — the `fs_3` migration on a real profile** · S · deps: T16
+  - **Highest-value check outstanding.** The Chrome profile from D64 holds ~5,105 events,
+    `fs_2` feature rows and a trained model. Loading the new build runs `migrateFeatureRows`
+    for real, against rows this project has never seen it applied to
+  - Every claim about it so far is from synthetic corpora. T5, T7 and T11 each had a
+    documented-looking claim fail on contact with a browser
+  - What to look for: the popup's model panel after one alarm — row count should be roughly
+    what it was before, **not** reset to the last 30 days. `skipped` must be 0
+  - An export afterwards also re-checks D76's loader against a profile that has migrated
+
 - [ ] **CHECKPOINT D** — the extension scores itself; reliability curve exists
 
 ---
