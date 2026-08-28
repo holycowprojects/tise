@@ -3542,3 +3542,98 @@ result is published as the headline rather than buried.** T-D remains open only 
 is unmeasured, not because it is a fallback.
 
 Three targets, three bars, all declared before a line of the model exists.
+
+### D95 — An outside plan reviewed: two candidates adopted, four confidence claims contradicted
+
+Akash supplied an external technical overview, *Local On-Device Browser Behavioral Prediction
+System*. It is not committed to this repository — its provenance is not ours to vouch for —
+so everything load-bearing from it is restated here and this entry stands alone.
+
+**Its data inventory is effectively identical to the Tier 0/1/2 list built here**, `idle`
+included. Two analyses arriving independently at the same inventory is worth something: it
+raises confidence that the *data* audit is right, and it says nothing about whether the
+*predictions* are achievable, which is where this project's evidence lives and the document
+has none.
+
+**What it proposes that D94 already covers.** Next navigation action, next domain (T-C),
+routine and session-start (T-B), session continuation (needs `idle`), next tab behaviour
+(T-D), domain habit and recurrence. Roughly 80% of its recommendations are already
+pre-registered or are natural extensions. Its architecture recommendations agree with ours:
+statistics and Markov before gradient boosting before sequence networks, and "do not start
+with a Transformer".
+
+---
+
+#### Two candidates adopted from it
+
+**T-E · session intent clustering.** Unsupervised clustering of sessions into recurring types
+— research, routine checking, entertainment, exploration — from session-level features
+(domain count, duration, transition distribution, entropy, idle periods). We had not
+considered this and it is a genuinely different shape from everything tried: it describes a
+session rather than predicting a topic, needs no labels, and is the same machinery T10b's
+domain clustering would use. **Descriptive, so it can ship without clearing a prediction
+bar**, which matters given D92's finding that the base-rate table is hard to beat.
+
+**T-F · domain association rules.** Which domains co-occur within a session, via association
+rules or FP-Growth. Co-occurrence was identified here as untapped; this names the method.
+`domain` is stored, read by zero features, and this is a use for it that needs no model.
+
+---
+
+#### Four confidence claims its own table makes, contradicted by measurements here
+
+The document's §18 rates prediction potential without measuring any of it. Four of those
+ratings conflict with numbers this project has already produced.
+
+| Its claim | Our measurement |
+|---|---|
+| Session continuation/end — **High** | **Saturated.** Chrome averages ~35 visits per session, so "will this continue" is ~97% yes. A constant is 97% accurate and useless — the exact trap `return_24h` fell into at 70%. Its *other* framing ("ends within 5/10/30 minutes") is sound; the binary one is not. |
+| Next transition type — **Very High** | `link` is the large majority of transitions. Accuracy will be high and **skill near zero**. Same trap. |
+| Next domain — **Very High** | Next *category* measures a 33.2% always-the-mode floor against 44.5% in-sample (T19). With ~227 domains, top-1 falls much further. Top-3 is plausible; "Very High" is not supported. |
+| Personal anomaly detection — **Very High** | **Unmeasurable.** Anomaly detection has no ground truth; the document concedes it trains without labelled anomalies and then rates it Very High regardless. |
+
+**The anomaly rating is disqualifying for this project specifically, not merely optimistic.**
+Tise's differentiator is that every published number came from a committed script with an
+interval on it. An unfalsifiable headline capability is **purchase intent returning under a
+new name** — D6 removed that target for exactly this reason, and reintroducing it as the
+flagship would undo the one thing the showcase demonstrates. Anomaly detection may still be
+worth building as a *labelled demo*, never as an evaluated claim.
+
+---
+
+#### The two things it does not address, which are the two that have actually beaten us
+
+**Scale.** It never confronts how little data one person produces. Eight weeks of browsing is
+~5,000 events. It recommends LightGBM, XGBoost, HMMs and LSTMs without noting that
+`block_volume` yielded **403 labels** across three corpora, where a boosted ensemble overfits
+immediately — D85 measured exactly that. Every failure in this project has been label count
+and cluster count, not model class.
+
+**Baselines.** It lists metrics thoroughly and **never says compare against a per-topic
+rate**. That omission is the entire history of this project: four models, all matched or
+beaten by `category_base_rate`. A plan recommending gradient boosting without a mandatory
+baseline comparison leads directly into the four failures already recorded here. D24 makes
+baselines mandatory in every report and that rule stands above anything this document says.
+
+---
+
+#### One correction, and one thing adopted
+
+**Rejected: §20's "hash or locally tokenize sensitive identifiers".** Hashes of low-entropy
+paths invert trivially — a URL path space is small enough to brute-force in seconds, so a
+hashed path is a reversible path. If path features are ever adopted, they are bounded
+non-reversible signals, never hashes. This does not change the still-open invariant-2
+decision; it removes one wrong way of implementing it.
+
+**Adopted: §17's confidence buckets** — "High / Medium / Low / Insufficient data" rather than
+a precise probability from a poorly-calibrated model. This is close to what D88 already
+decided (always show the denominator) and is the better UI expression of it. A bucket plus a
+denominator says more honestly what a bare percentage implies falsely.
+
+---
+
+**Net effect on the plan:** two candidates added (T-E, T-F), both descriptive and neither
+requiring a prediction bar to be useful; four confidence claims recorded as contradicted so
+they cannot be quoted back at us later; two omissions recorded because they are the
+constraints that have actually decided every result here. T-A through T-D are unchanged, and
+D94's stopping rule still governs.

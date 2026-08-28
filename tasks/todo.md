@@ -253,6 +253,19 @@ published as the headline.
   - Work: optional `tabs` permission in the manifest, consent-gated exactly as `history` is;
     tab activation/deactivation collection; then wait for data
 
+- [ ] **T-E · Session intent clustering** · M — **from D95, descriptive**
+  - Unsupervised clustering of *sessions* into recurring types (research, routine checking,
+    entertainment, exploration) from session-level features: domain count, duration,
+    transition distribution, navigation entropy, idle periods
+  - **A different shape from everything tried** — it describes a session rather than
+    predicting a topic, and needs no labels. Same machinery as T10b's domain clustering
+  - **Descriptive, so it ships without clearing a prediction bar.** That matters given D92:
+    the base-rate table is hard to beat, and this does not have to beat it
+
+- [ ] **T-F · Domain association rules** · S — **from D95, descriptive**
+  - Which domains co-occur within a session. Association rules / FP-Growth
+  - Uses `domain`, stored since T1 and read by **zero** features. Needs no model
+
 ---
 
 - [ ] **T22 · Measure `next_session_category`** · M · deps: T21 — **superseded by T-C**,
