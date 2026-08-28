@@ -2957,3 +2957,108 @@ all open. `return_24h` at least had T1's gate run before a line of it was built.
 The next task is that measurement, and **the target is pre-registered only after it** —
 including the possibility that the measurement kills `block_volume` and one of the other
 three candidates takes its place.
+
+### D89 — T19's measurement: `block_volume` does not survive contact with the data
+
+D88 retired `return_24h` on an argument and recorded, in its own closing section, that
+nothing about the replacement had been measured. `analysis/candidate_targets.py` is that
+measurement. **No model was fitted and nothing was scored**, which is what makes the
+data-sufficiency gate settable from it. The gate fires.
+
+**Two of the three corpora produce zero labels.** Chrome: 7 weekday and 5 weekend complete
+blocks, **1 label total**. Firefox: 4 and 4, **0 labels**. Edge, the largest at a 90-day
+span, produces **33 weekday and 14 weekend** — 47 against `return_24h`'s 503 on the same
+browsing, roughly a **10x drop**. At the most permissive minimum-history setting measured
+(`min_prior=2`) Edge reaches 116 and Chrome 44; Firefox still reaches 25.
+
+The arithmetic was always going to say this and the argument talked past it: a weekly block
+gives each topic **two observations a week**, so eight weeks of history is eight numbers per
+topic per block type. A trailing median needs most of them, and what is left over is the
+label supply. This was raised before T19 and is now measured rather than argued.
+
+**The 50/50 claim is false on this data, and the reason is not the one D88 anticipated.**
+D88's load-bearing property was that a median split has a base rate of 50% by construction,
+for every user. Measured on Edge: **60.6% weekday, 57.1% weekend**.
+
+The two mechanisms D88 named as risks are not responsible. Ties are **6.1% and 0.0%**, and
+the trailing median was zero on **0.0%** of labels — the qualifying rule does its job. The
+cause is a third thing, which the entry did not consider:
+
+> **A median split is 50/50 only on a stationary series.** These are not stationary. Mean
+> events per block, second half over first: Chrome weekday **5.45x**, Edge weekday
+> **3.57x**, Edge weekend **2.93x**, Firefox weekday **0.15x**.
+
+With activity growing threefold across the window, the current block beats a median of
+earlier blocks far more often than not, for reasons that have nothing to do with the topic
+being predicted. On Firefox, where volume *falls*, the bias runs the other way. So the base
+rate does not merely miss 50% — it **moves with each corpus's trend, and even changes
+direction**, which is precisely the property `return_24h` was retired for lacking.
+
+**And the trend is probably an artefact, which makes it worse rather than better.** Browsers
+expire history on their own schedule; `history-shape-*.md` has recorded that as a limitation
+since T1. A 5.45x rise over eight weeks is not plausible as behaviour change, and the simpler
+reading is that the *older* blocks have been thinned by retention. That has a direct
+consequence for D88's cold-start design: **medians bootstrapped from imported history are
+systematically low, so the first live blocks would read as "above your usual" almost
+regardless of what the person did.** The bootstrap would not be neutral; it would be biased
+in a known direction. Not proven — retention and behaviour cannot be separated from one
+corpus — but it is the more parsimonious explanation and it is testable against the owed
+import-versus-live check.
+
+**The share variant behaves differently and is not obviously better.** Computing the same
+target on each topic's share of the block rather than its raw count gives Edge **36.4%
+weekday, 50.0% weekend**. Weekend lands exactly on 50%, weekday overshoots downward.
+A share normalises out the volume trend, which is why weekend improves; it also makes topics
+compositional, so one topic rising forces others down. One number at 50.0% is not evidence
+that shares work.
+
+**The other three candidates, measured on the same blocks.**
+
+| Candidate | Labels (Edge) | Base rate | Verdict |
+|---|---:|---:|---|
+| `novelty` weekday | 12 | **91.7%** | Dead. "You will see something new this week" is not information. |
+| `novelty` weekend | 10 | 70.0% | Alive but thin, and 10 labels is not a basis for anything. |
+| `dormancy` weekday | 27 | 14.8% | Usable base rate, small supply. |
+| `dormancy` weekend | 30 | 13.3% | Same. Consistent across block types, which is mildly reassuring. |
+| `next_session_category` | **238** | 33.2% floor | **Five times the label supply of every block target combined.** |
+
+`next_session_category` is the surprise, and it was already built. Always predicting the
+single most common successor scores **33.2%**; predicting each category's own most common
+successor scores **44.5%** across 14 categories. Neither is a fitted model — both are modes
+of the observed data — and the eleven-point gap between them is headroom a transition table
+could occupy. The machinery has existed since T10 in both languages and has **never been
+benchmarked**.
+
+**Splitting `unknown` by co-occurrence does not work on this data.** Edge's `unknown` holds
+661 events across 67 domains, of which **7** appear in three or more sessions. Clustering
+finds **0 clusters at every threshold from 0.3 to 0.7**. The bucket is not a few hidden
+categories; it is a long tail of domains visited once or twice. D88 promoted this from
+optional to load-bearing on the strength of `unknown` holding a fifth of the labels — the
+share is real, the proposed mechanism does not reach it. A different signal (title keywords,
+which the rules layer already contemplates) or simply asking the user would be needed, and
+neither has been measured.
+
+**What this changes.** `block_volume` is **not adopted**. It fails the data-sufficiency gate
+on two corpora outright, produces a tenth of the labels on the third, and its central
+statistical property does not hold on non-stationary data — which every one of these corpora
+is, whether by behaviour or by retention.
+
+Nothing is chosen in its place here. T20 pre-registers the replacement, and this page is what
+it chooses from. The candidate with a measured claim to it is `next_session_category`, on
+label supply and on a floor-to-mode gap that is not zero; that is a statement about what to
+pre-register, not a decision that it works.
+
+**The method note.** Two targets have now been retired, one after being built and benchmarked
+across seventy decision entries, the other before a line of product code was written. The
+difference is that D88 recorded "nothing about this is measured" as a first-class item and
+put the measurement ahead of the build. **The gate cost one session; `return_24h` cost
+months.** That is the entire argument for gates, and it now has both halves of the comparison
+in the same repository.
+
+**One bug found and fixed inside T19, which changed the answer.** `blocks_from_events`
+originally created a block only where events existed, so a week with no browsing simply
+vanished. A weekend nobody browsed is a **real observation of zero**, not a missing block:
+dropping it removes a true zero from the median, pushes every later median up, and deletes a
+label a person would have found informative. Fixing it moved Edge's weekend labels from 7 to
+14 — the finding above is the number *after* the fix. It was noticed because the label yield
+was implausibly low, not because a test failed, and `test_blocks.py` now covers it.

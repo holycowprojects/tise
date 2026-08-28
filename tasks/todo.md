@@ -53,7 +53,32 @@ Work order: **T19 → T20 → T21 → then back to T14/T15/T17/T18.**
     old one. Fixed by marking shipped vs target-state rather than by changing TS — the
     extension still predicts `return_24h` until T21
 
-- [ ] **T19 · Measure all four candidate targets** · M · deps: none — **do this first**
+- [x] **T19 · Measure all four candidate targets** · M · deps: none — **GATE FIRED** (D89)
+  - Verify: `uv run python analysis/candidate_targets.py` ✓ — 646 Python, 338 TypeScript,
+    both linters clean. Report at `docs/benchmarks/candidate-targets.md`
+  - **`block_volume` is not adopted.** Chrome yields **1 label**, Firefox **0**, Edge **47**
+    against `return_24h`'s 503 on the same browsing. A weekly block gives each topic two
+    observations a week; a trailing median consumes most of eight weeks of them
+  - **D88's 50/50 claim is false here — 60.6% / 57.1% on Edge** — and not for either reason
+    D88 anticipated. Ties are 6.1%/0.0%, median-zero is 0.0%. **A median split is 50/50 only
+    on a stationary series**, and volume trends are Chrome **5.45×**, Edge **3.57×**,
+    Firefox **0.15×**. The base rate moves with each corpus's trend and changes direction
+  - **The trend is probably history retention, not behaviour** — which is worse: medians
+    bootstrapped from imported history would be systematically low, so the first live blocks
+    read "above your usual" almost regardless of what the person did. Testable against the
+    owed import-vs-live check
+  - **`novelty` weekday is dead at 91.7%.** `dormancy` is usable (13–15%) but small
+  - **`next_session_category` has 238 labels — five times every block target combined** —
+    with a 33.2% always-the-mode floor against a 44.5% per-category mode. Both are modes of
+    observed data, not fitted models. Built since T10 in both languages, **never benchmarked**
+  - **Clustering `unknown` finds 0 clusters at every threshold 0.3–0.7.** Only 7 of Edge's
+    67 `unknown` domains appear in ≥3 sessions. The bucket is a long tail of one-off
+    domains, not hidden categories — the share is real, the proposed mechanism does not
+    reach it
+  - **A bug found inside T19 that changed the answer:** blocks existed only where events
+    did, so a week with no browsing vanished. A weekend nobody browsed is a *real zero*;
+    dropping it lifts every later median and deletes an informative label. Edge weekend
+    labels 7 → 14. Found by the yield being implausible, not by a test — now covered
   - No model is fitted and nothing is scored. Purely descriptive, which is why D88 permits
     the data-sufficiency gate to be set *after* it
   - Per corpus, per candidate: **label yield, base rate, and how many topics survive**
@@ -73,7 +98,12 @@ Work order: **T19 → T20 → T21 → then back to T14/T15/T17/T18.**
     `docs/benchmarks/candidate-targets.md`
   - **Not to be done here:** choosing the target. That is T20, after these numbers exist
 
-- [ ] **T20 · Pre-register the target** · S · deps: T19
+- [ ] **T20 · Pre-register the target** · S · deps: T19 — **next, and now unblocked**
+  - T19 removed `block_volume` from the running. **Nothing has been chosen in its place** —
+    that is this task, and D89 is what it chooses from
+  - The candidate with a measured claim is `next_session_category`: the largest label supply
+    by 5×, a non-zero floor-to-mode gap, and code already written in both languages. That is
+    a statement about what to pre-register, **not** a finding that it works
   - D81's discipline. Argument, exact definition, predictions and adoption rule committed
     **before** any model is fitted — git holds the order
   - Sets the **performance** bar. The **data-sufficiency** gate is set from T19 (D88 splits
