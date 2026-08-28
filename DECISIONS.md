@@ -2268,3 +2268,82 @@ baseline. It says this much of one person's browsing cannot separate them, which
 statement about the evidence rather than about the model. The honest position for the
 README, T18 and any published claim is: **`logreg_fs2` is not yet distinguishable from a
 table of per-category base rates.**
+
+### D81 — Pre-registering the feature transform, before any number about it exists
+
+T16 requires that the fix for the cumulative-feature problem be **chosen without looking at
+the fold scores**, or it is fitted to the test set. That constraint is unenforceable after
+the fact: nobody can prove which numbers were on screen when a decision was made. So this
+entry is committed *before* the replacement features are implemented, and the result gets
+its own entry afterwards. Git holds the order.
+
+**The diagnosis, restated from what is already published.** `model.md` reports the share of
+test rows whose feature value falls outside the range the coefficients were fitted on. On
+Edge: `hoursSinceFirstSeen` **76.8%**, `priorSessionCount` **42.1%**. On Chrome, 67.5% and
+24.2%. Both features can only ever increase, so in an expanding-window backtest every test
+row sits later in the calendar than every training row and the feature works as an index of
+which fold you are in.
+
+**The argument for changing them does not depend on any score.** `hoursSinceFirstSeen` and
+`priorSessionCount` are not properties of how a person behaves. They are properties of
+**when observation started**. Two people with identical habits, one of whom installed Tise a
+year earlier, produce different values for both. Tise ships to individuals whose install
+date is arbitrary and whose history import reaches back an arbitrary distance — D64 found a
+90-day import returning 57 days, because that profile had nothing older. A coefficient
+learned against the author's install date transfers to nobody, and drifts for the author
+too, every day. That is a reason to replace them even if it made every published number
+worse, and it is the reason being acted on.
+
+**The rule being applied: replace a feature that grows with the calendar by a bounded one.**
+Boundedness makes a large excursion beyond the fitted range *structurally impossible* rather
+than merely unlikely.
+
+1. `hoursSinceFirstSeen` → **`firstSeenSaturation`** = `h / (h + 168)`, in [0, 1).
+   The scale is **168 hours = 7 days**, taken from the 7-day windows already in `fs_2`, so
+   the feature set carries one notion of "recent" rather than two. The signal it keeps is
+   the real one: the difference between a category first seen yesterday and one first seen
+   a month ago is large, and the difference between 300 days and 330 days is nothing.
+2. `priorSessionCount` → **`priorSessionRate`** = sessions per observed day, saturated:
+   `r / (r + 1)` where `r = resolved_prior_sessions / max(observed_days, 1)`. The scale is
+   **one session per day**, the natural unit of a daily habit. This is the behavioural
+   quantity the raw count was standing in for — how often, not how many since install.
+
+**Deliberately not touched:** `eventCount7d`, `eventCount30d`, `sessionCount7d`,
+`sessionEventCount`, `sessionCategoryCount`, `categoryEventsInSession`. These are unbounded
+counts and some show excursions too, but they are **windowed** — they rise and fall, and do
+not index the calendar. `eventCount30d`'s excursion has a different cause (early history is
+shorter than the window and fills in) and it self-corrects. Fixing what was not diagnosed
+would make the result unattributable.
+
+This becomes **`fs_3`**. `fs_2` is kept and benchmarked on identical folds, because a
+replacement that cannot be compared against what it replaced is not a measurement. `fs_2`
+remains what the extension ships until this is decided.
+
+**Predictions, recorded now.**
+
+1. **The share of test rows outside the fitted range will *not* fall to zero for the two
+   replaced features, and that is expected.** A bounded feature still has an observed
+   training range narrower than [0, 1) — `priorReturnRate` is already bounded and still
+   shows 13.2% outside. Share-outside is therefore the wrong mechanism metric.
+2. **The right metric is the size of the excursion, not its frequency**: how far beyond the
+   training range a test value lands, in units of the training range's own width. For a
+   feature bounded in [0, 1) this cannot exceed 1/width; for an unbounded counter it has no
+   limit. **Prediction: the maximum relative excursion for the two replaced features falls
+   substantially. This is the mechanism claim and the one that can fail cleanly.**
+3. **Prediction: `fs_3` will not be distinguishable from `fs_2` by interval.** D80 showed
+   271 Edge test rows cannot separate a Brier difference of 0.013 from zero; there is no
+   reason a feature swap would clear a bar the model itself could not.
+
+**The adoption rule, fixed now so it cannot be chosen to fit the outcome.** Adopt `fs_3` if
+**both**:
+
+- the maximum relative excursion for the two replaced features falls, prediction 2; **and**
+- the paired interval on `fs_3` versus `fs_2` **does not exclude zero in `fs_2`'s favour** —
+  that is, `fs_3` is not shown to be worse.
+
+Adoption is therefore on the **argument plus the mechanism**, with the score acting only as
+a veto. It is explicitly **not** conditional on `fs_3` scoring better, because D80 
+established that this corpus cannot demonstrate "better" for a difference of this size, and
+a rule requiring it would be a rule that can never fire honestly. If `fs_3` scores worse by
+point estimate while its interval includes zero, it is still adopted, and that sentence is
+written here rather than after the fact.
