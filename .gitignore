@@ -30,7 +30,19 @@ CLAUDE.local.md
 !/Screenshots/chrome screenshots/ss_check*.png
 
 # Belt and braces, path-independent: an export is a profile of a person wherever it lands.
+# The `/data/` rule above is anchored on purpose — a bare `data/` would swallow the source
+# package `research/tise_research/data/` — and an anchored rule protects one directory, not
+# the file. D97: running `analysis/history_shape.py` from `research/` made it write a fresh
+# copy of the live Chrome history to `research/data/`, which no rule here covered. It was
+# never committed, but nothing except noticing stood in the way.
+#
+# A history copy is a person's browsing wherever it lands, so these are path-independent and
+# named after the *file*, not the directory it happens to be in.
 **/tise-export-*.json
+**/*.copy
+**/*.copy-wal
+**/*.copy-shm
+**/history-shape-domains-*.md
 **/ss_tt*.png
 **/ss_ta*.png
 

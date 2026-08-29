@@ -4,7 +4,7 @@
 >
 > **The day-of-week pattern and its non-monotonicity stand** — measurements of the browsing itself, unaffected by what is being predicted.
 >
-> **The rates themselves are `return_24h` outcomes and** belongs to `return_24h`, retired as the product target in D88. Tise now predicts **`block_volume`**.
+> **The rates themselves are `return_24h` outcomes and** belongs to `return_24h`, retired as the product target in D88. The project now builds toward **`visit_engaged`**, and the shipped extension still trains **`return_24h`** — no target is wired in before it is built end to end.
 >
 > See D88 in [`DECISIONS.md`](../../DECISIONS.md).
 

@@ -3697,3 +3697,324 @@ neither list. D95 recorded why `cookies` in particular is the wrong trade — it
 credentials, and it needs host permissions for every site.
 
 356 TypeScript tests, 675 Python, both linters clean, builds.
+
+### D97 — T-A clears its bar. The first target this project has adopted on a rule written before the measurement
+
+`visit_engaged` — *at the moment a page opens, will you stay longer than you usually stay on
+pages of this topic?* — separates from its declared bar on both corpora with dwell.
+
+|  | `history-chrome` | `history-edge` *(the adoption corpus)* |
+|---|---|---|
+| labels / pooled test rows | 4,935 / 2,224 | 5,567 / 2,805 |
+| `logreg_as2` | **0.2462** | **0.2388** |
+| `logreg_as1` (D93) | 0.2488 | 0.2446 |
+| `domain_base_rate` | 0.2499 | 0.2453 |
+| `global_base_rate` (**the bar**) | 0.2500 | 0.2501 |
+| **vs the bar, session-clustered** | **+0.0038 [+0.0006, +0.0101]** (n=27) | **+0.0112 [+0.0068, +0.0159]** (n=155) |
+| vs the bar, *subject*-clustered | +0.0038 [−0.0005, +0.0318] (n=9) — **includes zero** | +0.0112 [−0.0054, +0.0166] (n=11) — **includes zero** |
+| vs `as_1`, session-clustered | +0.0026 [+0.0004, +0.0036] | +0.0057 [+0.0024, +0.0094] |
+| vs the domain table, session-clustered | +0.0037 [+0.0005, +0.0094] | +0.0065 [+0.0022, +0.0109] |
+
+**D94 fixed every one of those choices before the code existed** — the label, the feature
+set, the bar, the resampling unit and the adoption rule. Git holds the order. That is the
+only reason this row of numbers means anything: five entries have been spent on targets that
+were measured and then argued about, and this is the first one where there was nothing left
+to argue.
+
+**Both halves of D94's change were necessary, and that is measured rather than assumed.**
+The subject-clustered row exists to answer exactly this. Under the *old* cluster unit — the
+category, 9 and 11 clusters — the identical point estimate **includes zero on both
+corpora**. Under sessions it excludes zero on both. And with the cluster unit held fixed,
+`as_2` beats `as_1` by an interval that also excludes zero on both. So neither change alone
+would have carried it: the features moved the estimate, the unit made the estimate
+resolvable, and D93 failed by 0.0001 because it had neither.
+
+**`domain` earns its place on its first use.** It has been stored since T1 and read by zero
+features until now, and `domainDwellLevel` — the median dwell on this domain — is the
+**second-largest coefficient on both corpora**. That is the diagnosis confirmed: every
+target this project retired asked about *a topic in isolation*, which is precisely the
+question a per-topic rate already answers, so a per-topic rate was hard to beat. `news` is a
+bucket; the domain is the thing the person actually went to.
+
+**The rival was added because the coefficient table demands it, not because the rule did.**
+Four of `as_2`'s six new features read the domain, so "a per-domain rate table would do the
+same job" is the first thing a sceptical reader should be able to check, and D24 makes
+baselines mandatory. `domain_base_rate` is `category_base_rate`'s construction and smoothing
+keyed on the domain instead. **On Edge it very nearly matches D93's entire twelve-feature
+model** — 0.2453 against 0.2446 — which is the strongest single piece of evidence for the
+diagnosis above. On Chrome it does **nothing at all** (0.2499 against the constant's 0.2500),
+where 217 domains split 2,224 rows against Edge's 127 splitting 2,805. The model beats it on
+both regardless. It is reported beside the verdict and never inside it: promoting a rival to
+the bar after seeing the coefficients would be choosing the rule from the result.
+
+**Chrome clears the bar and should be read as the weaker corpus.** Its pooled test window is
+eleven days and **one session holds 43% of its rows**, against a median session of five. A
+bootstrap over 27 clusters is worth 27 clusters only when they are comparable; here most
+resamples turn on whether that one session was drawn. The report says so on the page, in a
+section that prints the spread for every corpus — a cluster *count* cannot distinguish these
+two cases and the `n=` alone is what a reader would otherwise trust. The threshold that
+triggers the wording is declared at a fifth and **no adoption decision reads it**, for the
+same reason: adding a concentration condition after seeing which corpus is concentrated
+would be choosing the rule from the result.
+
+**A 957-visit session is the D17 timeout showing through.** Clustering by session makes a
+*declared guess* load-bearing in a new way — too long a timeout merges several sittings into
+one cluster and widens the interval, too short splits one and narrows it. T1 looked for an
+empirical trough in the gap distribution and found none, so there is no natural value to
+discover. `idle` (authorised, D96) is what replaces the guess with a measurement, and this
+is now the second reason to want it.
+
+**Adopted is not shipped, and the gap is the point.** `as_2` is the `full` compat class: it
+needs dwell, which the `chrome.history` API cannot supply and which the research tier reads
+from the history *file*. D96 shipped live attention collection precisely so this day would
+not start from zero, but those spans are days old, there is no TypeScript twin of `as_2`, and
+the parity contract is therefore unmet. **The extension still trains `return_24h` and still
+shows nothing.** Wiring in a target before it is built end to end is the mistake five entries
+have been spent avoiding, and clearing a bar does not exempt it.
+
+**Two smaller things settled on the way.**
+
+`brier_difference_interval` now takes `unit=`, which names what a cluster is and changes no
+arithmetic. Until D94 the cluster was always the category and the word "subject" was always
+right; an interval that resampled sessions while printing `subjects, n=11` would be a right
+number under a wrong label, which is the D86/D87 defect. `run_backtest` keeps
+`pooled_sessions` alongside `pooled_subjects` so both bounds stay computable after the fact.
+
+And the target had two names: SPEC's `Prediction.target` union has said `visit_engaged` since
+D94 while the code emitted `attention_dwell`. One name now. No published figure moved,
+because no report prints the target string — and regenerating `attention.md` after all of
+this changed **not one figure**, which is how the `as_1` half of the comparison above is
+known to be untouched.
+
+697 Python tests, 356 TypeScript, both linters clean, builds.
+
+### D98 — Two provenance defects found while publishing T-A, one of them a near-miss on the privacy invariant
+
+Neither of these is about the model. Both were found by *regenerating* the benchmark site
+rather than by reading it, and both are cases where the machinery built to keep the public
+artifacts honest was itself wrong.
+
+**`reports.py` had gone stale, in the module written to stop reports going stale.**
+`CURRENT_TARGET` said `block_volume`. D92 retired `block_volume` two decisions earlier, so
+for that whole time **eight generated reports told readers that Tise now predicts a target
+the project had already abandoned** — under a heading marked "Superseded", which is the
+part that makes it worse. D88 created this module because twelve reports described a retired
+target with nothing saying so; the fix was to derive the banner instead of typing it, and
+the derived banner was wrong for two decisions.
+
+**Derivation was not the flaw. The constant was being asked to mean two things.** *What the
+project builds toward* and *what the extension actually runs* are different by design — D96
+records that no target is wired in before it is built end to end, so they are **meant** to
+diverge, and whichever of the two that single constant named, the banner was false about the
+other. It is now `CURRENT_TARGET` and `SHIPPED_TARGET`, with one shared sentence
+(`what_tise_predicts()`) that names both, so the two cannot drift apart in the wording
+either.
+
+Every existing test passed throughout, and they were not bad tests — they check the
+*mechanism*: that a retired target gets a banner naming the right decision, that a current
+target gets nothing, that the module refuses to invent a decision. None of them could check
+that the constant named something real, because **a constant cannot check itself**. The new
+test therefore reaches outside the module for the only external fact available: it asserts
+`SHIPPED_TARGET` against the literal in `extension/src/model/predict.ts`. That is the same
+shape as the parity contract — two tiers, one fact, asserted across the boundary.
+
+`block-volume.md` also had **no banner at all**, D88's original defect one target later, and
+now carries one. `attention.md` gained a forward pointer to `visit-engaged.md`: its numbers
+stand and are not withdrawn, but it is no longer the project's latest word on its own
+question.
+
+**And the second one: `analysis/history_shape.py` re-read the live browser.** Regenerating
+that report the way the report itself instructed —
+
+```
+uv run python analysis/history_shape.py --out docs/benchmarks/
+```
+
+— opened the **live Chrome profile**, copied it afresh, and rewrote the page against three
+extra days of browsing. Every figure on it moved: 5,129 visits became 5,418, the T1 gate
+count 358 became 377. The code three lines below that command already explained the hazard
+in a comment; the printed instruction walked straight into it. Reverted, and the page now
+prints `--history data/history-chrome.copy` and says why.
+
+**The near-miss.** Run from `research/`, the cwd-relative `--data-dir` default put that copy
+of a person's browsing history in **`research/data/`** — a path **no `.gitignore` rule
+covered**. The `/data/` rule is anchored deliberately, so a bare `data/` would not swallow
+the `research/tise_research/data/` source package, and an anchored rule protects one
+directory rather than the file. It was never committed and it is deleted. Nothing except
+noticing stood in the way, which is not a control.
+
+Both ends are closed. Paths in that script are anchored to the repository root, so running
+it from a subdirectory cannot scatter copies. And `.gitignore` gained **path-independent**
+rules — `**/*.copy`, `**/*.copy-wal`, `**/*.copy-shm`, `**/history-shape-domains-*.md` —
+named after the *file* rather than the directory it lands in, because a history copy is a
+person's browsing wherever it lands. Verified both ways: a probe file in `research/data/` is
+ignored, and no currently tracked file became ignored by the new rules.
+
+The general lesson is the one D78 already paid for once and this pays for again: **a
+generated artifact's stated reproduction command is part of the artifact.** If following it
+does not reproduce the artifact, the provenance is decorative — and here following it also
+touched a live profile.
+
+### D99 — Pre-registration: does `visit_engaged` replicate on 2,148 other people?
+
+**Nothing has been fitted to this corpus.** This entry fixes the corpus, the eligibility
+gate, the feature sets, the bar, the statistic, the resampling unit, the verdict rule and my
+predicted outcome. Then the run happens. Git holds the order, as it did for D94, and for the
+same reason: everything below can be checked against what actually happened, and a rule
+written afterwards cannot.
+
+**This entry can retire T-A.** A pre-registration that cannot lose is not one. D97 adopted
+`visit_engaged` on **one person** — Akash, two browsers — and his own objection is the right
+one: *"data of one person does not give a larger picture of our model."* If the model does not
+replicate here, the honest conclusion is that T-A was a property of his browsing, and that
+gets published as loudly as the adoption did.
+
+#### The corpus
+
+Kulshrestha, Oliveira, Karacalik, Bonnay & Wagner (2021), *Web Routineness and Limits of
+Predictability* — Zenodo **10.5281/zenodo.4757574**, data supplied by Respondi AG.
+**2,148 consenting German panelists, 1–31 October 2018, 9,151,243 visits, 49,918 domains.**
+Verified on arrival: MD5 matched Zenodo's published checksum, the archive was listed before
+extraction (24 CSVs, no traversal, no symlinks, no executables), and every headline figure
+reproduces — 9,151,243 rows, 2,148 panelists, 49,918 domains.
+
+**Why this one and not a generated one.** Akash asked for four invented personas at 2×–5× his
+volume. That was declined and the reasoning stands: a model scored on data I generate
+measures my generator. Whatever skill it showed would be structure I planted, so the number
+would be meaningless — and SPEC already forbids synthetic data as a benchmark. The best
+published synthetic alternative (Nature *Sci Data* 2025, 50 countries) additionally has **no
+duration field**, so it cannot express this target at all, and descends from a single real
+history, so it would not have fixed "one person" either.
+
+**Why this corpus can express the target, where nothing else could.** It records
+`active_seconds` per visit — **idle-excluded** attention, not tab-open time. That is not
+merely equal to what D97 used, it is **better**: D35's duration trap and D93's standing
+caveat both concern `visit_duration` counting a tab left open overnight as engagement. This
+corpus does not have that defect, so the caveat stops being a limitation and becomes a
+measurement.
+
+It also carries `panelist_id`, `used_at`, `domain`, and — from `users.csv` — **self-reported
+gender (1,049 male / 1,097 female) and age band**. The `url` column is already redacted to
+`0` by the publishers, so SPEC invariant 2 holds at the source and not merely in our reader.
+
+#### The unit is the person, and so is the cluster
+
+**One analysis per panelist. Corpora are never pooled** (D18) — a model trained across people
+describes someone who does not exist, which is the same mistake as merging two browsers.
+
+**The cluster for the population claim is therefore the panelist.** One Brier difference per
+person, then a bootstrap across people. This is the D94 insight arriving where it always
+belonged: every interval this project published before T-A was built from 9–12 categories,
+T-A's was built from 27 and 155 sessions, and this one is built from **over a thousand
+people**. Width scales with one over the square root of the cluster count, so for the first
+time the binding constraint is not the interval.
+
+It is also far cheaper — no within-person bootstrap is needed for the population claim — which
+is what makes running every eligible panelist feasible at all.
+
+#### Fixed before the run
+
+**Eligibility, declared on quantities that carry no score information.** A panelist is
+analysable if they have **≥ 1,000 visits** (1,395 of 2,148 qualify, measured before this entry
+was written), **≥ 20 sessions**, and produce **≥ 200 labels**. Visits and sessions are
+descriptive; label counts are a property of the data and not of any model. Ineligible
+panelists are **counted and reported**, never silently dropped — D26's rule, applied to people
+instead of categories.
+
+**Sample: every eligible panelist.** If measured runtime makes that infeasible, a seeded
+random draw of **500** using `BOOTSTRAP_SEED = 20260828`, drawn **before any score is
+computed**, and the switch to a subsample is recorded as its own decision rather than done
+quietly.
+
+**Categories: theirs, not ours.** The 43 published categories are used as the subject
+directly. Tise's own 15-category taxonomy is *not* mapped onto them, because a mapping I
+invent is exactly the researcher degree of freedom D81 exists to remove — I would be choosing
+it, and I would be choosing it knowing what it is for. A domain listing several categories
+(e.g. `"information-tech,media-sharing"`) takes the **first listed**; that rule is arbitrary,
+declared here, and not revisited after seeing results. Unmapped domains become
+`uncategorized`.
+
+**Feature sets: `as_1n` and `as_2n`.** The corpus has **no transition column**, so
+`arrivedTyped`, `arrivedBookmark` and `arrivedLink` cannot be computed. They are **not**
+filled with zero: "no transition recorded" is an absence, not "arrived by none of these", and
+zero-filling is the defect D51 forbids. The two sets are therefore `as_1` and `as_2` minus
+those three, and **this is a different model from the one D97 adopted** — every report must
+say so rather than quote the two side by side as though they were the same thing.
+`arrivedLink` was not a negligible coefficient on either of Akash's corpora (−0.245, −0.278),
+so this is a real difference and not a formality.
+
+**Constants do not move.** `DWELL_SCALE_SECONDS = 30`, trailing window 20, minimum prior 10,
+session timeout 1800s — all as shipped. Their median dwell is 8s against a scale declared for
+a 30s page read, and the scale still stays fixed: a declared constant that is re-tuned per
+corpus is a fitted one (D81), and the transform is monotone, so ordering is preserved either
+way.
+
+**The bar is a constant** (`global_base_rate`), per panelist, exactly as in D97 — not the
+per-category rate, which a per-category median split makes ~50% by construction (D93).
+
+**The statistic** is the pooled per-panelist Brier difference, `reference − challenger`, so
+**positive favours the model**, on rolling-origin test folds with the same fold machinery.
+
+**Reported alongside, never inside the verdict:** `domain_base_rate` (the per-domain rate
+table that on Edge nearly matched D93's whole model, and on Chrome did nothing), and the
+breakdown by **gender** and **age band**. Promoting any of these to the bar after seeing
+results would be choosing the rule from the result.
+
+#### The verdict rule
+
+`visit_engaged` **replicates** if the mean per-panelist Brier difference against the constant,
+bootstrapped over panelists at 95%, **excludes zero in the model's favour**.
+
+It **does not replicate** otherwise — and in that case D97's adoption is withdrawn to
+"single-person result, did not generalise", `SPEC.md` and `README.md` are corrected, and the
+failure becomes the headline. There is no third option, and no re-run with a different gate,
+a different bar, or "outlier" panelists removed. **One primary analysis.**
+
+#### Predictions, written down first
+
+1. The population interval **excludes zero** in the model's favour. With >1,000 clusters even
+   a small effect resolves — this is the prediction I hold most confidently, and it is
+   mostly a statement about the cluster count rather than about the model.
+2. The **median per-panelist difference is positive but smaller than Edge's +0.0112**, because
+   one month gives thinner per-category history and their median dwell is 8s against Akash's.
+3. The **fraction of panelists with a positive difference lands between 55% and 80%.** Near
+   50% would mean T-A was a property of Akash's browsing, whatever the pooled interval says —
+   so this number, not the interval, is the one that actually answers his question.
+4. `as_2n` beats `as_1n` on a **majority** of panelists: the domain features carry across
+   people rather than being a quirk of his.
+5. `domain_base_rate` beats the constant on **most** panelists — repeating Edge, not Chrome.
+6. The per-panelist difference is **positively correlated with visit count.** If it holds, it
+   is the answer to "how much browsing does Tise need before it can say anything", which is
+   the question Akash actually asked.
+7. **No meaningful difference by gender.** Recorded because gender was the axis originally
+   proposed, and because "we found a gender difference" discovered after the fact across 43
+   categories and six age bands would be fishing. Predicting the null in advance is what makes
+   a finding either way worth anything.
+
+#### Known limitations, before any result
+
+**Germany, 2018, desktop, one month.** Not India, not the US — neither has a public dataset
+with per-visit dwell, and this was checked rather than assumed. A paid panel is
+self-selecting. Seven years old.
+
+**Zero-dwell visits appear to have been filtered upstream** — not one of 9,151,243 rows has
+`active_seconds` of 0, missing, or negative, which is not what a raw capture looks like. The
+dwell distribution is therefore biased upward and short glances are probably absent. This
+affects the label's threshold and cannot be corrected from here.
+
+**One month is short for this label.** A category needs 10 prior visits before its first
+label, so slow categories may never qualify. The eligibility gate is what keeps that honest;
+the count of excluded panelists is part of the result.
+
+**T-D remains untestable.** No tab data here, as everywhere else.
+
+#### The licence gate
+
+The dataset is **CC BY-NC 4.0**. Tise is free and open source but demonstrates a commercial
+advisory, so whether our use is "non-commercial" is genuinely ambiguous and not mine to rule
+on. Akash chose to ask: `docs/gesis-permission-request.md` is drafted for him to send.
+
+**Until a reply arrives, nothing derived from this corpus enters `docs/benchmarks/` or any
+public artifact.** Results stay in `data/`, which is gitignored. If permission is refused, the
+local copy is deleted and the refusal is recorded — and the fact that the only public dataset
+carrying per-visit dwell could not be used is itself worth publishing.

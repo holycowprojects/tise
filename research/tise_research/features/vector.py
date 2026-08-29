@@ -168,11 +168,67 @@ _AS1: tuple[str, ...] = (
     "arrivedLink",
 )
 
+#: `as_2` — `as_1` plus the six features T-A exists to test, **registered before any model
+#: was fitted to them** (D94). It extends rather than replaces, and keeps `as_1`'s twelve in
+#: their original positions, so a coefficient from D93 is readable next to its counterpart
+#: here and any change in score is attributable to the six additions and the cluster unit.
+#:
+#: **Four of them are the first use of `domain` in this project.** It has been stored since
+#: T1 and read by exactly zero features, which is the single largest thing D93 was missing:
+#: every failed target so far asked about a topic in isolation, which is precisely the
+#: question a per-topic rate already answers, so a per-topic rate was hard to beat.
+#:
+#: * **Domain** — `domainVisits`, `domainShare`, `isDailyDomain`, `domainDwellLevel`.
+#:   Category is a bucket of fifteen; domain is the thing the person actually went to. Two
+#:   `news` visits can be a daily habit and a stranger.
+#: * **Sequence** — `prevSameDomain`, `prevDwellRatio`. `as_1`'s `sameAsPrevious` and
+#:   `lastDwellRatio` both look at the previous visit *of this category*; these look at the
+#:   immediately preceding visit, whatever it was. Nothing in this project has used the
+#:   actual order of visits before.
+#:
+#: Still the `full` compat class, and the extension can now measure it: D96 ships attention
+#: spans, so this set becomes shippable if it clears its bar rather than research-only.
+_AS2: tuple[str, ...] = _AS1 + (
+    "domainVisits",
+    "domainShare",
+    "isDailyDomain",
+    "domainDwellLevel",
+    "prevSameDomain",
+    "prevDwellRatio",
+)
+
+#: How the person arrived. Present in every browser corpus this project has read, and absent
+#: from the GESIS panel (D99), which records no transition type at all.
+ARRIVAL_FEATURES: tuple[str, ...] = ("arrivedTyped", "arrivedBookmark", "arrivedLink")
+
+
+def _without_arrival(names: tuple[str, ...]) -> tuple[str, ...]:
+    """Drop the arrival flags, keeping every other feature in its original position.
+
+    **Dropping is not zero-filling, and the difference is the whole point.** A corpus with no
+    transition column has not recorded that the person arrived by none of these routes; it
+    has recorded nothing. Filling with 0.0 would hand the model a measured-looking value that
+    was never measured, which is what D51 forbids, and the missing-indicator machinery cannot
+    help either — an indicator that is 1.0 on every row carries no information and merely
+    disguises the fill.
+    """
+    return tuple(name for name in names if name not in ARRIVAL_FEATURES)
+
+
+#: `as_1n` / `as_2n` — `as_1` and `as_2` for a corpus with **n**o transition column (D99).
+#: Registered before the replication run and never fitted on Akash's corpora, which do have
+#: the column: mixing them would compare two different models under one name.
+_AS1N: tuple[str, ...] = _without_arrival(_AS1)
+_AS2N: tuple[str, ...] = _without_arrival(_AS2)
+
 FEATURE_SETS: dict[str, tuple[str, ...]] = {
     "fs_2": _FS2,
     "fs_3": _FS3,
     "bs_1": _BS1,
     "as_1": _AS1,
+    "as_2": _AS2,
+    "as_1n": _AS1N,
+    "as_2n": _AS2N,
 }
 
 FEATURE_NAMES: tuple[str, ...] = FEATURE_SETS[DEFAULT_FEATURE_SET]

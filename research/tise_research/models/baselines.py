@@ -34,6 +34,7 @@ __all__ = [
     "fit_category_base_rate",
     "fit_global_base_rate",
     "fit_majority_class",
+    "fit_per_key",
     "fit_same_as_last",
     "fit_time_of_day",
 ]
@@ -109,13 +110,21 @@ class _PerKeyRate(Baseline):
         return self.rates.get(self.key(label), self.fallback)
 
 
-def _fit_per_key(
+def fit_per_key(
     labels: Sequence[Label],
     *,
     name: str,
     key: Callable[[Label], str],
     smoothing: float,
 ) -> Baseline:
+    """A smoothed rate per bucket, for whatever `key` a target's strongest rival is.
+
+    Public since D97. `key` is not restricted to fields on the `Label` — T-A's rival is a
+    per-**domain** rate, and the domain is carried alongside rather than on the label, so
+    the closure looks it up. Sharing this rather than writing a second smoothed rate is
+    what keeps the comparison fair: a rival fitted with different smoothing than
+    `category_base_rate` would be a different baseline wearing the same shape.
+    """
     prior = _base_rate(labels)
     if not labels:
         return _Constant(name, NO_INFORMATION)
@@ -146,7 +155,7 @@ def fit_category_base_rate(
     informative single fact about a `return_24h` label — `video` returns 90% of the time
     and `travel` almost never.
     """
-    return _fit_per_key(
+    return fit_per_key(
         labels,
         name="category_base_rate",
         key=lambda label: label.subject,
@@ -158,7 +167,7 @@ def fit_time_of_day(
     labels: Sequence[Label], *, bucket_hours: int = 6, smoothing: float = 5.0
 ) -> Baseline:
     """Base rate per time-of-day bucket of `window_end`."""
-    return _fit_per_key(
+    return fit_per_key(
         labels,
         name=f"time_of_day_{bucket_hours}h",
         key=lambda label: str(label.window_end.hour // bucket_hours),

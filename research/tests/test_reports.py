@@ -12,14 +12,20 @@ today's wording.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from tise_research.reports import (
     CURRENT_TARGET,
     RETIRED_TARGETS,
+    SHIPPED_TARGET,
     is_retired,
     partly_superseded_banner,
     superseded_banner,
+    what_tise_predicts,
 )
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class TestWhoGetsABanner:
@@ -91,6 +97,58 @@ class TestPartlySuperseded:
         )
         lines = [line for line in banner.splitlines() if line.strip()]
         assert all(line.startswith(">") for line in lines)
+
+
+class TestTheShippedTargetIsNotTheGoal:
+    """The defect this class exists for was found in this very module (D97).
+
+    `CURRENT_TARGET` said `block_volume` from D88 until D97, and D92 retired
+    `block_volume` two decisions earlier. Every test above passed the whole time, because
+    every one of them checks the *mechanism* — that a retired target gets a banner naming
+    the right decision — and none of them checks that the constant names something real.
+
+    A constant cannot check itself, so these check it against things outside the module:
+    the extension's own source, and the retirement table.
+    """
+
+    def test_the_shipped_target_matches_what_the_extension_actually_ships(self) -> None:
+        # The only external fact available: the TypeScript that runs in the browser. If
+        # the extension is rewired to a new target and this constant is not, the banners
+        # start describing an extension that does not exist — which is the failure, not
+        # the annoyance of updating two files.
+        source = (REPO_ROOT / "extension" / "src" / "model" / "predict.ts").read_text(
+            encoding="utf-8"
+        )
+        assert f'export const TARGET = "{SHIPPED_TARGET}"' in source
+
+    def test_the_shipped_target_is_allowed_to_be_retired(self) -> None:
+        # The distinction the whole entry is about. A target is retired as a *goal* long
+        # before the code stops carrying it, and a banner that conflates the two is false
+        # about one of them whichever way it is written.
+        assert SHIPPED_TARGET in RETIRED_TARGETS or SHIPPED_TARGET == CURRENT_TARGET
+
+    def test_the_sentence_names_both_when_they_differ(self) -> None:
+        sentence = what_tise_predicts()
+        if SHIPPED_TARGET == CURRENT_TARGET:
+            assert CURRENT_TARGET in sentence
+        else:
+            assert CURRENT_TARGET in sentence
+            assert SHIPPED_TARGET in sentence
+
+    def test_the_banner_carries_that_sentence(self) -> None:
+        assert what_tise_predicts() in superseded_banner("return_24h")
+        assert what_tise_predicts() in partly_superseded_banner(
+            "return_24h", stands="a", retired="b"
+        )
+
+    def test_every_retired_target_names_a_decision_that_exists(self) -> None:
+        # `block_volume` was retired by D92 and the table did not know for two decisions.
+        # This cannot detect a missing entry, but it does catch an invented one.
+        decisions = (REPO_ROOT / "DECISIONS.md").read_text(encoding="utf-8")
+        for target, decision in RETIRED_TARGETS.items():
+            assert f"### {decision} " in decisions, (
+                f"{target} claims to be retired by {decision}, which is not in DECISIONS.md"
+            )
 
 
 class TestItRefusesToInvent:

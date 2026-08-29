@@ -164,3 +164,46 @@ class TestRunBacktest:
         result = run_backtest(labels, n_folds=4)
         assert result.headline_excludes_unknown is True
         assert result.unknown_label_count == 60
+
+
+class TestPooledClusters:
+    """D94 made the session a resampling unit, so the backtest has to keep it.
+
+    Without this the session-clustered interval is not computable at all after the fact,
+    and every published interval stays built from 9-12 categories no matter how many rows
+    it holds.
+    """
+
+    def test_sessions_are_pooled_alongside_subjects(self):
+        result = run_backtest(LABELS, n_folds=4)
+        assert len(result.pooled_sessions) == len(result.pooled_subjects)
+        assert len(result.pooled_sessions) == len(result.pooled_outcomes)
+
+    def test_a_pooled_row_carries_its_own_label_s_session(self):
+        """Aligned, not merely the same length. A shuffle here would cluster rows into
+        groups they do not belong to and the interval would look fine."""
+        result = run_backtest(LABELS, n_folds=4)
+        by_session = {label.session_id: label.subject for label in LABELS}
+        for session, subject in zip(
+            result.pooled_sessions, result.pooled_subjects, strict=True
+        ):
+            assert by_session[session] == subject
+
+    def test_unknown_is_excluded_from_the_pooled_sessions_too(self):
+        """D27 applies to every pooled column or the interval covers different rows than
+        the Brier score it is placed next to."""
+        extra = [
+            Label(
+                target="return_24h",
+                subject="unknown",
+                window_end=datetime(2026, 3, 1, 9, tzinfo=UTC) + timedelta(hours=7 * i + 3),
+                outcome=True,
+                horizon_hours=24.0,
+                session_id=f"u{i}",
+            )
+            for i in range(60)
+        ]
+        result = run_backtest([*LABELS, *extra], n_folds=4)
+        assert not any(
+            session.startswith("u") for session in result.pooled_sessions
+        )

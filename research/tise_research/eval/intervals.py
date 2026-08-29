@@ -24,6 +24,15 @@ sessions within a category share whatever makes that category predictable. Resam
 *subjects* respects that and is the honest bound, at the cost of very few clusters. The
 row interval is the optimistic one and the subject interval is the defensible one; a claim
 that survives only the first is a claim about this corpus rather than about the model.
+
+**The cluster does not have to be the category, and until D94 it always was.** Width
+shrinks roughly with one over the square root of the cluster count, and every interval this
+project published resampled 9-12 clusters, because the subject was always the category.
+That is why nothing here could ever resolve a small effect — the sample size that mattered
+was never the row count. The unit is therefore an argument now: pass whatever grouping the
+target's dependence actually runs along, and pass `unit=` so the printed interval says
+which. An interval that resampled sessions while reporting `subjects, n=11` would be a
+right number with a wrong label, which is the defect D86 and D87 are both about.
 """
 
 from __future__ import annotations
@@ -66,7 +75,9 @@ class Interval:
     high: float
     level: float
     resamples: int
-    #: What was resampled: `"row"` treats labels as independent, `"subject"` does not.
+    #: What was resampled. `"row"` treats labels as independent; anything else names the
+    #: cluster they were grouped by — `"subject"` (the category) until D94, `"session"`
+    #: from T-A onward.
     unit: str
     #: How many things could be resampled. For `subject` this is often single digits, and
     #: an interval built from four clusters is a different object from one built from 250.
@@ -130,6 +141,7 @@ def brier_difference_interval(
     reference: Sequence[float],
     *,
     subjects: Sequence[str] | None = None,
+    unit: str = "subject",
     resamples: int = DEFAULT_RESAMPLES,
     level: float = DEFAULT_LEVEL,
     seed: int = BOOTSTRAP_SEED,
@@ -138,9 +150,13 @@ def brier_difference_interval(
 
     **Positive means the challenger is better.**
 
-    Pass `subjects` to resample whole categories instead of individual rows. That is the
+    Pass `subjects` to resample whole clusters instead of individual rows. That is the
     conservative unit and the one a claim about *the model* has to survive; resampling
     rows assumes labels are independent, and labels drawn from six categories are not.
+
+    `unit` names what a cluster **is**, and only labels the result — it changes no
+    arithmetic. It exists because the cluster stopped always being the category (D94), and
+    a printed interval that names the wrong unit is unfalsifiable by the reader.
 
     Returns None for empty input rather than a zero-width interval at zero, which would
     read as a confident finding of no difference.
@@ -156,7 +172,7 @@ def brier_difference_interval(
     rng = random.Random(seed)
     if subjects is None:
         groups = [[index] for index in range(len(paired))]
-        unit = "row"
+        unit_name = "row"
     else:
         if len(subjects) != len(paired):
             raise ValueError(
@@ -166,7 +182,7 @@ def brier_difference_interval(
         for index, subject in enumerate(subjects):
             clustered.setdefault(subject, []).append(index)
         groups = list(clustered.values())
-        unit = "subject"
+        unit_name = unit
 
     draws: list[float] = []
     count = len(groups)
@@ -188,7 +204,7 @@ def brier_difference_interval(
         high=_percentile(draws, 1.0 - tail),
         level=level,
         resamples=resamples,
-        unit=unit,
+        unit=unit_name,
         units=count,
     )
 

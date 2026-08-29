@@ -150,6 +150,53 @@ class TestClusterBootstrap:
         with pytest.raises(ValueError, match="length mismatch"):
             brier_difference_interval(OUTCOMES, GOOD, FLAT, subjects=["a", "b"])
 
+    def test_the_unit_can_be_named_and_defaults_to_subject(self):
+        """D94: the cluster stopped always being the category.
+
+        An interval that resampled sessions while printing `subjects, n=11` would be a
+        right number under a wrong label — the D86/D87 defect. The name is carried so the
+        reader can check which grouping produced the width.
+        """
+        clusters = ["s1", "s1", "s2", "s2", "s3", "s3", "s4", "s4"]
+        named = brier_difference_interval(
+            OUTCOMES, GOOD, FLAT, subjects=clusters, unit="session", resamples=500
+        )
+        assert named is not None
+        assert named.unit == "session"
+        assert "sessions, n=4" in named.describe()
+
+        default = brier_difference_interval(
+            OUTCOMES, GOOD, FLAT, subjects=clusters, resamples=500
+        )
+        assert default is not None
+        assert default.unit == "subject"
+
+    def test_naming_the_unit_changes_no_arithmetic(self):
+        """It is a label. If it ever moved a bound, every published interval would be
+        comparable only to others that happened to use the same word."""
+        clusters = ["s1", "s1", "s2", "s2", "s3", "s3", "s4", "s4"]
+        named = brier_difference_interval(
+            OUTCOMES, GOOD, FLAT, subjects=clusters, unit="session", resamples=500
+        )
+        plain = brier_difference_interval(
+            OUTCOMES, GOOD, FLAT, subjects=clusters, resamples=500
+        )
+        assert named is not None and plain is not None
+        assert (named.point, named.low, named.high, named.units) == (
+            plain.point,
+            plain.low,
+            plain.high,
+            plain.units,
+        )
+
+    def test_an_unnamed_row_bootstrap_stays_a_row_bootstrap(self):
+        """`unit` must not be able to relabel a row bootstrap as a cluster one."""
+        interval = brier_difference_interval(
+            OUTCOMES, GOOD, FLAT, unit="session", resamples=200
+        )
+        assert interval is not None
+        assert interval.unit == "row"
+
 
 class TestFoldWinProbability:
     @pytest.mark.parametrize(

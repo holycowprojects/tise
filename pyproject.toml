@@ -7,6 +7,16 @@ dependencies = []
 
 [dependency-groups]
 dev = [
+    # Declared explicitly, though scikit-learn and xgboost already pull it in. D99's
+    # replication needs a vectorised trainer to be affordable at all, and depending on a
+    # transitive install is how a build breaks the day one of those is dropped.
+    #
+    # **Research tier only.** The extension ships no Python and no numpy; `logreg.py` stays
+    # hand-written full-batch gradient descent because it has to run in a browser and be
+    # reproducible to 1e-9 against its TypeScript twin. The numpy trainer is a faster route
+    # to the *same* function, and `test_fast_logreg.py` has to prove that before it is
+    # allowed to produce a published number.
+    "numpy>=2.0",
     "pytest>=8.0",
     "ruff>=0.6",
     "scikit-learn>=1.5",

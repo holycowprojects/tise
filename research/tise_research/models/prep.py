@@ -79,6 +79,27 @@ NULLABLE_BY_SET: dict[str, tuple[str, ...]] = {
     # `as_1` has no legitimate absence: a visit is only labelled once its category has
     # enough dwell history, so every window is non-empty by construction.
     "as_1": (),
+    # `as_2` adds exactly two legitimate absences, and both are absences of a *different*
+    # history than the one the minimum-prior rule guarantees. The rule is about the
+    # category; these are about the domain and about the preceding visit.
+    #
+    # * `domainDwellLevel` — this domain has been visited before but never with a recorded
+    #   duration, so there is no median to take. Filling it with zero would say the person
+    #   leaves this domain instantly, which is the opposite of unknown.
+    # * `prevDwellRatio` — the immediately preceding visit has no recorded duration. The
+    #   previous visit is not skipped over to find one that does: "the visit before this
+    #   one" is the feature, and substituting an earlier visit would quietly change its
+    #   meaning while keeping its name.
+    #
+    # The other four are measured zeros. A domain seen zero times has been seen zero
+    # times; an indicator column would claim the count was never taken.
+    "as_2": ("domainDwellLevel", "prevDwellRatio"),
+    # `as_1n` / `as_2n` drop the arrival flags for a corpus with no transition column (D99).
+    # The flags were never nullable, so the nullable lists are unchanged from their parents —
+    # written out rather than aliased, because a set that silently shares another set's list
+    # is one rename away from being wrong.
+    "as_1n": (),
+    "as_2n": ("domainDwellLevel", "prevDwellRatio"),
 }
 
 NULLABLE_FEATURES: tuple[str, ...] = NULLABLE_BY_SET[DEFAULT_FEATURE_SET]

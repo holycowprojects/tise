@@ -226,6 +226,17 @@ D91 fixed the rule: a performance bar is pre-registered **before** a model is fi
 is not a bar. No bar exists for this target. **Nothing on this page can adopt anything** —
 it says whether the direction earns a pre-registration, and nothing else.
 
+> ### → It earned one, and the answer is next door
+>
+> This page is D93. It led to the pre-registration in **D94** and the adoption test in
+> **[`visit-engaged.md`](visit-engaged.md)**, which measures the **same label** with more
+> features and a different cluster unit.
+>
+> **Every number here still stands** — regenerating this page after T-A moved no figure,
+> which is how the `as_1` half of that comparison is known to be unchanged. But this is no
+> longer the project's latest word on whether attention is predictable, and the interval
+> below is built from 11 clusters for the reason D94 is about.
+
 ## What it found
 
 - **{total:,} labels** across {len(items)} corpora — against `block_volume`'s 403 and

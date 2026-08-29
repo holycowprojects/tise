@@ -2,7 +2,7 @@
 
 > ### ⚠ Superseded — this report describes a retired target
 >
-> **`return_24h` was retired as the product target in D88.** Tise now predicts **`block_volume`**.
+> **`return_24h` was retired as the product target in D88.** The project now builds toward **`visit_engaged`**, and the shipped extension still trains **`return_24h`** — no target is wired in before it is built end to end.
 >
 > Every number below was really measured and none of it has been withdrawn — it is kept deliberately, because it is the evidence that *justified* retiring the target. It is not a description of what Tise currently does, and no figure here should be quoted as a current result.
 >

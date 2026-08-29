@@ -171,6 +171,11 @@ class BacktestResult:
     min_category_labels: int
     span_start: datetime | None = None
     span_end: datetime | None = None
+    #: The session each pooled row belongs to, aligned with `pooled_subjects`. D94: the
+    #: cluster does not have to be the category, and while it always was, every published
+    #: interval was built from 9-12 things regardless of how many rows it held. Kept
+    #: alongside rather than instead of the subject so both bounds stay available.
+    pooled_sessions: tuple[str, ...] = ()
 
 
 def run_backtest(
@@ -198,6 +203,7 @@ def run_backtest(
     pooled_outcomes: dict[str, list[bool]] = defaultdict(list)
     pooled_probabilities: dict[str, list[float]] = defaultdict(list)
     pooled_subjects: list[str] = []
+    pooled_sessions: list[str] = []
     by_category: dict[str, dict[str, list]] = defaultdict(
         lambda: {"outcomes": [], "probabilities": defaultdict(list)}
     )
@@ -223,6 +229,7 @@ def run_backtest(
                     if name == REFERENCE_MODEL:
                         pooled_outcomes["_"].append(label.outcome)
                         pooled_subjects.append(label.subject)
+                        pooled_sessions.append(label.session_id)
 
         fold_results.append(
             FoldResult(
@@ -290,6 +297,7 @@ def run_backtest(
         per_category=per_category,
         pooled_outcomes=tuple(headline_outcomes),
         pooled_subjects=tuple(pooled_subjects),
+        pooled_sessions=tuple(pooled_sessions),
         pooled_probabilities={
             name: tuple(pooled_probabilities[name]) for name in fitters
         },

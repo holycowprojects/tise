@@ -7,9 +7,9 @@ working and committable.
 
 ---
 
-## ⚠ Read this first — the target has changed twice
+## ⚠ Read this first — two targets retired, the third adopted
 
-**Go to [START HERE](#-start-here--phase-7-four-targets-pre-registered-d94) below (Phase 7).**
+**Go to [START HERE](#-start-here--phase-7-one-target-adopted-and-three-still-open) below (Phase 7).**
 Everything above it is history, kept because it is the evidence trail.
 
 - **`return_24h` retired** as the product target (D88) — measurable, and not a question
@@ -17,16 +17,23 @@ Everything above it is history, kept because it is the evidence trail.
 - **`block_volume` retired too** (D92) — it produced labels but the model lost to *a single
   constant*, and `same_as_last` was far worse, so "above your usual" is close to independent
   day to day.
-- **Now: four targets pre-registered in D94** (T-A…T-D), plus two descriptive candidates from
-  D95 (T-E, T-F). **Nothing has been fitted to any of them.**
+- **`visit_engaged` is adopted (D97)** — T-A cleared the bar D94 wrote down before the
+  measurement, on both corpora with dwell. **It is not shipped**: it needs live attention
+  spans and has no TypeScript twin, so the extension still trains `return_24h` and still
+  shows nothing. That work is **T-G**.
+- T-B, T-C, T-D remain pre-registered and **unfitted**; T-E and T-F are descriptive (D95).
+- **T-H is the live one (D99):** the machinery to test whether `visit_engaged` replicates
+  on **1,326 real other people** is built and tested. **Not yet run.** It can retire T-A.
 
 T1–T21 below are left ticked and unedited. The machinery they produced — collection,
 sessions, features, parity, prediction, resolution, export, migration — is **reused**, not
 rewritten. Do not redo them, and do not quote their numbers as current: the generated
 reports in `docs/benchmarks/` carry superseded banners for the same reason.
 
-Work order: **T-A → T-B → T-C → T-D**, with T-E/T-F available any time (both descriptive,
-neither needs to clear a prediction bar).
+Work order: **T-H first** — it can retire T-A, so everything downstream waits on it. Then
+**T-B → T-C → T-D**, with T-E/T-F available any time (both descriptive, neither needs to
+clear a prediction bar). **T-G ships T-A** and is gated on having enough live attention
+spans to train on — a count from the store, not a date.
 
 ---
 
@@ -192,10 +199,11 @@ neither needs to clear a prediction bar).
 
 ---
 
-## ▶ START HERE — Phase 7, four targets pre-registered (D94)
+## ▶ START HERE — Phase 7, one target adopted and three still open
 
 **Akash's direction: Tise predicts all four.** D94 fixed every definition, bar, cluster unit
-and adoption rule **before implementation**. Nothing has been fitted to any of them.
+and adoption rule **before implementation**. **T-A has now been fitted and adopted (D97);
+T-B, T-C and T-D remain untouched.**
 
 **Akash authorised both `tabs` and `idle`, with live collection.** Both are optional
 permissions, consent-gated exactly as `history` already is.
@@ -215,9 +223,17 @@ clustering, with category reported alongside — and records that it was propose
 seeing D93 fail, which is why it is registered ahead of the run rather than applied to the
 old one.
 
+**T-A measured what that was worth, and it was decisive.** The identical point estimate
+**includes zero under the old subject unit on both corpora** (n=9, n=11) and **excludes it
+under sessions** (n=27, n=155). Without D94's change T-A would have failed. And a cluster
+*count* is not cluster quality — Chrome's 27 sessions include one holding **43%** of its
+rows, so every clustered report now prints the spread beside the count.
+
 **Stopping rule, fixed in D94:** if none of T-A, T-B or T-C separates from its declared bar,
 the finding is that this data does not support a model, Tise ships descriptive, and that is
-published as the headline.
+published as the headline. **T-A separated, so the rule is not triggered** — but it does not
+retire either: T-B and T-C still report against their own bars, and a failure there is still
+published as a failure.
 
 - [x] **T-0 · Attention collection** · M — **shipped before T-A on purpose** (D96)
   - **Data has lead time; model changes do not.** T-D cannot be measured on any corpus, so
@@ -236,23 +252,78 @@ published as the headline.
   - **Akash still owes the real-profile check** - reload the build and confirm the `fs_3`
     migration preserves the row count with `skipped` at 0. One reload covers both
 
-- [ ] **T-A · `visit_engaged`** — "will this visit hold you?" · **do this first**
-  - **Label identical to D93's `as_1`** on purpose, so any change is attributable. Only two
-    things change: **features** (`as_2`) and **cluster unit** (session)
-  - `as_2` = `as_1` + `domainVisits`, `domainShare`, `isDailyDomain`, `domainDwellLevel`,
-    `prevSameDomain`, `prevDwellRatio`. **`domain` is stored since T1 and read by zero
-    features** — this is its first use
-  - **Bar: a constant** (`global_base_rate`). D93 established `category_base_rate` is worse
-    than a constant here, because a per-category median split makes every category ~50%
-  - **Adoption:** session-clustered interval vs the constant excludes zero in the model's
-    favour on Edge. D93 missed by **0.0001** with neither domain nor sequence features and
-    with 11 clusters
-  - **Next concrete step:** register `as_2` in `vector.py` + `prep.py` (`NULLABLE_BY_SET`
-    entry `"as_2": ()`), extend `attention.py` to compute it, thread the real session id
-    onto the label so session clustering is possible, then run
-  - Note: `attention.py` currently sets `session_id=event.event_id`. That needs to become
-    the actual session id. It does not change the label's meaning (outcome, subject,
-    window_end are untouched), and D94's "identical label" claim still holds
+- [x] **T-A · `visit_engaged`** · M — **ADOPTED (D97)**. First target in the project to
+      clear a bar written down before the measurement
+  - Verify: `uv run python analysis/visit_engaged.py` ✓ 697 Python, 356 TypeScript, both
+    linters clean, builds → `docs/benchmarks/visit-engaged.md`
+  - **Edge** (the adoption corpus, named in D94 before anything was fitted):
+    **+0.0112 [+0.0068, +0.0159]**, session-clustered, n=155 — excludes zero.
+    **Chrome:** +0.0038 [+0.0006, +0.0101], n=27 — excludes zero
+  - **Both halves of D94's change were necessary, and it is measured.** Under the *old*
+    subject unit the identical estimate **includes zero on both corpora** (n=9, n=11). With
+    the unit held fixed, `as_2` still beats `as_1` by +0.0057 [+0.0024, +0.0094] on Edge.
+    D93 had neither and missed by 0.0001
+  - **`domain` carries it on first use** — stored since T1, read by zero features until now.
+    `domainDwellLevel` is the **second-largest coefficient on both corpora**
+  - **The rival, added because the coefficients demand it** (D24): `domain_base_rate`, the
+    same construction as `category_base_rate` keyed on the domain. On Edge it nearly matches
+    D93's *whole model* (0.2453 vs 0.2446); on Chrome it does nothing (0.2499 vs 0.2500).
+    The model beats it on both. **Reported beside the verdict, never inside it**
+  - **Chrome is the weaker corpus and the page says so** — one session holds **43%** of its
+    2,224 test rows. A cluster count is not cluster quality, and `n=` cannot tell them apart
+  - Also settled: `brier_difference_interval(unit=)`; `run_backtest` keeps `pooled_sessions`;
+    the target had two names (`attention_dwell` in code, `visit_engaged` in SPEC) and now has
+    one; regenerating `attention.md` moved **no figure**, which is how `as_1` is known intact
+
+- [ ] **T-G · Ship `visit_engaged` end to end** · L · deps: T-A, **and collected spans**
+  - **Adopted is not shipped, and this is the gap.** `as_2` is the `full` compat class: it
+    needs dwell, which only live attention spans can supply. D96 started collecting them
+    days ago, there is **no TypeScript twin of `as_2`**, so the parity contract is unmet
+  - Work: `as_2` in `extension/src/features/vector.ts` + `prep.ts`, extend the parity oracle,
+    attention-derived labels in the extension, then training and prediction
+  - **Gate: enough live spans to train on.** Not a date — a count, measured from the store.
+    Until then the extension keeps training `return_24h` and keeps showing nothing
+  - The import-vs-live offset check below becomes due in the same window
+
+- [ ] **T-H · Does `visit_engaged` replicate on other people?** · L — **PRE-REGISTERED
+      (D99), BUILT, NOT YET RUN. Resume here.**
+  - **Run it:** `uv run python analysis/replication.py` — approximately **75 minutes**.
+    Writes `data/replication.md`, gitignored, **not** `docs/benchmarks/`
+  - **This can retire T-A.** D97 adopted `visit_engaged` on one person. If the population
+    interval includes zero, the adoption is withdrawn to *single-person result*, `SPEC.md`
+    and `README.md` are corrected, and the failure is published as loudly as the adoption
+  - **Corpus:** GESIS/Respondi, Zenodo 4757574 — 2,148 consenting German panelists, October
+    2018, 9.15M visits, CC BY-NC. **Akash reports permission granted**; the reply itself
+    still needs pasting into `docs/gesis-permission-request.md` so the record names a person
+    and a date
+  - **It records `active_seconds`** — idle-excluded attention, *better* than the
+    `visit_duration` D97 used, so D93's standing caveat becomes a measurement
+  - **1,326 of 2,148 are eligible** (753 fail the 1,000-visit floor, 69 the 20-session
+    floor, **0 the 200-label floor** — that gate never bound, and the report must say so).
+    **8,586,879 labels.** Median 4,204 per person; **523 people match or exceed Akash's
+    Edge corpus**, so he is a heavier browser than most of this panel
+  - **The cluster is the person**, so the interval is built from ~1,326 clusters against
+    D93's 11 and T-A's 27/155. For the first time the interval is not the binding constraint
+  - Everything else — eligibility, feature sets, bar, statistic, verdict rule and **seven
+    predictions** — is fixed in D99 and scored automatically by the report
+
+- [x] **T-H0 · The machinery T-H needs** · L — built, tested, not run (D99)
+  - `research/tise_research/data/web_tracking.py` — reader and sharder. The 680MB file is
+    **not** grouped by person, so it is sharded on a *stable* id hash: Python's `hash()` is
+    salted per process and would make the corpus non-reproducible. 27 tests
+  - `as_1n` / `as_2n` — the corpus has **no transition column**, so the three arrival flags
+    are **dropped, not zero-filled** (D51). This is a different model from D97's and every
+    report must say so
+  - **`Label.label_id`** — analyses keyed rows on `(subject, window_end)`, which is unique
+    on Akash's browsing and not in general. 0.02% of GESIS rows are a second visit by one
+    person in one second. The guard added in D97 found nothing here and **fired on the first
+    external corpus**; the indexing changed rather than discarding real visits
+  - **`fast_logreg.py` — a numpy trainer, proven equal to the shipped one.** Agreement on
+    real rows is **4.4e-16** on weights and **3.3e-16** on probabilities, seven orders inside
+    the 1e-9 parity tolerance, at **52x** the speed. Without it this run is hundreds of
+    hours. **The extension is untouched** — it ships no Python and no numpy, and `logreg.py`
+    stays the definition. One test deletes the module if it stops being faster
+  - Verify: `uv run pytest` ✓ **761 Python**, 356 TypeScript, both linters clean, builds
 
 - [ ] **T-B · `browsing_next_hour`** — "will you be here?"
   - **Subject is the hour-of-day bucket**, so `category_base_rate` becomes the per-hour rate

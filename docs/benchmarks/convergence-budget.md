@@ -2,7 +2,7 @@
 
 > ### ⚠ Superseded — this report describes a retired target
 >
-> **`return_24h` was retired as the product target in D88.** Tise now predicts **`block_volume`**.
+> **`return_24h` was retired as the product target in D88.** The project now builds toward **`visit_engaged`**, and the shipped extension still trains **`return_24h`** — no target is wired in before it is built end to end.
 >
 > Every number below was really measured and none of it has been withdrawn — it is kept deliberately, because it is the evidence that *justified* retiring the target. It is not a description of what Tise currently does, and no figure here should be quoted as a current result.
 >
@@ -50,30 +50,30 @@ assumed.
 
 | Iterations | Brier | Log loss | Seconds |
 |---:|---:|---:|---:|
-| 2,000 | 0.202481 | 0.696867 | 9.6 |
-| 4,000 **(shipped)** | 0.202356 | 0.696968 | 12.2 |
-| 8,000 | 0.202352 | 0.696978 | 24.6 |
-| 20,000 | 0.202352 | 0.696978 | 61.6 |
+| 2,000 | 0.202481 | 0.696867 | 6.1 |
+| 4,000 **(shipped)** | 0.202356 | 0.696968 | 8.2 |
+| 8,000 | 0.202352 | 0.696978 | 16.4 |
+| 20,000 | 0.202352 | 0.696978 | 41.0 |
 
 Going from 4,000 to 20,000 iterations moves the pooled Brier by **4.41e-06**.
 ### history-edge
 
 | Iterations | Brier | Log loss | Seconds |
 |---:|---:|---:|---:|
-| 2,000 | 0.112800 | 0.390602 | 17.3 |
-| 4,000 **(shipped)** | 0.112933 | 0.391107 | 19.5 |
-| 8,000 | 0.112945 | 0.391145 | 39.1 |
-| 20,000 | 0.112945 | 0.391146 | 96.1 |
+| 2,000 | 0.112800 | 0.390602 | 10.6 |
+| 4,000 **(shipped)** | 0.112933 | 0.391107 | 12.8 |
+| 8,000 | 0.112945 | 0.391145 | 30.6 |
+| 20,000 | 0.112945 | 0.391146 | 99.1 |
 
 Going from 4,000 to 20,000 iterations moves the pooled Brier by **1.19e-05**.
 ### history-firefox
 
 | Iterations | Brier | Log loss | Seconds |
 |---:|---:|---:|---:|
-| 2,000 | 0.213090 | 0.638436 | 3.8 |
-| 4,000 **(shipped)** | 0.213077 | 0.638463 | 6.8 |
-| 8,000 | 0.213077 | 0.638464 | 13.5 |
-| 20,000 | 0.213077 | 0.638464 | 33.7 |
+| 2,000 | 0.213090 | 0.638436 | 3.9 |
+| 4,000 **(shipped)** | 0.213077 | 0.638463 | 7.1 |
+| 8,000 | 0.213077 | 0.638464 | 13.7 |
+| 20,000 | 0.213077 | 0.638464 | 31.8 |
 
 Going from 4,000 to 20,000 iterations moves the pooled Brier by **1.90e-07**.
 

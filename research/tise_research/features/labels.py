@@ -46,6 +46,18 @@ class Label:
     outcome: bool
     horizon_hours: float
     session_id: str
+    #: Unique per example, where the emitter can supply one.
+    #:
+    #: Consumers need to map a label back to its feature row, and every analysis in this
+    #: project keyed that on `(subject, window_end)` — which is unique on Akash's browsing
+    #: and **not** unique in general. The GESIS panel (D99) records visits to one second, so
+    #: one person visiting two pages of the same category within a second produces two
+    #: labels sharing that key: 0.02% of rows, never more than two, and enough to score one
+    #: feature row against two different labels with nothing reporting it.
+    #:
+    #: Empty for targets whose emitter predates this and whose subjects are unique by
+    #: construction (`return_24h` has one label per category *per session*).
+    label_id: str = ""
 
 
 def session_label_pairs(

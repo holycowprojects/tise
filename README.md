@@ -61,19 +61,38 @@ Written down here rather than discovered later:
 
 ## Where this is
 
-**The prediction target changed.** `return_24h` — "will you return to this topic within 24
-hours?" — was built, benchmarked and then **retired**, because it turned out to be
-measurable and uninteresting: a ~70% base rate meant a constant answer was already most of
-the way right, and a single browsing session is not a unit anyone cares about.
+**Two prediction targets were built, benchmarked and retired before the third one worked.**
 
-That work is kept, not deleted. Every report in [`docs/benchmarks/`](docs/benchmarks) stands
-as a superseded result and carries a banner saying so — it is the evidence that justified
-the change, and removing it would remove the reason.
+`return_24h` — "will you return to this topic within 24 hours?" — was retired because it
+turned out to be measurable and uninteresting: a ~70% base rate meant a constant answer was
+already most of the way right, and a single browsing session is not a unit anyone cares
+about.
 
-The current target is `block_volume`: *will a topic's activity in the coming weekday or
-weekend block be above that topic's own usual level?* **Nothing about it has been measured
-yet.** It is a hypothesis with an argument behind it, and the measurement that decides it
-comes before any of it is built.
+`block_volume` — "will a topic's activity in the coming day be above its own usual level?" —
+was retired because the model **lost to a single constant** on all three corpora, and
+"same as last time" was far worse still, which says daily activity is close to independent
+day to day.
+
+That work is kept, not deleted. Those reports in [`docs/benchmarks/`](docs/benchmarks) stand
+as superseded results and carry banners saying so — they are the evidence that justified the
+changes, and removing them would remove the reason.
+
+**The current target is `visit_engaged`,** and it is the first one to clear a bar that was
+written down before it was measured:
+
+> At the moment a page opens: will you stay on it longer than you usually stay on pages of
+> this topic?
+
+One label per **visit** — the finest unit the data contains, and thousands of them where the
+retired targets had hundreds. Its definition, features, baseline, resampling unit and
+adoption rule were all fixed in advance and committed before a model was fitted; git holds
+the order. See [`docs/benchmarks/visit-engaged.md`](docs/benchmarks/visit-engaged.md).
+
+**Adopted is not shipped.** It needs how long you actually looked at a page, which the
+`chrome.history` API cannot supply — so the extension collects that itself, from the day the
+permission was granted, and there is not yet enough of it to train on. Until there is, the
+extension keeps training the old target and the UI keeps showing nothing. Nothing gets wired
+in before it is built end to end.
 
 ## Repository layout
 

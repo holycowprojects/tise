@@ -251,17 +251,32 @@ the contradiction recorded in the audit.
 
 ## Prediction Targets
 
-**Two targets have been retired. Four are pre-registered and none is fitted.** The
-authoritative list is D94 in `DECISIONS.md`; this section summarises it.
+**Two targets have been retired. One is adopted; three remain pre-registered and unfitted.**
+The authoritative list is D94 in `DECISIONS.md`, and D97 records the adoption.
 
-### T-A — `visit_engaged` (primary, **pre-registered, not fitted**)
+### T-A — `visit_engaged` (primary, **adopted D97**, not yet shipped)
 
 > At the moment a page opens: will dwell exceed the median dwell for this category over its
 > trailing 20 visits?
 
-One label **per visit** — the finest unit the data contains. D93 measured **10,502 labels**
-at a **50.0% base rate**, the first target whose median split actually landed on 50%, and it
-**missed separating from a constant by 0.0001**.
+One label **per visit** — the finest unit the data contains. **The first target in this
+project to clear a bar that was written down before it was measured.** D94 fixed the label,
+the feature set (`as_2`), the bar, the cluster unit and the adoption rule before the code
+existed; git holds the order.
+
+| | `history-chrome` | `history-edge` *(adoption corpus)* |
+|---|---|---|
+| `logreg_as2` vs the constant, **session-clustered** | +0.0038 [+0.0006, +0.0101] (n=27) | +0.0112 [+0.0068, +0.0159] (n=155) |
+| the same, under the old *subject* unit | −0.0005 … +0.0318 (n=9) — includes zero | −0.0054 … +0.0166 (n=11) — includes zero |
+
+**Both halves of D94's change were needed.** Under the old cluster unit the identical point
+estimate includes zero on both corpora; with the unit fixed, `as_2` still beats `as_1` by an
+interval excluding zero. D93 had neither and missed by 0.0001.
+
+**`domain` carries it, on its first use in the project.** Stored since T1, read by zero
+features until `as_2`. `domainDwellLevel` is the second-largest coefficient on both corpora,
+and on Edge a plain per-domain rate table (0.2453) nearly matches D93's whole twelve-feature
+model (0.2446). On Chrome that table does nothing (0.2499 vs the constant's 0.2500).
 
 **`full` compat class:** it needs dwell time, which the `chrome.history` API cannot supply.
 The `tabs` permission (authorised) makes it shippable; `idle` (authorised) fixes its
@@ -269,6 +284,10 @@ The `tabs` permission (authorised) makes it shippable; `idle` (authorised) fixes
 
 **Bar: a constant.** D93 established that `category_base_rate` is *worse* than a constant
 here, because a per-category median split makes every category ~50% by construction.
+
+**Adopted is not shipped.** There is no TypeScript twin of `as_2`, so the parity contract is
+unmet, and the live attention spans it needs began collecting only at D96. The extension
+still trains `return_24h` and still shows nothing.
 
 ### T-B — `browsing_next_hour` · T-C — `next_category` · T-D — `tab_return`
 
@@ -279,12 +298,20 @@ implementation. T-D needs live tab data and cannot be measured on any existing c
 
 Descriptive candidates from D95. Neither needs to clear a prediction bar to be useful.
 
-### The cluster unit changed for all of them (D94)
+### The cluster unit changed for all of them (D94), and it decided T-A (D97)
 
 Every interval this project published was resampled over **9–12 subject clusters**, because
 the subject was always the category. Width scales with 1/√clusters, so no comparison here
 could resolve a small effect regardless of data volume. D94 declares **session** clustering
 with the category unit reported alongside.
+
+D97 measured what that is worth: T-A's point estimate **includes zero under the old unit and
+excludes it under the new one, on both corpora.** `brier_difference_interval` now takes
+`unit=` so a printed interval names what it actually resampled.
+
+**A cluster count is not cluster quality.** Chrome's 27 test sessions include one holding
+43% of the rows, so most resamples turn on whether that session was drawn. Every report that
+clusters now prints the spread beside the count.
 
 ### T1-superseded — `block_volume` (retired as product target, D92)
 
