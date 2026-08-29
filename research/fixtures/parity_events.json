@@ -9,7 +9,8 @@
   "timeoutSeconds": 1800.0,
   "horizonHours": 24.0,
   "overrides": {
-    "nothing-here.example": "work"
+    "nothing-here.example": "work",
+    "fresh-video.example": "video"
   },
   "events": [
     {
@@ -162,6 +163,160 @@
       "domain": "youtube.com",
       "transition": "link",
       "dwellSeconds": null,
+      "source": "import"
+    }
+  ],
+  "attentionEvents": [
+    {
+      "eventId": "att-000",
+      "occurredAt": "2026-06-01T09:00:00+00:00",
+      "domain": "youtube.com",
+      "transition": "link",
+      "dwellSeconds": 10.0,
+      "source": "import"
+    },
+    {
+      "eventId": "att-001",
+      "occurredAt": "2026-06-01T09:05:00+00:00",
+      "domain": "youtube.com",
+      "transition": "link",
+      "dwellSeconds": 20.0,
+      "source": "import"
+    },
+    {
+      "eventId": "att-002",
+      "occurredAt": "2026-06-01T09:10:00+00:00",
+      "domain": "youtube.com",
+      "transition": "link",
+      "dwellSeconds": 10.0,
+      "source": "import"
+    },
+    {
+      "eventId": "att-003",
+      "occurredAt": "2026-06-01T09:15:00+00:00",
+      "domain": "youtube.com",
+      "transition": "typed",
+      "dwellSeconds": 20.0,
+      "source": "import"
+    },
+    {
+      "eventId": "att-004",
+      "occurredAt": "2026-06-01T09:20:00+00:00",
+      "domain": "youtube.com",
+      "transition": "link",
+      "dwellSeconds": 10.0,
+      "source": "import"
+    },
+    {
+      "eventId": "att-005",
+      "occurredAt": "2026-06-02T09:00:00+00:00",
+      "domain": "youtube.com",
+      "transition": "link",
+      "dwellSeconds": 20.0,
+      "source": "import"
+    },
+    {
+      "eventId": "att-006",
+      "occurredAt": "2026-06-02T09:05:00+00:00",
+      "domain": "youtube.com",
+      "transition": "link",
+      "dwellSeconds": 10.0,
+      "source": "import"
+    },
+    {
+      "eventId": "att-007",
+      "occurredAt": "2026-06-02T09:10:00+00:00",
+      "domain": "youtube.com",
+      "transition": "link",
+      "dwellSeconds": 20.0,
+      "source": "import"
+    },
+    {
+      "eventId": "att-008",
+      "occurredAt": "2026-06-03T09:00:00+00:00",
+      "domain": "youtube.com",
+      "transition": "link",
+      "dwellSeconds": 10.0,
+      "source": "import"
+    },
+    {
+      "eventId": "att-009",
+      "occurredAt": "2026-06-03T09:05:00+00:00",
+      "domain": "youtube.com",
+      "transition": "link",
+      "dwellSeconds": 20.0,
+      "source": "import"
+    },
+    {
+      "eventId": "att-010",
+      "occurredAt": "2026-06-04T09:00:00+00:00",
+      "domain": "youtube.com",
+      "transition": "link",
+      "dwellSeconds": 30.0,
+      "source": "import"
+    },
+    {
+      "eventId": "att-011",
+      "occurredAt": "2026-06-04T09:05:00+00:00",
+      "domain": "youtube.com",
+      "transition": "link",
+      "dwellSeconds": 15.0,
+      "source": "import"
+    },
+    {
+      "eventId": "att-012",
+      "occurredAt": "2026-06-04T09:10:00+00:00",
+      "domain": "youtube.com",
+      "transition": "link",
+      "dwellSeconds": null,
+      "source": "import"
+    },
+    {
+      "eventId": "att-013",
+      "occurredAt": "2026-06-04T09:15:00+00:00",
+      "domain": "youtube.com",
+      "transition": "link",
+      "dwellSeconds": 25.0,
+      "source": "import"
+    },
+    {
+      "eventId": "att-014",
+      "occurredAt": "2026-06-04T09:20:00+00:00",
+      "domain": "fresh-video.example",
+      "transition": "link",
+      "dwellSeconds": 40.0,
+      "source": "import"
+    },
+    {
+      "eventId": "att-015",
+      "occurredAt": "2026-06-04T09:25:00+00:00",
+      "domain": "fresh-video.example",
+      "transition": "link",
+      "dwellSeconds": 5.0,
+      "source": "import"
+    },
+    {
+      "eventId": "att-016",
+      "occurredAt": "2026-06-04T09:30:00+00:00",
+      "domain": "youtube.com",
+      "transition": "link",
+      "dwellSeconds": 12.0,
+      "source": "import"
+    },
+    {
+      "eventId": "att-017",
+      "occurredAt": "2026-06-04T11:00:00+00:00",
+      "domain": "youtube.com",
+      "transition": "link",
+      "dwellSeconds": 60.0,
+      "source": "import"
+    },
+    {
+      "eventId": "att-018",
+      "occurredAt": "2026-06-04T11:05:00+00:00",
+      "domain": "youtube.com",
+      "transition": "link",
+      "dwellSeconds": 8.0,
       "source": "import"
     }
   ]

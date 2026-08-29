@@ -276,7 +276,31 @@ published as a failure.
     the target had two names (`attention_dwell` in code, `visit_engaged` in SPEC) and now has
     one; regenerating `attention.md` moved **no figure**, which is how `as_1` is known intact
 
-- [ ] **T-G · Ship `visit_engaged` end to end** · L · deps: T-A, **and collected spans**
+- [x] **T-G1 · `as_2` in TypeScript, with parity** · L — done. **363 TypeScript / 761
+      Python**, both linters clean, builds
+  - `extension/src/features/attention.ts` mirrors `attention.py`. **TypeScript reproduced
+    Python's oracle on the first run** — 20 dwell-carrying events, 473 fixture insertions
+    and **one deletion, which was a comma**: no existing expected value moved
+  - **A feature-set registry**, mirroring Python: `featureNames`, `nullableFeatures`,
+    `designColumns`. `fs_3` stays the default so no existing caller changed
+  - **A parity bug I wrote and caught:** `getHours()`/`getDay()` are *local*; this project is
+    UTC on both sides (`context.ts` sets it). It would have shifted every hour feature and
+    `isDailyDomain` by the machine's offset and failed nothing but the fixture
+  - **A real bug TypeScript found:** `rows.map(rawRow)` passes the array index as the second
+    argument — invisible until `rawRow` took one
+  - **A guarantee replaced rather than dropped:** widening `values` to string keys lost a
+    compile-time check, so `rawRow` now rejects *extra* keys, which the type never checked.
+    The preprocessor carries its feature set, because two sets' widths can coincide and a
+    length check would not catch an `fs_3` row entering an `as_2` preprocessor
+  - The fixture **asserts it reaches its own edges**: both nullable features, both outcomes,
+    more than one session, and a dwell landing *exactly* on the threshold that a `>=`
+    implementation would pass everything else on
+
+- [ ] **T-G · Ship `visit_engaged` end to end** · L · deps: **T-G1 done**, and collected spans
+  - **Next: the span→dwell join** — read the `attention` store, attach `dwellSeconds` to
+    events in memory, never to disk. Unblocked, no data needed
+  - **Then training and prediction, which are gated.** Akash has not yet reloaded the
+    extension, so span collection may not have started counting
   - **Adopted is not shipped, and this is the gap.** `as_2` is the `full` compat class: it
     needs dwell, which only live attention spans can supply. D96 started collecting them
     days ago, there is **no TypeScript twin of `as_2`**, so the parity contract is unmet

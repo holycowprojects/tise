@@ -66,7 +66,13 @@ TIMEOUT_SECONDS = 1800.0
 HORIZON_HOURS = 24.0
 
 #: `nothing-here.example` would resolve to `unknown`; the override must win.
-OVERRIDES = {"nothing-here.example": "work"}
+#:
+#: `fresh-video.example` exists for the attention fixture below and is the only way to
+#: reach one of `as_2`'s two nullable features: `domainDwellLevel` is absent exactly when a
+#: *labelled* visit lands on a domain never seen before, which needs a domain that is new
+#: while its **category** already has ten priors. Relying on the shipped map to supply a
+#: second `video` domain would make the fixture depend on a file that is allowed to change.
+OVERRIDES = {"nothing-here.example": "work", "fresh-video.example": "video"}
 
 
 def _at(day: int, hour: int, minute: int, second: int = 0) -> datetime:
@@ -115,6 +121,93 @@ RAW_EVENTS: list[tuple[datetime, str]] = [
 ]
 
 
+#: Input for the `as_2` / `visit_engaged` fixture (D97, replicated D100).
+#:
+#: **A separate list, deliberately.** `RAW_EVENTS` carries `dwell_seconds=None` on every
+#: row because D35 made dwell unmeasurable, and every expected value in this file was
+#: computed from that. Adding dwell there would move all of them at once; every extension
+#: of this fixture so far has been strictly additive, and that is what makes a diff
+#: readable when one language disagrees.
+#:
+#: `(day, hour, minute, domain, transition, dwell)`. Each case earns its place:
+#:
+#: * eleven prior `video` visits before the first label, so `min_prior = 10` is crossed
+#:   exactly rather than approximately
+#: * an **even-length** trailing window, so Python's `median` averaging the two middle
+#:   values is observable — taking the lower would pass every odd-length test
+#: * a dwell landing **exactly on the threshold**, which must be negative under strict `>`
+#: * a visit with **no dwell**, which is skipped rather than imputed but still joins the
+#:   domain's visit count and day set
+#: * the visit **immediately after** it, whose `prevDwellRatio` is therefore absent
+#: * a **brand-new domain in an established category**, whose `domainDwellLevel` is absent
+#: * consecutive same-domain visits, so `prevSameDomain` is observed at 1 and not only 0
+#: * four distinct days inside seven, so `isDailyDomain` is observed firing and not firing
+#: * a `typed` arrival among `link` ones, so the transition flags are not all constant
+ATTENTION_RAW_EVENTS: list[tuple[int, int, int, str, str, float | None]] = [
+    # Day 1 - build `video` history. Alternating 10s/20s gives a median of 15 over any
+    # even-length window, which is the value the two middle elements average to.
+    (1, 9, 0, "youtube.com", "link", 10.0),
+    (1, 9, 5, "youtube.com", "link", 20.0),
+    (1, 9, 10, "youtube.com", "link", 10.0),
+    (1, 9, 15, "youtube.com", "typed", 20.0),
+    (1, 9, 20, "youtube.com", "link", 10.0),
+    # Day 2 - a second day for `isDailyDomain`, still below its four-day threshold.
+    (2, 9, 0, "youtube.com", "link", 20.0),
+    (2, 9, 5, "youtube.com", "link", 10.0),
+    (2, 9, 10, "youtube.com", "link", 20.0),
+    # Day 3.
+    (3, 9, 0, "youtube.com", "link", 10.0),
+    (3, 9, 5, "youtube.com", "link", 20.0),
+    # Day 4 - the eleventh visit: prior is exactly 10, so this is the FIRST label.
+    # Threshold 15, dwell 30 -> positive. Fourth distinct day -> `isDailyDomain` fires.
+    (4, 9, 0, "youtube.com", "link", 30.0),
+    # A dwell exactly on the threshold. Strict `>` makes it negative, and an implementation
+    # using `>=` passes everything else in this file.
+    (4, 9, 5, "youtube.com", "link", 15.0),
+    # No dwell: no label, but the domain's visit count and day set still advance.
+    (4, 9, 10, "youtube.com", "link", None),
+    # Immediately after it, so `prevDwellRatio` is absent while everything else is present.
+    (4, 9, 15, "youtube.com", "link", 25.0),
+    # A brand-new domain in an established category -> `domainDwellLevel` absent,
+    # `domainVisits` zero, `prevSameDomain` zero.
+    (4, 9, 20, "fresh-video.example", "link", 40.0),
+    # Straight back to it, so `prevSameDomain` is observed at 1 and the new domain now has
+    # a dwell history of its own.
+    (4, 9, 25, "fresh-video.example", "link", 5.0),
+    (4, 9, 30, "youtube.com", "link", 12.0),
+    # A new session on the same day: more than the 30-minute timeout after the last event,
+    # so `isSessionStart` and `sessionPosition` reset.
+    (4, 11, 0, "youtube.com", "link", 60.0),
+    (4, 11, 5, "youtube.com", "link", 8.0),
+]
+
+
+def build_attention_events() -> list[Event]:
+    """Events for the attention fixture, carrying dwell.
+
+    Ids continue past `RAW_EVENTS` so the two lists can never collide if a future change
+    concatenates them.
+    """
+    category_map = load_category_map()
+    events: list[Event] = []
+    for index, (day, hour, minute, domain, transition, dwell) in enumerate(
+        ATTENTION_RAW_EVENTS
+    ):
+        resolution = resolve(domain, category_map=category_map, overrides=OVERRIDES)
+        events.append(
+            Event(
+                event_id=f"att-{index:03d}",
+                occurred_at=_at(day, hour, minute),
+                domain=domain,
+                category=resolution.category,
+                transition=transition,
+                dwell_seconds=dwell,
+                source="import",
+            )
+        )
+    return events
+
+
 def build_events() -> list[Event]:
     category_map = load_category_map()
     events: list[Event] = []
@@ -158,6 +251,17 @@ def build_input_document() -> dict:
                 "source": "import",
             }
             for index, (occurred_at, domain) in enumerate(RAW_EVENTS)
+        ],
+        "attentionEvents": [
+            {
+                "eventId": event.event_id,
+                "occurredAt": event.occurred_at.isoformat(),
+                "domain": event.domain,
+                "transition": event.transition,
+                "dwellSeconds": event.dwell_seconds,
+                "source": event.source,
+            }
+            for event in build_attention_events()
         ],
     }
 
@@ -247,6 +351,7 @@ def build_expected_document() -> dict:
         "sessions": sessions,
         "labels": labels,
         "features": features,
+        "attention": build_attention_section(),
         "model": build_model_section(
             events, feature_rows, [label.outcome for label in label_objects]
         ),
@@ -423,6 +528,56 @@ def build_model_section(events: list[Event], feature_rows: list, outcomes: list[
             },
             "unseenDistribution": table.distribution("__never-seen__"),
         },
+    }
+
+
+def build_attention_section() -> dict:
+    """`visit_engaged` labels and `as_2` rows. The oracle TypeScript must reproduce.
+
+    Both the label and the row are written for every example, because the label carries the
+    two things a feature vector cannot check for itself: the outcome, and which session and
+    visit it belongs to.
+    """
+    from tise_research.features.attention import (
+        DEFAULT_MIN_PRIOR_VISITS,
+        DEFAULT_TRAILING_VISITS,
+        ENGAGED_FEATURE_SET,
+        attention_examples,
+    )
+    from tise_research.features.vector import feature_names
+    from tise_research.models.prep import design_columns, nullable_features
+
+    names = feature_names(ENGAGED_FEATURE_SET)
+    examples = attention_examples(
+        build_attention_events(),
+        timeout_seconds=TIMEOUT_SECONDS,
+        feature_set=ENGAGED_FEATURE_SET,
+    )
+    return {
+        "featureSet": ENGAGED_FEATURE_SET,
+        "featureNames": list(names),
+        "designColumns": list(design_columns(ENGAGED_FEATURE_SET)),
+        "nullableFeatures": list(nullable_features(ENGAGED_FEATURE_SET)),
+        "trailingVisits": DEFAULT_TRAILING_VISITS,
+        "minPriorVisits": DEFAULT_MIN_PRIOR_VISITS,
+        "examples": [
+            {
+                "label": {
+                    "target": example.label.target,
+                    "subject": example.label.subject,
+                    "windowEnd": example.label.window_end.isoformat(),
+                    "outcome": example.label.outcome,
+                    "horizonHours": example.label.horizon_hours,
+                    "sessionId": example.label.session_id,
+                    "labelId": example.label.label_id,
+                },
+                "domain": example.domain,
+                "compat": example.row.compat,
+                # In feature-set order. The order is the column order of the design matrix.
+                "values": {name: example.row.values[name] for name in names},
+            }
+            for example in examples
+        ],
     }
 
 

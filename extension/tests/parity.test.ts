@@ -24,11 +24,19 @@ import { sessionise } from "../src/features/sessions";
 import { return24hLabels } from "../src/features/labels";
 import { dayOfWeek } from "../src/features/context";
 import {
+  AS2_FEATURE_SET,
+  attentionExamples,
+  DEFAULT_MIN_PRIOR_VISITS,
+  DEFAULT_TRAILING_VISITS,
+} from "../src/features/attention";
+import { designColumns, nullableFeatures } from "../src/model/prep";
+import {
   computeFeatures,
   FEATURE_NAMES,
   FEATURE_SET,
   type FeatureName,
 } from "../src/features/vector";
+import { AS2_FEATURE_NAMES } from "../src/features/vector";
 import type { TiseEvent } from "../src/types";
 import {
   buildMatrix,
@@ -72,11 +80,21 @@ interface PolicyFixture {
   targetMet: boolean;
 }
 
+interface AttentionEventRow {
+  eventId: string;
+  occurredAt: string;
+  domain: string;
+  transition: string;
+  dwellSeconds: number | null;
+  source: TiseEvent["source"];
+}
+
 interface FixtureInput {
   categoryMapVersion: number;
   timeoutSeconds: number;
   horizonHours: number;
   overrides: Record<string, string>;
+  attentionEvents: AttentionEventRow[];
   events: Array<{
     eventId: string;
     occurredAt: string;
@@ -167,6 +185,28 @@ interface FixtureExpected {
     };
   };
   summary: Record<string, number>;
+  attention: {
+    featureSet: string;
+    featureNames: string[];
+    designColumns: string[];
+    nullableFeatures: string[];
+    trailingVisits: number;
+    minPriorVisits: number;
+    examples: Array<{
+      label: {
+        target: string;
+        subject: string;
+        windowEnd: string;
+        outcome: boolean;
+        horizonHours: number;
+        sessionId: string;
+        labelId: string;
+      };
+      domain: string;
+      compat: string;
+      values: Record<string, number | null>;
+    }>;
+  };
 }
 
 function fixture<T>(name: string): T {
@@ -180,6 +220,18 @@ const EXPECTED = fixture<FixtureExpected>("parity_expected.json");
 
 /** Resolve the input into events, exactly as the Python generator does. */
 const EVENTS: TiseEvent[] = INPUT.events.map((row) => ({
+  eventId: row.eventId,
+  occurredAt: row.occurredAt,
+  source: row.source,
+  domain: row.domain,
+  category: resolve(row.domain, INPUT.overrides).category,
+  transition: row.transition,
+  dwellSeconds: row.dwellSeconds,
+  sessionId: "",
+}));
+
+/** The attention input, resolved the same way. These carry dwell; the others cannot. */
+const ATTENTION_EVENTS: TiseEvent[] = INPUT.attentionEvents.map((row) => ({
   eventId: row.eventId,
   occurredAt: row.occurredAt,
   source: row.source,
@@ -212,6 +264,9 @@ describe("the fixture itself", () => {
     // than letting an unchecked section look verified. `labels` went unchecked here
     // until T11, which is exactly the gap this guard existed to keep visible.
     expect(Object.keys(EXPECTED).sort()).toEqual([
+      // Added deliberately when `as_2` shipped: this guard failed the moment Python
+      // grew the section, which is the whole point of it existing.
+      "attention",
       "categoryMapVersion",
       "featureNames",
       "featureSet",
@@ -335,7 +390,9 @@ describe("feature parity", () => {
 
       for (const name of FEATURE_NAMES) {
         closeEnough(
-          actual.values[name],
+          // `?? null` cannot mask a bug: `closeEnough` compares null-ness strictly, so an
+          // absent value where a number is expected still fails.
+          actual.values[name] ?? null,
           expected.values[name] ?? null,
           `row ${index} (${expected.subject} @ ${expected.windowEnd}) ${name}`,
         );
@@ -397,7 +454,7 @@ describe("feature parity", () => {
     // Recompute them, rather than only asserting the fixture contains them.
     for (const { subject, windowEnd, name, value } of repeating) {
       const actual = computeFeatures(EVENTS, subject, Date.parse(windowEnd), OPTIONS);
-      closeEnough(actual.values[name], value, `${subject} ${name} @ ${windowEnd}`);
+      closeEnough(actual.values[name] ?? null, value, `${subject} ${name} @ ${windowEnd}`);
     }
   });
 
@@ -806,5 +863,91 @@ describe("calibration parity — the T12 half of the oracle", () => {
       CAL.lenientNaivePolicy.threshold,
       "naive threshold",
     );
+  });
+});
+
+/**
+ * `visit_engaged` / `as_2` — the first `full`-class feature set, and the first parity
+ * section where the input carries dwell.
+ *
+ * The target was adopted in D97 and replicated across 1,326 people in D100. Neither of
+ * those numbers means anything for the *product* unless the extension computes the same
+ * features as the research tier that produced them, which is what this asserts.
+ */
+describe("attention parity (as_2)", () => {
+  const A = EXPECTED.attention;
+
+  it("agrees on the feature set, its order, and its design columns", () => {
+    expect(AS2_FEATURE_SET).toBe(A.featureSet);
+    expect([...AS2_FEATURE_NAMES]).toEqual(A.featureNames);
+    expect([...designColumns(A.featureSet)]).toEqual(A.designColumns);
+    expect([...nullableFeatures(A.featureSet)]).toEqual(A.nullableFeatures);
+  });
+
+  it("agrees on the declared windows", () => {
+    expect(DEFAULT_TRAILING_VISITS).toBe(A.trailingVisits);
+    expect(DEFAULT_MIN_PRIOR_VISITS).toBe(A.minPriorVisits);
+  });
+
+  const ACTUAL = attentionExamples(ATTENTION_EVENTS, {
+    timeoutSeconds: EXPECTED.timeoutSeconds,
+  });
+
+  it("emits exactly the same examples, in the same order", () => {
+    expect(ACTUAL.length).toBe(A.examples.length);
+    expect(ACTUAL.map((e) => e.label.labelId)).toEqual(A.examples.map((e) => e.label.labelId));
+  });
+
+  it("agrees on every label", () => {
+    ACTUAL.forEach((actual, index) => {
+      const expected = A.examples[index];
+      if (!expected) throw new Error(`no expected example at ${index}`);
+      expect(actual.label.target, `target ${index}`).toBe(expected.label.target);
+      expect(actual.label.subject, `subject ${index}`).toBe(expected.label.subject);
+      expect(actual.label.windowEnd, `windowEnd ${index}`).toBe(expected.label.windowEnd);
+      // The whole point of the target. A flipped outcome is invisible in any aggregate
+      // until the model is scored, and then it looks like a worse model.
+      expect(actual.label.outcome, `outcome ${index}`).toBe(expected.label.outcome);
+      expect(actual.label.horizonHours, `horizon ${index}`).toBe(expected.label.horizonHours);
+      expect(actual.domain, `domain ${index}`).toBe(expected.domain);
+      expect(actual.row.compat, `compat ${index}`).toBe(expected.compat);
+      expect(actual.row.featureSet, `featureSet ${index}`).toBe(A.featureSet);
+    });
+  });
+
+  it("agrees on every feature value, including which ones are absent", () => {
+    ACTUAL.forEach((actual, index) => {
+      const expected = A.examples[index];
+      if (!expected) throw new Error(`no expected example at ${index}`);
+      for (const name of AS2_FEATURE_NAMES) {
+        closeEnough(
+          actual.row.values[name] ?? null,
+          expected.values[name] ?? null,
+          `example ${index} ${name}`,
+        );
+      }
+    });
+  });
+
+  it("actually exercises both nullable features and both outcomes", () => {
+    // A parity suite that only ever compares present values and positive outcomes proves
+    // less than it appears to. This asserts the fixture reaches the cases it was built for.
+    const nulls = new Set<string>();
+    for (const example of A.examples) {
+      for (const [name, value] of Object.entries(example.values)) {
+        if (value === null) nulls.add(name);
+      }
+    }
+    expect([...nulls].sort()).toEqual(["domainDwellLevel", "prevDwellRatio"]);
+
+    const outcomes = new Set(A.examples.map((e) => e.label.outcome));
+    expect(outcomes.has(true), "fixture must contain a positive label").toBe(true);
+    expect(outcomes.has(false), "fixture must contain a negative label").toBe(true);
+  });
+
+  it("groups examples into more than one session", () => {
+    // `sessionPosition` and `isSessionStart` are constant if every example shares a
+    // session, so the fixture would be comparing two implementations of a constant.
+    expect(new Set(A.examples.map((e) => e.label.sessionId)).size).toBeGreaterThan(1);
   });
 });

@@ -150,7 +150,10 @@ function plural(count: number, one: string, many: string): string {
 export function priorSessionsFrom(row: FeatureRow): number | null {
   const saturatedRate = row.values.priorSessionRate;
   const saturatedHours = row.values.firstSeenSaturation;
-  if (saturatedRate === null || saturatedHours === null) return null;
+  // `undefined` means the row belongs to a set that has no such feature at all — `as_2`
+  // rows do not. That is an absence like any other, so it reads as "cannot be shown"
+  // rather than throwing: evidence is a courtesy to the reader, not a contract.
+  if (saturatedRate == null || saturatedHours == null) return null;
 
   const hours = unsaturate(saturatedHours, FIRST_SEEN_SCALE_HOURS);
   const perDay = unsaturate(saturatedRate, PRIOR_SESSION_RATE_SCALE);
@@ -159,7 +162,10 @@ export function priorSessionsFrom(row: FeatureRow): number | null {
 }
 
 export function evidenceFor(row: FeatureRow): string[] {
-  const value = (name: FeatureName): number | null => row.values[name];
+  // Absent when this row's feature set does not contain the name; every caller below
+  // already treats null as "nothing to say about this", so a missing feature is silently
+  // and correctly skipped rather than reported as a zero.
+  const value = (name: FeatureName): number | null => row.values[name] ?? null;
   const lines: string[] = [];
 
   const lastSeen = value("hoursSinceLastSeen");
