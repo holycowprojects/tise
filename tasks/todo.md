@@ -318,8 +318,19 @@ published as a failure.
   - **Akash owes one pass:** reload → popup → *Measure attention* → Allow → **Resume**
     (he is currently paused) → browse → Export and send the file. It is v3, so it carries
     the spans and the gate becomes checkable from this side
-  - **Next: the span→dwell join in the extension** — `dwell_by_event` already exists in
-    Python; the TypeScript twin reads the `attention` store and attaches dwell in memory
+  - [x] **Span→dwell join done.** `features/dwell.ts` — `dwellByEvent`, `attachDwell`,
+    `measuredCount`. 11 tests reading `export_v3.json` **directly**, so it is a genuine
+    cross-language check: Python reads the same file and asserts the same properties from
+    the other side. The fixture carries **two spans on one event**, so both languages must
+    sum rather than take the last
+  - **Two decisions pinned, neither visible in any score:** attention is *summed* across
+    spans (a revisited page would otherwise have its dwell halved, and a revisited page is
+    what this target is about); an unmeasured event stays `null`, never zero (a zero enters
+    the trailing median as a real short visit and shifts the threshold for **every other
+    visit in that category** — the damage is not local to the missing row)
+  - **The popup now shows the gate** — spans, pages, and minutes of attention. D101's
+    lesson applied: a store with no reader cannot be observed to be wrong, and the count
+    that would have exposed that bug was invisible for two days
   - **Then training and prediction, gated** on enough spans to train on
   - **Adopted is not shipped, and this is the gap.** `as_2` is the `full` compat class: it
     needs dwell, which only live attention spans can supply. D96 started collecting them

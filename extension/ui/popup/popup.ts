@@ -15,7 +15,7 @@ import { buildExport, exportFilename, serialiseExport } from "../../src/storage/
 import { countsByCategory, countEvents, recentEvents } from "../../src/storage/events";
 import { isCollecting, loadSettings, saveSettings } from "../../src/storage/settings";
 import { countLabels } from "../../src/storage/labels";
-import { countSpans } from "../../src/storage/spans";
+import { allSpans } from "../../src/storage/spans";
 import { readJob, readModel } from "../../src/model/train";
 import { isIdentity } from "../../src/model/calibrate";
 import { allPredictions, predictionCounts } from "../../src/storage/predictions";
@@ -81,12 +81,26 @@ async function renderAttention(consented: boolean): Promise<void> {
   const button = element("attention") as HTMLButtonElement;
 
   if (granted) {
-    const spans = await countSpans();
+    const spans = await allSpans();
+    // Distinct events, counted from the spans alone rather than by loading every event:
+    // D96 forbids inventing a span, so every `eventId` here belongs to a real navigation.
+    const pages = new Set(spans.map((span) => span.eventId)).size;
+
     status.textContent = "Attention measured";
-    detail.textContent =
-      spans === 0
-        ? "Granted, but nothing recorded yet. Spans appear as you browse — one per page you actually look at."
-        : `${spans.toLocaleString()} span${spans === 1 ? "" : "s"} recorded.`;
+    if (spans.length === 0) {
+      // The state that hid a two-day bug: collection looked enabled and recorded nothing,
+      // and nothing displayed the number that would have shown it (D101).
+      detail.textContent =
+        "Granted, but nothing recorded yet. A span appears for each page you actually " +
+        "look at, so browse for a minute and reopen this.";
+    } else {
+      const total = spans.reduce((sum, span) => sum + span.activeSeconds, 0);
+      detail.textContent =
+        `${spans.length.toLocaleString()} span${spans.length === 1 ? "" : "s"} over ` +
+        `${pages.toLocaleString()} page${pages === 1 ? "" : "s"}, ` +
+        `${Math.round(total / 60).toLocaleString()} minutes of attention. ` +
+        "Predictions need roughly ten measured visits per topic before they begin.";
+    }
     button.hidden = true;
     return;
   }
