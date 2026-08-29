@@ -31,10 +31,27 @@ sessions, features, parity, prediction, resolution, export, migration — is **r
 rewritten. Do not redo them, and do not quote their numbers as current: the generated
 reports in `docs/benchmarks/` carry superseded banners for the same reason.
 
-Work order: **T-H is done and T-A survived it.** Next is **T-G** (ship `visit_engaged`,
-gated on having enough live attention spans — a count from the store, not a date) or
-**T-B → T-C → T-D**, with T-E/T-F available any time (both descriptive, neither needs to
-clear a prediction bar).
+**RESUME HERE (2026-08-30): T-C `next_category`.** Akash's call, made after reviewing the
+product state below and choosing research over surface. It is the largest untouched label
+supply in the project — 238 labels built since T10 and **never benchmarked** — with a
+pre-registered floor of **33.2%** (D91: the always-the-mode floor, *not* the 44.5%
+per-category mode, which is in-sample). It needs new plumbing: `run_backtest` is binary, so
+this wants accuracy folds and a bootstrap on the accuracy difference.
+
+**Where Tise stands as a product, checked 2026-08-29 rather than recalled.** A person
+installing it today gets a popup that says it is a developer view, an import button, a train
+button, and "No predictions yet". No dashboard, no onboarding, **no icons in the manifest**,
+not on the Web Store. **Three independent reasons nothing shows:** `predict.ts` still ships
+the retired `return_24h`; abstention still gates and D70 certified no threshold, so it
+answers nothing by design; and `visit_engaged` is adopted and replicated but not wired.
+The engine is real — collection, import, features, training, retention, export, parity, all
+working on a real profile — and the surface is a stub. **The research is far ahead of the
+product**, and T23 (the base-rate card, which needs no training data) is the cheapest thing
+that would change that.
+
+Work order after T-C: **T-G4** (ship `visit_engaged`, gated on live spans — a count from the
+store, not a date), **T-B**, **T-D**, with T-E/T-F available any time (both descriptive,
+neither needs to clear a prediction bar).
 
 ---
 
@@ -401,6 +418,16 @@ published as a failure.
   - **Bar is the rhythm, not a flat rate** — beating a flat rate would be trivial
   - Cluster unit: calendar day. D94 predicts this one **fails** its bar
 
+- [ ] **OWED — D88's abstention replacement was never implemented** · S — found while
+      reviewing the product state, 2026-08-29
+  - `predict.ts` still calls `shouldAnswer(model.policy, …)`. D70 found **no confidence
+    threshold certified the 90% target on any fold**, so the shipped path abstains from
+    everything by design
+  - **D88 said to replace abstention with "show everything with its denominator"** and that
+    was never done. So there are *two* independent reasons the extension shows nothing, and
+    only one of them (no adopted target wired in) was being tracked
+  - Blocks any UI work: T14 and T23 both have nothing to render until this is settled
+
 - [ ] **T-C · `next_category`** — "what comes next?"
   - Multiclass, **top-1 accuracy** against T19's **33.2% always-the-mode floor** — explicitly
     *not* the 44.5% per-category mode, which is in-sample
@@ -448,8 +475,10 @@ published as a failure.
     these deliberately: one has no score available to bias it, the other does)
   - Must state plainly that T19 may kill `block_volume` and promote another candidate
 
-- [ ] **T21 · Build the new target end to end** · L · deps: T20
-  - Labels, features, blocks, the two weekly cards, learned clusters
+- [ ] ~~**T21 · Build the new target end to end**~~ · **RETIRED — superseded by T-G.**
+      Written for `block_volume`, which D92 retired. Its shipping work is now T-G1/2/3
+      (done) and T-G4 (gated). Kept as the evidence trail, not as work
+  - Superseded notes: Labels, features, blocks, the two weekly cards, learned clusters
   - **Import may set the yardstick; only live collection may score** (D88). An imported
     block may contribute to a median; a prediction may never be resolved against one —
     D72's rule in a new place, and it keeps the scorecard clean during bootstrap
@@ -726,8 +755,12 @@ published as a failure.
     because every test stopped at an early return. Fixed with an end-to-end group
   - Owed: the two manual checks — satisfy a prediction by browsing, and let one expire
 
-- [ ] **Owed verification — the `fs_3` migration on a real profile** · S · deps: T16
-  - **Highest-value check outstanding.** The Chrome profile from D64 holds ~5,105 events,
+- [x] **Owed verification — the `fs_3` migration on a real profile** · S — **DONE (D101).**
+      **334 labels against 5,366 events — exactly the 334 D64 recorded on this profile.**
+      Nothing stranded, nothing reset to the 30-day window. Confirmed from a screenshot of
+      the live popup, and the v3 export afterwards re-checked D76's loader on a migrated
+      profile at the same time
+  - Superseded notes: The Chrome profile from D64 holds ~5,105 events,
     `fs_2` feature rows and a trained model. Loading the new build runs `migrateFeatureRows`
     for real, against rows this project has never seen it applied to
   - Every claim about it so far is from synthetic corpora. T5, T7 and T11 each had a
