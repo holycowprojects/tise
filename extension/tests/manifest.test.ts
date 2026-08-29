@@ -35,6 +35,39 @@ describe("manifest", () => {
     expect(manifest["optional_permissions"]).toEqual(["history", "tabs", "idle"]);
   });
 
+  it("can actually ask for every optional permission it declares", () => {
+    // The bug this exists for: D96 declared `tabs` and `idle`, gated attention collection
+    // on `permissions.contains([...])`, and built nothing that could ever *request* them.
+    // Optional permissions are not granted at install, so the gate could never open. The
+    // span store stayed empty and the only symptom was a number that never moved — no
+    // test failed, nothing threw, and it surfaced only because a screenshot was sent.
+    //
+    // **It is not enough to find the permission's name in the source.** The first version
+    // of this test did exactly that and passed with the bug reintroduced, because `tabs`
+    // and `idle` appear in the `contains` call that reads the gate. Only the arguments of
+    // `permissions.request` count, which is the one call that can actually open it.
+    const source = readFileSync(
+      fileURLToPath(new URL("../ui/popup/popup.ts", import.meta.url)),
+      "utf8",
+    );
+
+    const requested = new Set<string>();
+    for (const match of source.matchAll(/permissions\.request\(([^)]*)\)/g)) {
+      for (const name of (match[1] ?? "").matchAll(/"([a-zA-Z]+)"/g)) {
+        if (name[1] && name[1] !== "permissions") requested.add(name[1]);
+      }
+    }
+
+    expect(requested.size, "no permission is requested anywhere").toBeGreaterThan(0);
+    for (const permission of manifest["optional_permissions"] as string[]) {
+      expect(
+        requested.has(permission),
+        `${permission} is declared optional but never passed to permissions.request, ` +
+          "so a user has no way to grant it and the feature behind it can never run",
+      ).toBe(true);
+    }
+  });
+
   it("asks for none of the permissions that would read page content or requests", () => {
     // A separate claim from the one above, and the one that matters most: `tabs` gives
     // tab lifecycle and URLs, but `cookies` would give credentials, `webRequest` every

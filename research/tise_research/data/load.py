@@ -15,7 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -27,20 +27,46 @@ __all__ = [
     "SUPPORTED_SCHEMAS",
     "ExportedPrediction",
     "TiseExport",
+    "AttentionSpan",
     "load_export",
     "parse_export",
 ]
 
 #: What the extension writes today.
-EXPORT_SCHEMA = "tise.export.v2"
+EXPORT_SCHEMA = "tise.export.v3"
 
-#: What this loader will read. v2 added `predictions`; a v1 file is a v2 file without them,
-#: so it is still readable and loads with an empty tuple. Accepting v1 is a deliberate
-#: promise rather than an accident of parsing — someone who exported their browsing months
-#: ago should not find the file unreadable because a later version added a key.
-SUPPORTED_SCHEMAS = ("tise.export.v1", "tise.export.v2")
+#: What this loader will read. Every version so far has been additive — v2 added
+#: `predictions`, v3 added `attention` — so an older file is a newer one without some keys
+#: and loads with empty tuples. Accepting them is a deliberate promise rather than an
+#: accident of parsing: someone who exported their browsing months ago should not find the
+#: file unreadable because a later version added a key.
+SUPPORTED_SCHEMAS = ("tise.export.v1", "tise.export.v2", "tise.export.v3")
 
 _REQUIRED = ("schema", "exportedAt", "events")
+
+
+@dataclass(frozen=True, slots=True)
+class AttentionSpan:
+    """One measured period of attention on a visit (D96).
+
+    **This is what `visit_engaged` is defined on**, and until v3 it never left the browser.
+    D96 put spans in their own store and did not extend the export, so live dwell could not
+    reach the research tier at all — the extension could have shipped `as_2` with no way to
+    check the model it ran against the model the benchmarks describe.
+
+    `active_seconds` excludes idle time, which makes it a *better* measurement than the
+    history file's `visit_duration`: a tab left open overnight records no attention here,
+    and D93 named exactly that as able to account for the whole effect.
+    """
+
+    span_id: str
+    event_id: str
+    started_at: datetime
+    ended_at: datetime
+    active_seconds: float
+    #: Why the span closed. `shutdown` means Tise stopped watching, so the value is a lower
+    #: bound rather than a measurement — kept because the reasons are not equivalent.
+    end_reason: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,7 +117,37 @@ class TiseExport:
     events: tuple[Event, ...]
     #: Empty for a v1 export, which predates the registry.
     predictions: tuple[ExportedPrediction, ...] = ()
+    #: Empty for v1 and v2, which predate attention collection.
+    attention: tuple[AttentionSpan, ...] = ()
     schema: str = EXPORT_SCHEMA
+
+    def dwell_by_event(self) -> dict[str, float]:
+        """Total attention per event, summed across spans.
+
+        **Summed, not taken from the last span.** One visit produces several spans when the
+        person switches away and comes back, so keeping only one would silently halve the
+        dwell of every revisited page — and a revisited page is precisely the kind this
+        target is about. Events with no span are absent rather than zero: no measurement is
+        not a measurement of none (D51).
+        """
+        totals: dict[str, float] = {}
+        for span in self.attention:
+            totals[span.event_id] = totals.get(span.event_id, 0.0) + span.active_seconds
+        return totals
+
+    def events_with_dwell(self) -> tuple[Event, ...]:
+        """Events with attention joined on, ready for `attention_examples`.
+
+        The join happens here and never reaches disk on either side: `TiseEvent` keeps
+        `dwellSeconds` null in the browser (D35, enforced by `assertStorable`) and `Event`
+        is rebuilt in memory here. An event with no span keeps `dwell_seconds=None` and is
+        skipped by the labeller rather than treated as a short visit.
+        """
+        totals = self.dwell_by_event()
+        return tuple(
+            replace(event, dwell_seconds=totals.get(event.event_id))
+            for event in self.events
+        )
 
 
 def _parse_instant(value: str) -> datetime:
@@ -130,6 +186,22 @@ def parse_export(raw: dict[str, Any]) -> TiseExport:
             )
         except (KeyError, ValueError) as error:
             raise ValueError(f"event {index} is malformed: {error}") from error
+
+    spans = []
+    for index, row in enumerate(raw.get("attention") or []):
+        try:
+            spans.append(
+                AttentionSpan(
+                    span_id=str(row["spanId"]),
+                    event_id=str(row["eventId"]),
+                    started_at=_parse_instant(str(row["startedAt"])),
+                    ended_at=_parse_instant(str(row["endedAt"])),
+                    active_seconds=float(row["activeSeconds"]),
+                    end_reason=str(row["endReason"]),
+                )
+            )
+        except (KeyError, ValueError) as error:
+            raise ValueError(f"attention span {index} is malformed: {error}") from error
 
     predictions = []
     for index, row in enumerate(raw.get("predictions") or []):
@@ -170,6 +242,7 @@ def parse_export(raw: dict[str, Any]) -> TiseExport:
         raw_retention_days=int(raw.get("rawRetentionDays", 0)),
         overrides={str(k): str(v) for k, v in (raw.get("overrides") or {}).items()},
         events=tuple(sorted(events, key=lambda event: (event.occurred_at, event.event_id))),
+        attention=tuple(sorted(spans, key=lambda span: (span.ended_at, span.span_id))),
         predictions=tuple(
             sorted(predictions, key=lambda row: (row.window_start, row.subject))
         ),

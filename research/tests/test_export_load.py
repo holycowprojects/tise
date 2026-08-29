@@ -22,9 +22,11 @@ from tise_research.features.sessions import sessionise
 
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "export_v1.json"
 V2_FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "export_v2.json"
+V3_FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "export_v3.json"
 
 _RAW = json.loads(FIXTURE.read_text(encoding="utf-8"))
 _V2_RAW = json.loads(V2_FIXTURE.read_text(encoding="utf-8"))
+_V3_RAW = json.loads(V3_FIXTURE.read_text(encoding="utf-8"))
 
 
 def test_the_fixture_loads_without_transformation() -> None:
@@ -112,9 +114,79 @@ def test_a_naive_timestamp_is_refused() -> None:
 
 
 def test_the_schema_string_is_pinned() -> None:
-    assert EXPORT_SCHEMA == "tise.export.v2"
-    assert _V2_RAW["schema"] == EXPORT_SCHEMA
+    assert EXPORT_SCHEMA == "tise.export.v3"
+    assert _V3_RAW["schema"] == EXPORT_SCHEMA
+    assert _V2_RAW["schema"] == "tise.export.v2"
     assert _RAW["schema"] == "tise.export.v1"
+
+
+def test_older_exports_still_load() -> None:
+    """The promise that makes freezing v1 and v2 worth anything (D76).
+
+    Every version has been additive, so an older file is a newer one without some keys.
+    A person who exported their browsing months ago must not find it unreadable.
+    """
+    for path in (FIXTURE, V2_FIXTURE, V3_FIXTURE):
+        export = load_export(path)
+        assert export.events, f"{path.name} lost its events"
+
+    assert load_export(FIXTURE).attention == ()
+    assert load_export(V2_FIXTURE).attention == ()
+    assert load_export(V3_FIXTURE).attention
+
+
+def test_attention_spans_load_with_their_reason() -> None:
+    export = load_export(V3_FIXTURE)
+    assert len(export.attention) == len(_V3_RAW["attention"])
+    # `shutdown` means Tise stopped watching, so the value is a lower bound. Dropping the
+    # reason would make a truncated span indistinguishable from a measured one.
+    assert {span.end_reason for span in export.attention} >= {"navigated", "shutdown"}
+    for span in export.attention:
+        assert span.ended_at >= span.started_at
+        assert span.active_seconds > 0
+
+
+def test_dwell_is_summed_across_spans_not_replaced() -> None:
+    """One visit produces several spans when the person leaves and comes back.
+
+    Keeping only the last would silently halve the dwell of every revisited page — and a
+    revisited page is exactly the kind `visit_engaged` is about.
+    """
+    export = load_export(V3_FIXTURE)
+    counts: dict[str, int] = {}
+    for span in export.attention:
+        counts[span.event_id] = counts.get(span.event_id, 0) + 1
+    repeated = [event_id for event_id, count in counts.items() if count > 1]
+    assert repeated, "the fixture must contain an event with more than one span"
+
+    totals = export.dwell_by_event()
+    for event_id in repeated:
+        parts = [s.active_seconds for s in export.attention if s.event_id == event_id]
+        assert totals[event_id] == sum(parts)
+        assert totals[event_id] > max(parts)
+
+
+def test_events_without_a_span_keep_no_dwell() -> None:
+    """No measurement is not a measurement of none (D51).
+
+    A zero would enter the median as a real short visit and drag every threshold down.
+    """
+    export = load_export(V3_FIXTURE)
+    measured = export.dwell_by_event()
+    joined = {event.event_id: event.dwell_seconds for event in export.events_with_dwell()}
+
+    assert any(value is None for value in joined.values()), (
+        "the fixture must contain an event with no span"
+    )
+    for event_id, dwell in joined.items():
+        assert dwell == measured.get(event_id)
+
+
+def test_the_join_never_writes_dwell_back_to_the_events() -> None:
+    """`Event` is rebuilt in memory; the exported rows stay dwell-free (D35)."""
+    export = load_export(V3_FIXTURE)
+    export.events_with_dwell()
+    assert all(event.dwell_seconds is None for event in export.events)
 
 
 def test_the_fixture_holds_no_url() -> None:

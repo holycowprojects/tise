@@ -18,6 +18,7 @@ import { IDBFactory } from "fake-indexeddb";
 import { beforeEach, describe, expect, it } from "vitest";
 import { closeTiseDb } from "../src/storage/db";
 import { putEvents } from "../src/storage/events";
+import { putSpans } from "../src/storage/spans";
 import { putPredictions } from "../src/storage/predictions";
 import { saveSettings } from "../src/storage/settings";
 import {
@@ -30,9 +31,21 @@ import {
 import { EVENT_FIELDS, type TiseEvent } from "../src/types";
 
 const FIXTURE_PATH = fileURLToPath(
-  new URL("../../research/fixtures/export_v2.json", import.meta.url),
+  new URL("../../research/fixtures/export_v3.json", import.meta.url),
 );
 const FIXTURE: TiseExport = JSON.parse(readFileSync(FIXTURE_PATH, "utf8"));
+
+/**
+ * v1 and v2 are frozen next to v3 and are never regenerated (D76). They exist so that
+ * "old exports still load" is tested rather than asserted — the Python loader reads all
+ * three, and a file a person exported last year must not become unreadable because the
+ * exporter moved on.
+ */
+const FROZEN: TiseExport[] = ["export_v1.json", "export_v2.json"].map((name) =>
+  JSON.parse(
+    readFileSync(fileURLToPath(new URL(`../../research/fixtures/${name}`, import.meta.url)), "utf8"),
+  ),
+);
 
 const NOW = Date.parse(FIXTURE.exportedAt);
 
@@ -41,6 +54,7 @@ beforeEach(async () => {
   globalThis.indexedDB = new IDBFactory();
   await putEvents(FIXTURE.events as TiseEvent[]);
   await putPredictions(FIXTURE.predictions);
+  await putSpans(FIXTURE.attention);
   await saveSettings({
     sessionTimeoutSeconds: FIXTURE.sessionTimeoutSeconds,
     rawRetentionDays: FIXTURE.rawRetentionDays,
@@ -82,6 +96,10 @@ describe("the export contains nothing beyond the schema", () => {
   it("has exactly the declared top-level keys", async () => {
     const built = await buildExport({ now: NOW, extensionVersion: "0.1.0" });
     expect(Object.keys(built).sort()).toEqual([
+      // v3. D96 shipped attention spans into their own store and left them out of the
+      // export for as long as that stood, which made the file the visible half of the
+      // truth and — worse — kept live dwell out of the research tier entirely.
+      "attention",
       "categoryMapVersion",
       "events",
       "exportedAt",
@@ -93,6 +111,34 @@ describe("the export contains nothing beyond the schema", () => {
       "sessionTimeoutSeconds",
       "suffixListVersion",
     ]);
+  });
+
+  it("carries every span, including two on one event", async () => {
+    // The join sums attention across spans, so an exporter that kept only the last span
+    // per event would quietly halve the dwell of every revisited page.
+    const built = await buildExport({ now: NOW, extensionVersion: "0.1.0" });
+    expect(built.attention.length).toBe(FIXTURE.attention.length);
+    const perEvent = new Map<string, number>();
+    for (const span of built.attention) {
+      perEvent.set(span.eventId, (perEvent.get(span.eventId) ?? 0) + 1);
+    }
+    expect([...perEvent.values()].some((count) => count > 1)).toBe(true);
+  });
+
+  it("still keeps dwell off every exported event (D35)", async () => {
+    // Spans are the measurement; the event stays final and dwell-free. If dwell ever
+    // appears on an exported event, something wrote it to disk.
+    const built = await buildExport({ now: NOW, extensionVersion: "0.1.0" });
+    for (const event of built.events) {
+      expect(event.dwellSeconds, `${event.eventId} must not carry dwell`).toBeNull();
+    }
+  });
+
+  it("older exports stay readable, which is what freezing them is for", () => {
+    for (const old of FROZEN) {
+      expect(old.schema).not.toBe(EXPORT_SCHEMA);
+      expect(Array.isArray(old.events)).toBe(true);
+    }
   });
 
   it("gives every event exactly the declared fields", async () => {

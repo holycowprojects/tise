@@ -15,6 +15,7 @@ import { buildExport, exportFilename, serialiseExport } from "../../src/storage/
 import { countsByCategory, countEvents, recentEvents } from "../../src/storage/events";
 import { isCollecting, loadSettings, saveSettings } from "../../src/storage/settings";
 import { countLabels } from "../../src/storage/labels";
+import { countSpans } from "../../src/storage/spans";
 import { readJob, readModel } from "../../src/model/train";
 import { isIdentity } from "../../src/model/calibrate";
 import { allPredictions, predictionCounts } from "../../src/storage/predictions";
@@ -55,6 +56,49 @@ function clockTime(iso: string): string {
 }
 
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * The attention block. **The reason this exists is a bug worth naming.**
+ *
+ * D96 shipped attention collection gated on `chrome.permissions.contains(["tabs","idle"])`
+ * and never built anything that could *request* them. They are optional permissions, so
+ * Chrome does not grant them at install — meaning the gate could never open, the span
+ * store stayed empty, and the only symptom was a number that never moved. It surfaced
+ * because Akash sent a screenshot of an empty store, not because anything failed.
+ *
+ * Hidden until consent, for the same reason the import block is: asking to watch which tab
+ * is in front before the person has agreed Tise may store anything is asking for the
+ * larger thing first.
+ */
+async function renderAttention(consented: boolean): Promise<void> {
+  const block = element("attention-block");
+  block.hidden = !consented;
+  if (!consented) return;
+
+  const granted = await chrome.permissions.contains({ permissions: ["tabs", "idle"] });
+  const status = element("attention-status");
+  const detail = element("attention-detail");
+  const button = element("attention") as HTMLButtonElement;
+
+  if (granted) {
+    const spans = await countSpans();
+    status.textContent = "Attention measured";
+    detail.textContent =
+      spans === 0
+        ? "Granted, but nothing recorded yet. Spans appear as you browse — one per page you actually look at."
+        : `${spans.toLocaleString()} span${spans === 1 ? "" : "s"} recorded.`;
+    button.hidden = true;
+    return;
+  }
+
+  status.textContent = "Attention not measured";
+  detail.textContent =
+    "Tise can measure how long you actually look at a page, rather than how long a tab sat open. " +
+    "That needs permission to see which tab is in front and whether you are idle. " +
+    "No page content is read, and nothing new is stored about where you go.";
+  button.hidden = false;
+  button.disabled = false;
+}
 
 /**
  * The import block.
@@ -266,6 +310,7 @@ async function render(): Promise<void> {
   toggle.dataset["collecting"] = String(collecting);
 
   await renderImport(settings.consentGrantedAt !== null);
+  await renderAttention(settings.consentGrantedAt !== null);
   await renderTraining(settings.consentGrantedAt !== null);
   await renderRegistry(settings.consentGrantedAt !== null);
 
@@ -323,6 +368,23 @@ element("import").addEventListener("click", async () => {
   element("import-status").textContent = "Importing…";
   (element("import") as HTMLButtonElement).disabled = true;
   setTimeout(() => void render(), 300);
+});
+
+element("attention").addEventListener("click", async () => {
+  // Inside the handler: Chrome requires a user gesture, and it focuses Deny (D33), so the
+  // text above the button has to have done the persuading.
+  const granted = await chrome.permissions.request({ permissions: ["tabs", "idle"] });
+  if (!granted) {
+    element("attention-status").textContent = "Attention not measured";
+    element("attention-detail").textContent =
+      "That is a valid answer. Everything else works exactly as before; Tise simply cannot " +
+      "tell a page you read from a tab you left open.";
+    (element("attention") as HTMLButtonElement).hidden = true;
+    return;
+  }
+  // The listeners are registered at the worker's top level and check the permission on
+  // every event, so nothing needs restarting — the next tab switch records a span.
+  await render();
 });
 
 element("train").addEventListener("click", () => {

@@ -15,6 +15,7 @@ import {
   type Settings,
 } from "../src/storage/settings";
 import { allFeatureRows, countFeatureRows, putFeatureRows } from "../src/storage/features";
+import { allSpans, countSpans, putSpans } from "../src/storage/spans";
 import { FEATURE_SET, type FeatureRow } from "../src/features/vector";
 import type { TiseEvent } from "../src/types";
 
@@ -57,7 +58,7 @@ describe("retention", () => {
   it("treats 0 as keep forever, not as delete everything", async () => {
     const outcome = await enforceRetention(settings({ rawRetentionDays: 0 }), NOW);
 
-    expect(outcome).toEqual({ deleted: 0, cutoff: null });
+    expect(outcome).toEqual({ deleted: 0, spansDeleted: 0, cutoff: null });
     expect(await countEvents()).toBe(5);
   });
 
@@ -162,5 +163,67 @@ describe("feature rows outlive raw events (D11)", () => {
 
     expect(await countFeatureRows()).toBe(1);
     expect((await allFeatureRows())[0]?.values["hoursSinceLastSeen"]).toBe(99);
+  });
+});
+
+/**
+ * Attention spans expire with raw events.
+ *
+ * D96 said they would and never touched `retention.ts`, so they accumulated without
+ * bound. A span records when attention began, how long it lasted and which navigation it
+ * belongs to — that is raw browsing data, and the README promises raw data is deleted
+ * after 30 days. An unbounded span store was a broken privacy promise, not a stale
+ * comment, and it went unnoticed because nothing could read the store at all.
+ */
+describe("attention spans expire too", () => {
+  function spanAt(daysAgo: number) {
+    const at = new Date(NOW - daysAgo * DAY).toISOString();
+    return {
+      spanId: `s${daysAgo}`,
+      eventId: `e${daysAgo}`,
+      startedAt: at,
+      endedAt: at,
+      activeSeconds: 30,
+      endReason: "navigated" as const,
+    };
+  }
+
+  beforeEach(async () => {
+    await closeTiseDb();
+    globalThis.indexedDB = new IDBFactory();
+  });
+
+  it("deletes spans older than the window and keeps the rest", async () => {
+    await putSpans([spanAt(60), spanAt(45), spanAt(10), spanAt(1)]);
+    const outcome = await enforceRetention(settings({ rawRetentionDays: 30 }), NOW);
+
+    expect(outcome.spansDeleted).toBe(2);
+    expect((await allSpans()).map((s) => s.spanId).sort()).toEqual(["s1", "s10"]);
+  });
+
+  it("keeps every span when retention is off", async () => {
+    // `rawRetentionDays: 0` means keep forever. Deleting here would destroy a corpus the
+    // person explicitly chose to keep.
+    await putSpans([spanAt(400), spanAt(1)]);
+    const outcome = await enforceRetention(settings({ rawRetentionDays: 0 }), NOW);
+
+    expect(outcome.spansDeleted).toBe(0);
+    expect(await countSpans()).toBe(2);
+  });
+
+  it("expires spans on the same boundary as the events they describe", async () => {
+    // The two must not drift: a span outliving its event is a record of browsing whose
+    // navigation has already been deleted, which is the exact thing retention exists to
+    // prevent.
+    await putEvents([eventAt(60), eventAt(10)]);
+    await putSpans([spanAt(60), spanAt(10)]);
+
+    const outcome = await enforceRetention(settings({ rawRetentionDays: 30 }), NOW);
+    expect(outcome.deleted).toBe(1);
+    expect(outcome.spansDeleted).toBe(1);
+
+    const events = (await allEvents()).map((e) => e.eventId);
+    const spans = (await allSpans()).map((s) => s.eventId);
+    expect(spans).toEqual(events);
   });
 });

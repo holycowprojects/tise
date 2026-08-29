@@ -4135,3 +4135,76 @@ still needs the reply pasted into it, so the record names a person and a date. T
 stays in gitignored `data/` until it does.
 
 761 Python tests, 356 TypeScript, both linters clean, builds.
+
+### D101 — Attention collection never collected anything. Three defects in D96, found by a screenshot
+
+D96 shipped attention spans and reported them tested, linted and building. They were. The
+feature was still completely inert, and stayed that way for two days while every entry since
+described it as running.
+
+**The collector was gated on a permission nothing could grant.** `attentionEnabled()` ends
+with `chrome.permissions.contains({ permissions: ["tabs", "idle"] })`. Both are
+**optional** permissions, so Chrome does not grant them at install — something must call
+`permissions.request()` from a user gesture, and D96 built no such thing. The popup has done
+exactly that for `history` since T7. The gate could therefore never open, `beginSpan` never
+ran, and the store stayed empty.
+
+**Nothing failed.** No test broke, nothing threw, no counter went negative. The only symptom
+was a number that never moved, and nothing in the extension displayed that number either. It
+surfaced because Akash was asked to read a row count out of DevTools and sent a screenshot
+showing `Total entries: 0`. Had he not, the next step would have been to wait for spans to
+accumulate — indefinitely, on a feature that could not run.
+
+**The export omitted spans, which is worse than it sounds.** `export.ts` says the file
+"contains everything Tise holds" and that omitting part of the store would be "the visible
+half of the truth". D96 added a store and did not extend the export, so it was. And because
+the research tier reads *only* that file — there is no server, by design — **live dwell could
+not reach research at all**. `as_2` could have shipped with no way to check the model that
+runs against the model the benchmarks describe. Export is now **v3**, additive, with v1 and
+v2 frozen and still loading (D76).
+
+**Retention never expired spans, though D96 said it did.** That is not a stale comment. A
+span records when attention began, how long it lasted and which navigation it belongs to —
+raw browsing data — and the README promises raw data is deleted after 30 days. An unbounded
+span store was a **broken privacy promise**. Spans now expire on the same boundary as the
+events they describe, in a separate transaction so a failure there cannot roll back the event
+deletion and silently disable retention entirely.
+
+All three share one cause: **D96 wrote spans and built nothing that could read them.** No
+accessor meant no export, no retention sweep, no count to display, and no way for any test to
+observe that the store was empty. The lesson is not "write more tests" — D96 had tests, and
+they passed. It is that a store with no reader cannot be observed to be wrong.
+
+#### The guard, and why the first version of it was worthless
+
+`manifest.test.ts` now asserts that **every permission in `optional_permissions` appears in
+the arguments of a `permissions.request` call**. A declared permission with no request path
+is a promise the extension cannot keep.
+
+The first version checked whether the permission's *name* appeared anywhere in the popup
+source. It was tested by reintroducing the bug, and **it passed** — because `tabs` and `idle`
+appear in the `contains` call that reads the gate. It was a test that pinned the bug rather
+than catching it, which is the exact defect D87 recorded when a test asserted a hardcoded
+model name. The version that ships parses only `permissions.request(...)` arguments, and was
+verified the same way: reintroduce the bug, watch it fail with the reason stated, restore,
+watch it pass.
+
+#### What the same screenshot settled
+
+**The `fs_3` migration works on a real profile** — 334 labels against 5,366 events, exactly
+the 334 D64 recorded there. Nothing stranded, nothing reset to the 30-day window. That check
+has been owed since D83 and every claim about the migration until now came from synthetic
+corpora. The `attention` store also exists with both indexes, so the DB v5 upgrade ran.
+
+The extension was also simply **paused**, which would have stopped collection regardless.
+Both facts came from one screenshot, and neither was reachable from the repository.
+
+#### What ships
+
+A permission block in the popup, hidden until consent for the same reason the import block is
+— asking to watch which tab is in front, before the person has agreed Tise may store
+anything, is asking for the larger thing first. It states what the permission buys, shows the
+live span count once granted, and treats a refusal as a valid answer that changes nothing
+else.
+
+370 TypeScript tests, 766 Python, both linters clean, builds.

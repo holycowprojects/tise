@@ -296,11 +296,31 @@ published as a failure.
     more than one session, and a dwell landing *exactly* on the threshold that a `>=`
     implementation would pass everything else on
 
-- [ ] **T-G · Ship `visit_engaged` end to end** · L · deps: **T-G1 done**, and collected spans
-  - **Next: the span→dwell join** — read the `attention` store, attach `dwellSeconds` to
-    events in memory, never to disk. Unblocked, no data needed
-  - **Then training and prediction, which are gated.** Akash has not yet reloaded the
-    extension, so span collection may not have started counting
+- [x] **T-G2 · Export v3, span retention, and the permission nobody could grant** · M —
+      **D101.** Three defects in D96, found because Akash sent a screenshot
+  - **The collector was inert.** `tabs`/`idle` are *optional* permissions and nothing ever
+    called `permissions.request()`, so the gate could never open and the store stayed empty
+    for two days while every entry described collection as running. Nothing failed
+  - **Export v3** adds `attention`. Until now live dwell could not reach the research tier
+    **at all** — Python reads only the export — so `as_2` could have shipped unverifiable
+  - **Retention now expires spans**, which D96 said it did and it did not. Spans are raw
+    browsing data and the README promises 30-day deletion, so that was a broken privacy
+    promise, not a stale comment
+  - **The guard's first version was worthless** and I caught it by reintroducing the bug:
+    it checked the permission *name* appeared in the source, which it does — in the
+    `contains` call that reads the gate. The shipped version parses only
+    `permissions.request` arguments, verified by mutation both ways
+  - **`fs_3` migration confirmed on the real profile** (owed since D83): 334 labels against
+    5,366 events, exactly D64's 334. Nothing stranded, nothing reset to 30 days
+  - Verify: 370 TypeScript, 766 Python, both linters clean, builds
+
+- [ ] **T-G · Ship `visit_engaged` end to end** · L · deps: **T-G1, T-G2 done**, and spans
+  - **Akash owes one pass:** reload → popup → *Measure attention* → Allow → **Resume**
+    (he is currently paused) → browse → Export and send the file. It is v3, so it carries
+    the spans and the gate becomes checkable from this side
+  - **Next: the span→dwell join in the extension** — `dwell_by_event` already exists in
+    Python; the TypeScript twin reads the `attention` store and attaches dwell in memory
+  - **Then training and prediction, gated** on enough spans to train on
   - **Adopted is not shipped, and this is the gap.** `as_2` is the `full` compat class: it
     needs dwell, which only live attention spans can supply. D96 started collecting them
     days ago, there is **no TypeScript twin of `as_2`**, so the parity contract is unmet

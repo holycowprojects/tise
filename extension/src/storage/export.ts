@@ -16,10 +16,11 @@
  */
 import { allEvents } from "./events";
 import { allPredictions } from "./predictions";
+import { allSpans } from "./spans";
 import { loadSettings } from "./settings";
 import { CATEGORY_MAP_VERSION } from "../categories/map";
 import { SUFFIX_LIST_VERSION } from "../collect/domain";
-import type { TiseEvent } from "../types";
+import type { AttentionSpan, TiseEvent } from "../types";
 import type { Prediction } from "../model/prediction";
 
 /**
@@ -29,8 +30,15 @@ import type { Prediction } from "../model/prediction";
  * version moves anyway, because "the loader happens to ignore it" is not a contract. A
  * loader that silently accepted a file whose predictions it dropped would produce a
  * benchmark missing exactly the rows the file was exported to carry.
+ *
+ * v3 adds `attention`, and it is a correction rather than a feature. D96 shipped attention
+ * spans into their own store and never extended this file, so for as long as that stood the
+ * export was exactly what the docstring above says it must never be — the visible half of
+ * the truth. Worse, the research tier reads only this file, so **live dwell could not reach
+ * research at all**, and `as_2` could have shipped with no way to check the shipped model
+ * against the one the benchmarks describe.
  */
-export const EXPORT_SCHEMA = "tise.export.v2";
+export const EXPORT_SCHEMA = "tise.export.v3";
 
 export interface TiseExport {
   readonly schema: string;
@@ -52,6 +60,14 @@ export interface TiseExport {
    * was drawn from.
    */
   readonly predictions: readonly Prediction[];
+  /**
+   * Every attention span (D96): the measured periods of attention a visit received.
+   *
+   * These are what `visit_engaged` is defined on. Without them a reader has the events and
+   * the predictions but not the quantity the model was trained to predict, which is the
+   * one thing that would make the benchmark uncheckable by anyone but the author.
+   */
+  readonly attention: readonly AttentionSpan[];
 }
 
 export async function buildExport(options: {
@@ -70,6 +86,7 @@ export async function buildExport(options: {
     overrides: settings.overrides,
     events: await allEvents(),
     predictions: await allPredictions(),
+    attention: await allSpans(),
   };
 }
 
