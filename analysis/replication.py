@@ -402,6 +402,7 @@ def write_report(
     *,
     out_path: Path,
     dropped_rows: int,
+    failures: dict[str, int] | None = None,
 ) -> Path:
     vs_bar = [item.vs_bar for item in results]
     interval = population_interval(vs_bar)
@@ -438,6 +439,13 @@ def write_report(
         if dropped_rows
         else "No rows were dropped."
     )
+    if failures:
+        listed = ", ".join(f"{name} x{count}" for name, count in sorted(failures.items()))
+        dropped_note += (
+            f" **{sum(failures.values()):,} panelists raised and were counted rather "
+            f"than analysed: {listed}.** That is a defect to investigate, not a smaller "
+            "sample."
+        )
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(
@@ -548,6 +556,7 @@ def main() -> int:
 
     results: list[PanelistResult] = []
     excluded: list[Excluded] = []
+    failures: dict[str, int] = {}
     dropped_rows = 0
 
     for number, shard in enumerate(shards, start=1):
@@ -556,9 +565,17 @@ def main() -> int:
                 continue
             dropped_rows += dropped
             gender, age_band = people.get(panelist, ("", ""))
-            outcome = measure_panelist(
-                panelist, events, gender=gender, age_band=age_band
-            )
+            try:
+                outcome = measure_panelist(
+                    panelist, events, gender=gender, age_band=age_band
+                )
+            except Exception as error:  # noqa: BLE001 - counted, not swallowed
+                # One pathological panelist must not discard an hour of completed work.
+                # Failures are counted by type and printed in the report: a silent skip
+                # would change the denominator of every rate, and a systematic bug would
+                # look like a smaller sample rather than a defect.
+                failures[type(error).__name__] = failures.get(type(error).__name__, 0) + 1
+                continue
             if isinstance(outcome, Excluded):
                 excluded.append(outcome)
             else:
@@ -573,7 +590,10 @@ def main() -> int:
         print("no panelist cleared the eligibility gate")
         return 1
 
-    path = write_report(results, excluded, out_path=args.out, dropped_rows=dropped_rows)
+    path = write_report(
+        results, excluded, out_path=args.out, dropped_rows=dropped_rows,
+        failures=failures,
+    )
     values = [item.vs_bar for item in results]
     interval = population_interval(values)
     print()

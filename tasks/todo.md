@@ -22,18 +22,19 @@ Everything above it is history, kept because it is the evidence trail.
   spans and has no TypeScript twin, so the extension still trains `return_24h` and still
   shows nothing. That work is **T-G**.
 - T-B, T-C, T-D remain pre-registered and **unfitted**; T-E and T-F are descriptive (D95).
-- **T-H is the live one (D99):** the machinery to test whether `visit_engaged` replicates
-  on **1,326 real other people** is built and tested. **Not yet run.** It can retire T-A.
+- **`visit_engaged` REPLICATES on 1,326 other people (D100)** — +0.0091 [+0.0086, +0.0097],
+  and it beats a constant for **88.6%** of them individually. T-A no longer rests on one
+  person. **It is still not shipped** — that is T-G.
 
 T1–T21 below are left ticked and unedited. The machinery they produced — collection,
 sessions, features, parity, prediction, resolution, export, migration — is **reused**, not
 rewritten. Do not redo them, and do not quote their numbers as current: the generated
 reports in `docs/benchmarks/` carry superseded banners for the same reason.
 
-Work order: **T-H first** — it can retire T-A, so everything downstream waits on it. Then
+Work order: **T-H is done and T-A survived it.** Next is **T-G** (ship `visit_engaged`,
+gated on having enough live attention spans — a count from the store, not a date) or
 **T-B → T-C → T-D**, with T-E/T-F available any time (both descriptive, neither needs to
-clear a prediction bar). **T-G ships T-A** and is gated on having enough live attention
-spans to train on — a count from the store, not a date.
+clear a prediction bar).
 
 ---
 
@@ -285,10 +286,24 @@ published as a failure.
     Until then the extension keeps training `return_24h` and keeps showing nothing
   - The import-vs-live offset check below becomes due in the same window
 
-- [ ] **T-H · Does `visit_engaged` replicate on other people?** · L — **PRE-REGISTERED
-      (D99), BUILT, NOT YET RUN. Resume here.**
-  - **Run it:** `uv run python analysis/replication.py` — approximately **75 minutes**.
-    Writes `data/replication.md`, gitignored, **not** `docs/benchmarks/`
+- [x] **T-H · Does `visit_engaged` replicate on other people?** · L — **YES (D100).**
+      **+0.0091 [+0.0086, +0.0097]** over **1,326 panelists**; the model beats a constant for
+      **88.6%** of them individually
+  - Verify: `uv run python analysis/replication.py` ✓ 1,326 analysed, 822 excluded, **0
+    errors, 0 rows dropped**, ~70 min. Report at `data/replication.md` (gitignored)
+  - **6 of D99's 7 predictions held. The one that failed, failed upward:** it predicted
+    55–80% of people positive and the answer was **88.6%** — the number D99 named as the one
+    that actually answers the question, and the estimate was wrong in the flattering
+    direction. Recorded rather than filed under "6 of 7"
+  - **ρ = +0.348** between visit count and effect size, so Akash's heavy-vs-median question is
+    answered as a **slope across 1,326 people** rather than two underpowered batches
+  - **Gender: 0.0002 difference**, a null *predicted in advance*. **Age is a monotone gradient**
+    (75.8% at 18–24 to 95.4% at 64–80) that **nobody pre-registered**, so it is a hypothesis
+    for a future test and must not be reported as a finding
+  - The corpus records **idle-excluded** dwell, so D93's standing caveat — that tab-open time
+    could account for the whole effect — is answered rather than outstanding
+  - Superseded run notes: `uv run python analysis/replication.py` — approximately **75
+    minutes**. Writes `data/replication.md`, gitignored, **not** `docs/benchmarks/`
   - **This can retire T-A.** D97 adopted `visit_engaged` on one person. If the population
     interval includes zero, the adoption is withdrawn to *single-person result*, `SPEC.md`
     and `README.md` are corrected, and the failure is published as loudly as the adoption

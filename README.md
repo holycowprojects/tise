@@ -42,10 +42,14 @@ no API, no hosted component of any kind. The repository layout below is the whol
 
 Written down here rather than discovered later:
 
-- **All published benchmark numbers come from one person's browsing** — the author's, across
-  three browsers, measured separately and never merged. Because nothing is collected from
-  users, no larger evaluation is possible. Between-browser results already vary by nearly
-  2×, which is a lower bound on how much they would vary between people.
+- **Most published benchmark numbers come from one person's browsing** — the author's,
+  across three browsers, measured separately and never merged. Because Tise collects nothing
+  from its users, no evaluation on *its own* users is possible or wanted. Between-browser
+  results vary by nearly 2×, which is a lower bound on how much they would vary between
+  people. The **one exception** is the current target, which was additionally tested on 1,326
+  consenting participants in a published research panel (never pooled, one analysis each) —
+  and that panel is German, desktop-only, and from October 2018, so it is a check on
+  generalisation rather than a claim about everyone.
 - **Tise has no dwell time, and cannot have any.** Chrome's history *database* records how
   long you spent on a page; the `chrome.history` API does not expose it, and neither does
   live navigation monitoring. Research run against the database file can measure things the
@@ -77,8 +81,9 @@ That work is kept, not deleted. Those reports in [`docs/benchmarks/`](docs/bench
 as superseded results and carry banners saying so — they are the evidence that justified the
 changes, and removing them would remove the reason.
 
-**The current target is `visit_engaged`,** and it is the first one to clear a bar that was
-written down before it was measured:
+**The current target is `visit_engaged`.** It is the first one to clear a bar that was
+written down before it was measured — and the first result in this project that does not rest
+on a single person:
 
 > At the moment a page opens: will you stay on it longer than you usually stay on pages of
 > this topic?
@@ -87,6 +92,17 @@ One label per **visit** — the finest unit the data contains, and thousands of 
 retired targets had hundreds. Its definition, features, baseline, resampling unit and
 adoption rule were all fixed in advance and committed before a model was fitted; git holds
 the order. See [`docs/benchmarks/visit-engaged.md`](docs/benchmarks/visit-engaged.md).
+
+**Then it was tested on 1,326 other people.** Everything above was measured on the author's
+own browsing, which says little about whether it generalises. So the same model was run
+separately for each of 1,326 consenting participants in a published research panel — never
+pooled — and it beats its baseline for **88.6% of them individually**. The rule for what would
+count as replication, and seven predicted outcomes, were committed before that run; six held,
+and the one that missed had **underestimated** how consistently it works.
+
+That panel measures attention with idle time excluded, which is a *better* measurement than
+the author's own data could provide — so the largest known caveat on the original result is
+now closed rather than outstanding.
 
 **Adopted is not shipped.** It needs how long you actually looked at a page, which the
 `chrome.history` API cannot supply — so the extension collects that itself, from the day the
@@ -126,10 +142,12 @@ published benchmark could describe a model that was never shipped.
 
 ## Benchmarks
 
-Available in [`docs/benchmarks/`](docs/benchmarks), and all of them describe the retired
-target — see [Where this is](#where-this-is). Reports that measure the browsing itself
-(session boundaries, domain concentration, how visits reach the extension) are unaffected
-and stand.
+Available in [`docs/benchmarks/`](docs/benchmarks). The current target's report is
+[`visit-engaged.md`](docs/benchmarks/visit-engaged.md); the replication on 1,326 other people
+is not published there, because that corpus is licensed non-commercially and its report stays
+local. Reports describing a **retired** target carry a banner saying so, generated rather than
+typed, so they cannot quietly go stale. Reports that measure the browsing itself — session
+boundaries, domain concentration, how visits reach the extension — are unaffected and stand.
 
 **No number is published that a committed script did not produce.** No hand-written
 benchmarks, and no synthetic data used as a benchmark — synthetic data appears only in unit

@@ -4018,3 +4018,120 @@ on. Akash chose to ask: `docs/gesis-permission-request.md` is drafted for him to
 public artifact.** Results stay in `data/`, which is gitignored. If permission is refused, the
 local copy is deleted and the refusal is recorded — and the fact that the only public dataset
 carrying per-visit dwell could not be used is itself worth publishing.
+
+### D100 — `visit_engaged` replicates on 1,326 other people. Six of seven predictions held; the one that failed, failed upward
+
+D99's rule, fixed before the run: replicate if the mean per-panelist Brier difference
+against a constant, bootstrapped over panelists, excludes zero in the model's favour.
+
+**+0.0091 [+0.0086, +0.0097]**, 95%, **n = 1,326 panelists**. It excludes zero.
+
+**D97's adoption stands, and it no longer rests on one person.**
+
+| | |
+|---|---|
+| panelists analysed | **1,326** of 2,148 |
+| excluded — under 1,000 visits | 753 |
+| excluded — under 20 sessions | 69 |
+| excluded — under 200 labels | **0** |
+| labels | **8,586,879** |
+| rows dropped, panelists erroring | **0**, **0** |
+| **share of people the model beats a constant for** | **88.6%** |
+| median per-panelist difference | +0.0092 |
+
+#### The prediction that failed
+
+**Prediction 3 said 55–80% of panelists would be positive. The answer is 88.6%.** D99 named
+that as the number that actually answers Akash's question, on the grounds that a pooled
+interval can exclude zero while most individuals see nothing. It was the right number to
+watch and the estimate was wrong — in the direction that flatters the result, which is worth
+saying plainly rather than filing under "6 of 7 held". A pre-registration where every
+prediction lands is usually evidence the predictions were too cautious to be worth making.
+
+| D99 prediction | Held | Measured |
+|---|---|---|
+| 1. Interval excludes zero, model's favour | yes | +0.0091 [+0.0086, +0.0097] |
+| 2. Median positive but under Edge's +0.0112 | yes | +0.0092 |
+| 3. Share positive in 55–80% | **NO** | **88.6%** |
+| 4. `as_2n` beats `as_1n` for a majority | yes | 83.2% |
+| 5. Domain table beats the constant for most | yes | 59.4% |
+| 6. Effect correlates with visit count | yes | Spearman ρ = **+0.348** |
+| 7. No meaningful gender difference | yes | \|male − female\| = **0.0002** |
+
+#### What "88.6% of people" does and does not mean
+
+It counts panelists whose **point estimate** is positive. It is not 88.6% of people for whom
+the effect is *established* — a person whose difference is +0.0001 counts the same as one at
++0.05, and no per-person interval was computed. The population claim is the interval; this
+number describes how one-sided the distribution is, which is a different and useful thing.
+Both are reported because either alone would mislead.
+
+#### What this settles that a bigger sample of Akash could not
+
+**The measurement itself.** D93 named a caveat that could account for T-A's entire effect:
+`visit_duration` counts how long a tab held a URL, so a tab left open overnight reads as deep
+engagement. This corpus records `active_seconds` — **idle-excluded**. The effect survives the
+better measurement, so that caveat is now answered rather than outstanding.
+
+**The person.** Every number this project published before today came from one person and
+10,502 labels. This is 1,326 people and 8.59 million.
+
+**The width.** The interval is **0.0011 wide** against T-A's 0.0091 on Edge, because it is
+built from 1,326 clusters rather than 155. That is the arc from D93 completing: the binding
+constraint was never data volume, it was how many independent things the interval was
+resampling — and for the first time the interval is not the limiting factor in anything.
+
+#### Volume, and Akash's own question
+
+**Spearman ρ = +0.348 between visit count and the per-panelist difference.** The effect is
+real across the range and larger for heavier browsers. This is the answer to *how much
+browsing does Tise need before it can say anything* — a gradient, not a threshold.
+
+Akash proposed running 100 heavy users and 100 median users as separate batches. That was
+declined and the reasoning holds: browsing volume is the very variable predicted to correlate
+with the effect, so "the heaviest 100" is the most favourable subset by construction, and two
+batches of 100 would have produced two underpowered numbers that cannot be compared. Running
+everyone gives the same comparison as a **slope**, measured across 1,326 people.
+
+#### Gender: a null predicted in advance, and measured
+
+Female **+0.0093** (638 people, 88.7% positive); male **+0.0090** (688, 88.5%). A gap of
+**0.0002**. This is the only reason the statement is worth anything: D99 predicted the null
+*before* the run, precisely so a difference found afterwards could not be dressed up as a
+discovery. Akash's original proposal was to model imaginary people by nationality and gender;
+the real answer, from real people, is that gender does not matter here.
+
+#### Age is a gradient nobody predicted, and is therefore not a finding
+
+75.8% of 18–24s (n=157) through to **95.4% of 64–80s** (n=65), rising monotonically, with the
+mean difference more than doubling across the range. It is striking and it was **not
+pre-registered**, so under this project's own rules it is a hypothesis for a future test and
+must not be reported as a result. Recorded here so that if it is ever tested, the fact that
+it was noticed post hoc is on the record too.
+
+#### What it does not settle
+
+**Germany, October 2018, desktop, one month, a paid panel.** Not India, not the US — checked,
+and no public dataset with per-visit dwell exists for either.
+
+**Zero-dwell visits were filtered upstream.** Not one of 9,151,243 rows has `active_seconds`
+of zero, missing or negative, which is not what a raw capture looks like. Short glances are
+probably absent and the dwell distribution is biased upward.
+
+**This is not the model D97 adopted.** `as_1n`/`as_2n` drop the three arrival flags because
+the corpus has no transition column, and `arrivedLink` was not a negligible coefficient on
+Akash's data. The replicated model is a near neighbour, not the same one.
+
+**Adopted and replicated is still not shipped.** T-G is unchanged: `as_2` needs live
+attention spans, has no TypeScript twin, and the parity contract is unmet. The extension
+still trains `return_24h` and still shows nothing.
+
+#### Provenance
+
+Kulshrestha, Oliveira, Karaçalık, Bonnay & Wagner (2021), ICWSM — Zenodo
+10.5281/zenodo.4757574, data supplied by Respondi AG, CC BY-NC 4.0. Akash sought and reports
+receiving permission for this use; `docs/gesis-permission-request.md` holds the request and
+still needs the reply pasted into it, so the record names a person and a date. The report
+stays in gitignored `data/` until it does.
+
+761 Python tests, 356 TypeScript, both linters clean, builds.

@@ -1,9 +1,12 @@
 # Spec: Tise V1
 
 **Status:** built and working, not released. The extension collects, imports, trains,
-predicts, expires and exports; 675 Python and 338 TypeScript tests pass. **No prediction
-target is adopted** — two have been retired and four are pre-registered and unfitted.
-**Decisions this spec implements:** D1–D95 in [`DECISIONS.md`](DECISIONS.md), which is
+predicts, expires and exports; 761 Python and 356 TypeScript tests pass. **`visit_engaged`
+is adopted (D97) and replicates on 1,326 other people (D100)** — two targets have been
+retired and three remain pre-registered and unfitted. **It is adopted, not shipped**: the
+extension still trains `return_24h` and shows nothing, because no target is wired in before
+it is built end to end.
+**Decisions this spec implements:** D1–D100 in [`DECISIONS.md`](DECISIONS.md), which is
 authoritative wherever this file disagrees with it.
 
 ---
@@ -254,7 +257,7 @@ the contradiction recorded in the audit.
 **Two targets have been retired. One is adopted; three remain pre-registered and unfitted.**
 The authoritative list is D94 in `DECISIONS.md`, and D97 records the adoption.
 
-### T-A — `visit_engaged` (primary, **adopted D97**, not yet shipped)
+### T-A — `visit_engaged` (primary, **adopted D97, replicated D100**, not yet shipped)
 
 > At the moment a page opens: will dwell exceed the median dwell for this category over its
 > trailing 20 visits?
@@ -285,9 +288,20 @@ The `tabs` permission (authorised) makes it shippable; `idle` (authorised) fixes
 **Bar: a constant.** D93 established that `category_base_rate` is *worse* than a constant
 here, because a per-category median split makes every category ~50% by construction.
 
-**Adopted is not shipped.** There is no TypeScript twin of `as_2`, so the parity contract is
-unmet, and the live attention spans it needs began collecting only at D96. The extension
-still trains `return_24h` and still shows nothing.
+**It replicates on 1,326 other people (D100).** Bootstrapped over panelists on the
+GESIS/Respondi corpus: **+0.0091 [+0.0086, +0.0097]**, and the model beats a constant for
+**88.6%** of them individually. Six of D99's seven pre-registered predictions held; the one
+that failed predicted 55–80% positive and the answer was 88.6% — wrong in the direction that
+flatters the result, which is recorded rather than filed away.
+
+That corpus records **idle-excluded** dwell, so it also answers D93's standing caveat: the
+effect survives a *better* measurement than the one T-A was adopted on. The effect grows with
+browsing volume (Spearman **ρ = +0.348**) and does not differ by gender (**0.0002**), a null
+predicted in advance.
+
+**Adopted and replicated is still not shipped.** There is no TypeScript twin of `as_2`, so the
+parity contract is unmet, and the live attention spans it needs began collecting only at D96.
+The extension still trains `return_24h` and still shows nothing.
 
 ### T-B — `browsing_next_hour` · T-C — `next_category` · T-D — `tab_return`
 
