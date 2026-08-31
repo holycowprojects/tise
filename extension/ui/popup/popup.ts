@@ -392,7 +392,9 @@ async function renderRegistry(consented: boolean): Promise<void> {
 
   status.textContent = `${predictions.length.toLocaleString()} predictions`;
   const parts = [
-    `${counts["hit"] ?? 0} hit, ${counts["miss"] ?? 0} miss, ` +
+    // "hit" is the topic coming back, not Tise being right — `resolveOutcome` never reads
+    // the probability. Named here so the popup cannot be read as a score (D108).
+    `${counts["hit"] ?? 0} came back, ${counts["miss"] ?? 0} did not, ` +
       `${counts["pending"] ?? 0} pending, ${counts["expired"] ?? 0} expired`,
     // `expired` is called out rather than folded in, because a reader who assumes it is a
     // miss will read a fabricated negative into the score.

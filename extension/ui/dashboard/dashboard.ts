@@ -273,19 +273,30 @@ function renderScorecard(card: Scorecard): void {
 
   const facts = document.createElement("table");
   factRow(facts, "Predictions made", card.total.toLocaleString());
+  // **These two rows are different questions and this page conflated them until D108.**
+  // A `hit` means the topic came back, whatever Tise said about it — so the first row is
+  // how often the thing happened and the second is how often Tise called it correctly.
+  // Labelling the first one "accuracy" turns an easy target into a good model.
   factRow(
     facts,
-    "Right / wrong",
+    "Topic came back / did not",
     `${card.hit.toLocaleString()} / ${card.miss.toLocaleString()}`,
   );
   factRow(
     facts,
-    "Accuracy on what has resolved",
+    "…so it happened this often",
+    card.outcomeRate === null
+      ? "nothing scored yet"
+      : `${percent(card.outcomeRate)} of ${card.scored.toLocaleString()}`,
+  );
+  factRow(
+    facts,
+    "Tise called it correctly",
     // Null until something resolves. A scorecard reading 0% because nothing has been
     // scored yet is a lie in the shape of a measurement.
     card.accuracy === null
       ? "nothing scored yet"
-      : `${percent(card.accuracy)} of ${card.scored.toLocaleString()}`,
+      : `${percent(card.accuracy)} — ${card.correct.toLocaleString()} of ${card.scored.toLocaleString()}`,
   );
   factRow(facts, "Still open", card.pending.toLocaleString());
   factRow(facts, "Expired — Tise was not watching", card.expired.toLocaleString());
@@ -305,7 +316,9 @@ function renderScorecard(card: Scorecard): void {
   p.textContent =
     "Expired is not wrong. It means the window passed while Tise was paused or the " +
     "browser was closed, so nobody scored it — counting those as misses would invent " +
-    "failures that never happened.";
+    "failures that never happened. It also means the scored rows are the days Tise " +
+    "watched without interruption, which are the days you browsed most, so they are not " +
+    "a fair sample of every day.";
   host.append(p);
 }
 

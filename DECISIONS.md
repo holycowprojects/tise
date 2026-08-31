@@ -4803,3 +4803,76 @@ prediction registry; every one is computed from labels by `analysis/` scripts. T
 number reached the popup and this entry, and nowhere else.
 
 454 TypeScript tests, 831 Python, both linters clean, builds.
+
+### D108 — The fix worked, and revealed that the scorecard was measuring the wrong thing
+
+D107's migration ran. The registry rebuilt under rule 2:
+
+| | before | after |
+|---|---:|---:|
+| hit | 192 | **19** |
+| miss | 1 | **1** |
+| expired | 48 | **221** |
+| scored | 193 | **20** |
+
+Exactly the predicted shape. 221 windows are `expired` because Tise genuinely was not
+watching during the imported history, and 20 remain that it did watch. The numbers got much
+worse and became correct, which is the outcome D107 said to expect.
+
+**And then the remaining number was still wrong, for a different reason.**
+
+#### `hit` is not "Tise was right"
+
+`resolveOutcome` never reads `probability`. A `hit` means the topic came back inside the
+window, whatever the model said about it — a prediction of 0.2 on a window that recurred is a
+`hit` and the model was **wrong**.
+
+So `hit / (hit + miss)` is the **base rate of the target over the scored windows**, and the
+dashboard printed it under the heading **"Right / wrong"**, with the row beneath it labelled
+**"Accuracy on what has resolved"**. It read 95%.
+
+That is my own defect from D104, four days after D102 spent an entire entry on the difference
+between a target being easy and a model being good. The same confusion, in the same project,
+this time rendered for a person instead of into a benchmark table — where it is worse, because
+a dashboard is read by someone with no way to check it.
+
+`abstain.ts` has had the correct rule since T12: `probability > 0.5 === outcome`. It was sitting
+in the repository the whole time.
+
+**Both numbers now appear, and they answer different questions:**
+
+- *Topic came back / did not* → **19 / 1**, "…so it happened this often" → the base rate.
+- *Tise called it correctly* → the model's calls against those outcomes.
+
+Exactly one half calls **against** a recurrence, the same tie-break `abstain.ts` uses, so a
+model outputting 0.5 everywhere cannot inherit a high base rate and look competent.
+
+#### The scored twenty are not a fair sample, and the page now says so
+
+A window only scores if Tise watched **all 24 hours** of it without interruption. That requires
+the browser open and collection on for a full day, which selects for the days someone browsed
+most — and those are exactly the days a topic is most likely to recur.
+
+The arithmetic agrees that something is being selected: at the measured base rate of 73.2%, 20
+windows would be expected to yield **14.6** recurrences, and 19 or more has probability
+**0.0162**. That is not a second bug; it is the selection effect, visible. The dashboard now
+states it beside the expired count rather than leaving the reader to infer it.
+
+#### What this run establishes
+
+The loop is closed and honest: 248 predictions, 221 of them correctly refusing to score, 20
+scored from windows Tise actually watched, a base rate and an accuracy reported as the separate
+things they are, and a stated caveat about which days those twenty came from.
+
+**Nothing here is a claim about the model.** `return_24h` remains the target D88 retired, twenty
+scored windows support no conclusion whatever, and every published benchmark is still computed
+from labels by `analysis/` scripts that never touch this registry.
+
+#### Four entries, four defects, one property
+
+D105 stale shape, D106 two paths assumed equivalent, D107 an ordering inside one function, D108
+a label on a number. Every one surfaced from a real run and a number that looked wrong, and
+every one was checkable only because something else had been measured first. The last two were
+caught against **73.2%**, recorded in T2 and never since touched.
+
+457 TypeScript tests, 831 Python, both linters clean, builds.

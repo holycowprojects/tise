@@ -188,10 +188,27 @@ export interface Scorecard {
   readonly withheldByRetiredRule: number;
   readonly scored: number;
   /**
-   * `hit / (hit + miss)`. **Null until something has actually resolved** — a scorecard
-   * reading 0% because nothing has been scored yet is a lie in the shape of a measurement.
+   * `hit / (hit + miss)` — **how often the thing happened, not how often Tise was right.**
+   *
+   * `resolveOutcome` never reads `probability`: a `hit` means the category recurred inside
+   * the window, whatever the model said about it. So this is the base rate of the target
+   * over the scored windows, and calling it accuracy — which this did until D108, on a
+   * dashboard, under the heading "Right / wrong" — turns the target being easy into the
+   * model being good. On a real profile it read 95%.
+   *
+   * Null until something has resolved. A scorecard reading 0% because nothing has been
+   * scored yet is a lie in the shape of a measurement.
+   */
+  readonly outcomeRate: number | null;
+  /**
+   * How often the model's call matched what happened: `(probability > 0.5) === recurred`.
+   *
+   * The number a person means by "is it any good". It is the same rule `abstain.ts` uses
+   * for its accuracy-versus-coverage curve, so the two cannot disagree.
    */
   readonly accuracy: number | null;
+  /** Scored windows where the model called it the other way. `scored - correct`. */
+  readonly correct: number;
 }
 
 export function scorecard(predictions: readonly Prediction[]): Scorecard {
@@ -201,6 +218,16 @@ export function scorecard(predictions: readonly Prediction[]): Scorecard {
   const hit = by("hit");
   const miss = by("miss");
   const scored = hit + miss;
+
+  // A probability above one half calls a recurrence; exactly one half calls against it, so
+  // an undecided model cannot ride the base rate to a good-looking score. Same tie-break
+  // as `abstain.ts`.
+  const correct = predictions.filter(
+    (prediction) =>
+      (prediction.outcome === "hit" || prediction.outcome === "miss") &&
+      prediction.probability > 0.5 === (prediction.outcome === "hit"),
+  ).length;
+
   return {
     total: predictions.length,
     hit,
@@ -209,7 +236,9 @@ export function scorecard(predictions: readonly Prediction[]): Scorecard {
     expired: by("expired"),
     withheldByRetiredRule: predictions.filter((prediction) => prediction.abstained).length,
     scored,
-    accuracy: scored > 0 ? hit / scored : null,
+    outcomeRate: scored > 0 ? hit / scored : null,
+    accuracy: scored > 0 ? correct / scored : null,
+    correct,
   };
 }
 

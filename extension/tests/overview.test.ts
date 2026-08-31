@@ -57,14 +57,14 @@ function event(category: string, day: number, source: "live" | "import"): TiseEv
   };
 }
 
-function prediction(outcome: string, abstained = false): Prediction {
+function prediction(outcome: string, abstained = false, probability = 0.7): Prediction {
   counter += 1;
   return {
     predictionId: `p${counter}`,
     createdAt: "2026-06-01T09:00:00.000Z",
     target: "return_24h",
     subject: "video",
-    probability: 0.7,
+    probability,
     windowStart: "2026-06-01T09:00:00.000Z",
     windowEnd: "2026-06-02T09:00:00.000Z",
     abstained,
@@ -196,15 +196,16 @@ describe("the browsing summary", () => {
 });
 
 describe("the scorecard", () => {
-  it("has no accuracy until something has actually resolved", () => {
+  it("has no rate at all until something has actually resolved", () => {
     // 0% would be a lie in the shape of a measurement, and it is the number a reader
     // would most readily believe.
     const card = scorecard([prediction("pending"), prediction("pending")]);
+    expect(card.outcomeRate).toBeNull();
     expect(card.accuracy).toBeNull();
     expect(card.scored).toBe(0);
   });
 
-  it("scores hits against hits plus misses only", () => {
+  it("counts what happened over hits plus misses only", () => {
     const card = scorecard([
       prediction("hit"),
       prediction("hit"),
@@ -214,7 +215,45 @@ describe("the scorecard", () => {
       prediction("expired"),
     ]);
     expect(card.scored).toBe(4);
-    expect(card.accuracy).toBe(0.75);
+    expect(card.outcomeRate).toBe(0.75);
+  });
+
+  it("separates what happened from whether Tise was right", () => {
+    // **The bug this pair exists for.** `resolveOutcome` never reads the probability, so a
+    // `hit` is the topic coming back — not the model calling it. A model that said 0.2 on
+    // a window that recurred produces a hit and was wrong, and the dashboard reported the
+    // first number under the heading "Right / wrong" until D108. On a real profile that
+    // read 95% while the model had called 3 of those 20 the other way.
+    const card = scorecard([
+      prediction("hit", false, 0.9), // happened, called right
+      prediction("hit", false, 0.9), // happened, called right
+      prediction("hit", false, 0.2), // happened, called WRONG
+      prediction("miss", false, 0.2), // did not happen, called right
+    ]);
+    expect(card.outcomeRate).toBe(0.75); // three of four came back
+    expect(card.accuracy).toBe(0.75); // three of four were called correctly
+    expect(card.correct).toBe(3);
+  });
+
+  it("can report a high outcome rate and a poor model at the same time", () => {
+    // The shape that matters: an easy target and a model adding nothing. Reporting one
+    // number would hide exactly this.
+    const card = scorecard([
+      prediction("hit", false, 0.4),
+      prediction("hit", false, 0.4),
+      prediction("hit", false, 0.4),
+      prediction("miss", false, 0.4),
+    ]);
+    expect(card.outcomeRate).toBe(0.75);
+    expect(card.accuracy).toBe(0.25);
+  });
+
+  it("calls exactly one half against a recurrence, so an undecided model scores nothing", () => {
+    // Same tie-break as `abstain.ts`. Without it a model outputting 0.5 everywhere would
+    // inherit the base rate and look competent on any target with a high one.
+    const card = scorecard([prediction("hit", false, 0.5), prediction("miss", false, 0.5)]);
+    expect(card.accuracy).toBe(0.5);
+    expect(card.correct).toBe(1);
   });
 
   it("never counts an expired window as a miss (D72)", () => {
@@ -223,7 +262,7 @@ describe("the scorecard", () => {
     const card = scorecard([prediction("hit"), ...Array.from({ length: 9 }, () => prediction("expired"))]);
     expect(card.expired).toBe(9);
     expect(card.miss).toBe(0);
-    expect(card.accuracy).toBe(1);
+    expect(card.outcomeRate).toBe(1);
   });
 
   it("counts rows written by the retired confidence rule separately", () => {
@@ -234,6 +273,7 @@ describe("the scorecard", () => {
   it("is all zeroes and no accuracy when nothing has been predicted", () => {
     const card = scorecard([]);
     expect(card.total).toBe(0);
+    expect(card.outcomeRate).toBeNull();
     expect(card.accuracy).toBeNull();
   });
 });
