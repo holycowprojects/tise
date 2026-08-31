@@ -31,12 +31,23 @@ sessions, features, parity, prediction, resolution, export, migration — is **r
 rewritten. Do not redo them, and do not quote their numbers as current: the generated
 reports in `docs/benchmarks/` carry superseded banners for the same reason.
 
-**RESUME HERE (2026-08-30): T-C `next_category`.** Akash's call, made after reviewing the
-product state below and choosing research over surface. It is the largest untouched label
-supply in the project — 238 labels built since T10 and **never benchmarked** — with a
-pre-registered floor of **33.2%** (D91: the always-the-mode floor, *not* the 44.5%
-per-category mode, which is in-sample). It needs new plumbing: `run_backtest` is binary, so
-this wants accuracy folds and a bootstrap on the accuracy difference.
+**T-C is done (D102).** It cleared D94's pre-registered bar on Edge — **+0.0987 [+0.0202,
++0.1725]**, session-clustered — and the entry that records it spends most of its length
+explaining why that is worth less than it sounds. A T-C label is a category *change*, so the
+answer can never be the source; `global_mode` does not know that and was **guaranteed wrong
+on 31.9% of Edge's rows** before it looked at anything, while the table was wrong that way on
+0.0%. `constrained_mode` — the global mode minus the source, which knows that one fact and
+nothing else — **beats the table's point estimate on all three corpora**. So the shipped
+transition table has not been shown to beat a two-line rule anywhere.
+
+**Method note worth carrying forward:** pre-registration stopped the bar being chosen after
+the fact; it did not stop the bar being handicapped by the label definition. **Ask a floor
+one question before registering it — can it produce a legal answer on every row?**
+
+**RESUME HERE (2026-08-31): pick from the work order below.** The obvious candidates are
+**T23** (the base-rate card — needs no training data, and D102 just supplied a defensible
+"what's next" rule to put on it), the **owed abstention replacement** that blocks it, and
+**T-G4**, which is still gated on live spans.
 
 **Where Tise stands as a product, checked 2026-08-29 rather than recalled.** A person
 installing it today gets a popup that says it is a developer view, an import button, a train
@@ -49,9 +60,11 @@ working on a real profile — and the surface is a stub. **The research is far a
 product**, and T23 (the base-rate card, which needs no training data) is the cheapest thing
 that would change that.
 
-Work order after T-C: **T-G4** (ship `visit_engaged`, gated on live spans — a count from the
-store, not a date), **T-B**, **T-D**, with T-E/T-F available any time (both descriptive,
-neither needs to clear a prediction bar).
+Work order: **T23** (the base-rate card — no training data needed, and D102 supplied the
+rule it would show), the **owed abstention replacement** that blocks it, **T-G4** (ship
+`visit_engaged`, gated on live spans — a count from the store, not a date), **T-B**,
+**T-D**, with T-E/T-F available any time (both descriptive, neither needs to clear a
+prediction bar).
 
 ---
 
@@ -428,12 +441,28 @@ published as a failure.
     only one of them (no adopted target wired in) was being tracked
   - Blocks any UI work: T14 and T23 both have nothing to render until this is settled
 
-- [ ] **T-C · `next_category`** — "what comes next?"
-  - Multiclass, **top-1 accuracy** against T19's **33.2% always-the-mode floor** — explicitly
-    *not* the 44.5% per-category mode, which is in-sample
-  - **Within-session** transitions as well as between; D94 predicts >1,500 labels per corpus
-  - Needs new plumbing: `run_backtest` is binary, so accuracy folds + a bootstrap on the
-    accuracy difference
+- [x] **T-C · `next_category`** · L · deps: D94 — **clears its bar, and the bar was not worth
+      clearing** (D102)
+  - Verify: `uv run python analysis/next_category.py` ✓ — 828 Python, 381 TypeScript, both
+    linters clean. Report at `docs/benchmarks/next-category.md`
+  - **The shipped transition table's first benchmark ever.** In both languages since T10,
+    driving the "what's next" surface, never scored
+  - **Edge clears D94's rule:** 52.9% vs `global_mode` 43.1%, **+0.0987 [+0.0202, +0.1725]**
+    session-clustered (n=124). Firefox clears; Chrome does not
+  - **And the bar was wrong before it started on 31.9% of Edge rows.** A label is a category
+    *change*, so the answer can never be the source — and `global_mode` does not know that.
+    The table makes that mistake on **0.0%**, so a third of its margin is handed to it by
+    the label definition
+  - **`constrained_mode`** (the global mode minus the source) scores **57.1%** on Edge,
+    *above* the table's 52.9%. Table − constrained is negative on **all three** corpora and
+    excludes zero on none. **Added post-hoc, stated as post-hoc, cannot change the verdict**
+  - **`bounce_back`, declared in advance, beats the table on Chrome** by an interval that
+    excludes zero, and leads on Edge
+  - **The two cluster units disagree on Edge** — session n=124 excludes zero, source-category
+    n=13 does not, same point estimate. D94 said that disagreement is itself a finding
+  - **D94's prediction 4 failed**: within-session supply was 797 / 710 / 192, not >1,500
+  - New plumbing, reusable: `features/transitions.py`, `eval/multiclass.py`,
+    `expanding_windows` (both targets now cut identical folds), `fit_transition_pairs`
 
 - [ ] **T-D · `tab_return`** — "will you come back to this tab?"
   - **`tabs` permission authorised.** Not measurable on any corpus — the history database
@@ -457,8 +486,8 @@ published as a failure.
 
 ---
 
-- [ ] **T22 · Measure `next_session_category`** · M · deps: T21 — **superseded by T-C**,
-      which subsumes it and adds within-session transitions
+- [x] **T22 · Measure `next_session_category`** · M · deps: T21 — **retired, subsumed by
+      T-C** (D102), which measured the same table over a larger label set
   - The remaining candidate. 238 labels, **never fitted at all**, code in both languages
     since T10. Bar fixed in D91: beat the **33.2% always-the-mode floor** by a
     subject-clustered interval excluding zero — *not* the 44.5% per-category mode, which is

@@ -41,6 +41,20 @@ is not learning anything a two-line rule does not already know — which is wort
 is not the adoption question. Promoting it after seeing the scores would be choosing the
 rule from the result.
 
+## And one thing this file added *after* seeing the numbers
+
+**`constrained_mode` is a post-hoc diagnostic, and saying so is the point.** A label is a
+category change, so the answer can never equal the source — and `global_mode` does not know
+that. On the rows where the source *is* the global mode, the bar is wrong before it starts.
+That is **31.9% of Edge's test rows**, against 0.0% for the table, whose row for a source
+holds no self-count. So some unknown share of the table's margin is not learning at all.
+
+`constrained_mode` is the global mode with the source removed. It measures what the counts
+are worth on top of knowing only that you will do something different. **It cannot change
+the verdict** — D94 named `global_mode` before anything was fitted and that comparison stands
+as written. It is reported beside it, and it was found by asking why the floor was so low,
+not by shopping for a better number.
+
 All three corpora run: unlike T-A this target needs no dwell, so Firefox is included.
 Aggregates only; no domain, URL or title is written anywhere by this script.
 """
@@ -74,7 +88,9 @@ from tise_research.models.next_category import (  # noqa: E402
     BAR_MODEL,
     BOUNCE_BACK_MODEL,
     CHALLENGER_MODEL,
+    CONSTRAINED_MODEL,
     fit_bounce_back,
+    fit_constrained_mode,
     fit_global_mode,
     fit_transition_ranker,
 )
@@ -100,6 +116,7 @@ MODELS = {
     BAR_MODEL: fit_global_mode,
     CHALLENGER_MODEL: fit_transition_ranker,
     BOUNCE_BACK_MODEL: fit_bounce_back,
+    CONSTRAINED_MODEL: fit_constrained_mode,
 }
 
 
@@ -122,6 +139,12 @@ class Variant:
     #: `bounce_back` against the floor, so a reader can see whether the rival beats the bar
     #: even where the table does not.
     rival_vs_bar: Interval | None
+    #: The table against `constrained_mode` — what the counts are worth once the floor is
+    #: told the one thing the label guarantees. Added after seeing the result; see below.
+    constrained_interval: Interval | None
+    #: Share of the bar's pooled predictions that were the source category, and therefore
+    #: impossible by construction. The number that motivated `constrained_mode`.
+    bar_impossible_share: float
     test_sessions: int
     largest_session_share: float
     median_session_size: int
@@ -166,7 +189,13 @@ def _scored(name: str, transitions: list[CategoryTransition]) -> Variant:
     table = result.pooled_predictions[CHALLENGER_MODEL]
     bar = result.pooled_predictions[BAR_MODEL]
     rival = result.pooled_predictions[BOUNCE_BACK_MODEL]
+    constrained = result.pooled_predictions[CONSTRAINED_MODEL]
 
+    impossible = sum(
+        1
+        for prediction, source in zip(bar, result.pooled_sources, strict=True)
+        if prediction == source
+    )
     per_session = Counter(result.pooled_sessions)
     sizes = sorted(per_session.values(), reverse=True)
 
@@ -187,6 +216,10 @@ def _scored(name: str, transitions: list[CategoryTransition]) -> Variant:
         rival_vs_bar=accuracy_difference_interval(
             outcomes, rival, bar, subjects=result.pooled_sessions, unit="session"
         ),
+        constrained_interval=accuracy_difference_interval(
+            outcomes, table, constrained, subjects=result.pooled_sessions, unit="session"
+        ),
+        bar_impossible_share=(impossible / len(outcomes)) if outcomes else 0.0,
         test_sessions=len(per_session),
         largest_session_share=(sizes[0] / len(outcomes)) if sizes and outcomes else 0.0,
         median_session_size=sizes[len(sizes) // 2] if sizes else 0,
@@ -227,7 +260,8 @@ def _model_table(variant: Variant) -> str:
         mark = {
             CHALLENGER_MODEL: " **(the model)**",
             BAR_MODEL: " *(the bar)*",
-            BOUNCE_BACK_MODEL: " *(the rival, not the bar)*",
+            BOUNCE_BACK_MODEL: " *(a rival, not the bar)*",
+            CONSTRAINED_MODEL: " *(a rival, added post-hoc, not the bar)*",
         }.get(model.name, "")
         rows.append(
             f"| `{model.name}`{mark} | {model.top1:.1%} | {model.top3:.1%} | {model.n:,} |"
@@ -306,8 +340,15 @@ presentable answer; {item.unknown_answers:,} answered `{EXCLUDED_TARGET}`.
 - **Session-clustered, the pre-registered unit:** {_described(headline.session_interval)}
 - Source-category clustered, D94's side-by-side: {_described(headline.source_interval)}
 - Rows, the optimistic bound: {_described(headline.row_interval)}
-- The table against `{BOUNCE_BACK_MODEL}` *(the rival)*: {_described(headline.rival_interval)}
+- The table against `{BOUNCE_BACK_MODEL}` *(a rival)*: {_described(headline.rival_interval)}
 - `{BOUNCE_BACK_MODEL}` against the bar: {_described(headline.rival_vs_bar)}
+- The table against `{CONSTRAINED_MODEL}` *(a rival, post-hoc)*:
+  {_described(headline.constrained_interval)}
+
+**The bar spent {headline.bar_impossible_share:.1%} of its predictions on the source
+category**, which a category *change* can never answer. The table did so on 0.0% of rows,
+because a source's row holds no self-count. That much of the margin below is the floor
+being handicapped rather than the table learning.
 
 Pooled test rows span {headline.test_sessions:,} sessions, median {headline.median_session_size}
 rows each, largest {headline.largest_session_share:.0%}.{concentration}
@@ -350,19 +391,42 @@ def write_report(items: list[CorpusResult], *, out_dir: Path) -> Path:
             "support a directional claim, and T-C is not adopted."
         )
 
-    beat_bar = [
-        item.name
-        for item in items
-        if item.headline.top1(CHALLENGER_MODEL) > item.headline.top1(BAR_MODEL)
-    ]
-    beat_rival = [
-        item.name
-        for item in items
-        if item.headline.top1(CHALLENGER_MODEL) > item.headline.top1(BOUNCE_BACK_MODEL)
-    ]
+    def verdict(interval: Interval | None) -> str:
+        """A claim only where the interval supports one. Point estimates are not verdicts."""
+        if interval is None:
+            return "not computable"
+        if not interval.excludes_zero:
+            return "**not established**"
+        return "**yes**" if interval.point > 0.0 else "**no — worse**"
 
-    def listed(names: list[str]) -> str:
-        return ", ".join(f"`{name}`" for name in names) if names else "**no corpus**"
+    summary = "\n".join(
+        [
+            f"| Corpus | Labels | `{CHALLENGER_MODEL}` | Clears the bar? | "
+            f"Beats `{CONSTRAINED_MODEL}`? |",
+            "|---|---:|---:|---|---|",
+        ]
+        + [
+            f"| `{item.name}` | {item.headline.transitions:,} | "
+            f"{item.headline.top1(CHALLENGER_MODEL):.1%} | "
+            f"{verdict(item.headline.session_interval)} | "
+            f"{verdict(item.headline.constrained_interval)} |"
+            for item in items
+        ]
+    )
+
+    impossible = "\n".join(
+        [
+            f"| Corpus | Bar's impossible predictions | `{BAR_MODEL}` | "
+            f"`{CONSTRAINED_MODEL}` |",
+            "|---|---:|---:|---:|",
+        ]
+        + [
+            f"| `{item.name}` | {item.headline.bar_impossible_share:.1%} | "
+            f"{item.headline.top1(BAR_MODEL):.1%} | "
+            f"{item.headline.top1(CONSTRAINED_MODEL):.1%} |"
+            for item in items
+        ]
+    )
 
     floors = "\n".join(
         f"| `{item.name}` | {item.headline.top1(BAR_MODEL):.1%} | "
@@ -430,12 +494,37 @@ all-labels variant is printed for every corpus.
 
 {outcome}
 
-- `{CHALLENGER_MODEL}` beats the bar (`{BAR_MODEL}`) on: {listed(beat_bar)}
-- `{CHALLENGER_MODEL}` beats `{BOUNCE_BACK_MODEL}` *(the rival)* on: {listed(beat_rival)}
+{summary}
+
+Every column is read off a session-clustered interval, not a point estimate. Two models can
+differ by four points and support no claim at all, and this project has published that
+mistake before (D80).
 
 `{BOUNCE_BACK_MODEL}` predicts the category you were on *before* the one just finished and
 reads no counts at all. It is the cheapest thing that could make a fitted table redundant,
 and D24 makes baselines mandatory for exactly that reason. It is **not** the bar.
+
+### The bar is wrong before it starts on a third of the rows
+
+A label is a category *change*, so the answer can never be the source. `{BAR_MODEL}` does
+not know that and predicts one category regardless; on every row where the source **is** the
+global mode it is guaranteed wrong. Per corpus, the share of the bar's predictions that were
+impossible by construction:
+
+{impossible}
+
+`{CHALLENGER_MODEL}` never does this — a source's row in the table holds no self-count — so
+part of its margin is the floor being handicapped rather than counts being learned.
+
+**`{CONSTRAINED_MODEL}` separates the two.** It is the global mode with the source category
+removed: it knows the one thing the label guarantees and nothing else. Whatever the table
+beats it by is what the counts are worth on top of that.
+
+**It was added after these numbers existed, and it cannot change the verdict.** D94 named
+`{BAR_MODEL}` before anything was fitted and that comparison stands exactly as written. This
+one is reported beside it. It was found by asking why the floor was so low, which is a
+different act from choosing a bar that flatters a model — but the ordering is the reader's
+to judge, so it is stated rather than smoothed over.
 
 ## Results
 

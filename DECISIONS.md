@@ -4208,3 +4208,136 @@ live span count once granted, and treats a refusal as a valid answer that change
 else.
 
 370 TypeScript tests, 766 Python, both linters clean, builds.
+
+### D102 — T-C clears its bar, and the bar turns out not to have been worth clearing
+
+`next_category` is the shipped transition table's first benchmark. It has existed in both
+languages since T10 and drives the "what's next" surface, and nothing had ever scored it.
+
+**It clears its pre-registered bar on Edge**: `transition_table` 52.9% against
+`global_mode` 43.1%, **+0.0987 [+0.0202, +0.1725]**, session-clustered over 124 sessions,
+excluding zero in the model's favour. That is D94's rule, written before any of this
+existed, evaluated exactly as written. Firefox clears it too (+0.1311 [+0.0526, +0.2065]);
+Chrome does not (+0.0112 [+0.0000, +0.0246]).
+
+**And the result is worth much less than that sentence makes it sound**, for a reason
+pre-registration did not protect against.
+
+#### The bar was wrong before it started on a third of the rows
+
+A T-C label is a category **change** — D94's own words — so the answer can never equal the
+category just finished. `global_mode` does not know that. It predicts one category
+regardless, and on every row whose source *is* the global mode it is guaranteed wrong before
+it looks at anything. That is **31.9% of Edge's test rows**, 26.0% of Chrome's, 27.0% of
+Firefox's. The transition table makes that mistake on **0.0%**, because a source's row holds
+no self-count and the smoothing never overcomes it.
+
+So the table starts with a third of the bar's rows handed to it by the label definition,
+before any counting happens.
+
+#### `constrained_mode`, and the confession that it is post-hoc
+
+`constrained_mode` is the global mode with the source category removed. It knows the one
+thing the label guarantees and **nothing else** — no counts, no conditioning, no fitting
+beyond the marginal ordering. Whatever the table beats it by is what the counts are actually
+worth.
+
+| Corpus | `global_mode` (the bar) | `constrained_mode` | `transition_table` | Table − constrained |
+|---|---:|---:|---:|---|
+| `history-chrome` | 57.3% | 58.9% | 58.4% | −0.0056 [−0.0362, +0.0162] |
+| `history-edge` | 43.1% | 57.1% | 52.9% | −0.0420 [−0.0990, +0.0050] |
+| `history-firefox` | 50.0% | 65.6% | 63.1% | −0.0246 [−0.0556, +0.0000] |
+
+**On all three corpora the point estimate favours the two-line rule, and on none of them
+does the interval exclude zero.** The fitted table has not been shown to beat "the answer is
+never what you just did" anywhere. On Edge the constraint alone is worth +14.0 points over
+the bar and the whole fitted table is worth +9.9.
+
+**This was added after seeing the result, and that is stated wherever it appears.** D94's
+comparison stands exactly as written and `constrained_mode` cannot change the verdict — the
+bar was named before anything was fitted and a bar replaced afterwards is not a bar. But a
+page that printed +0.0987 and stopped would have been true and misleading, which is the
+failure D24 exists to prevent. It was found by asking why the floor was so low, not by
+shopping for a number.
+
+#### `bounce_back` was declared in advance, and it beats the table too
+
+`bounce_back` predicts the category you were on *before* the one just finished. It was
+committed as a rival before the script was run — git holds that order — on the argument that
+A→B→A is a real pattern and a two-line rule matching a fitted table is worth knowing.
+
+It beats the table on Chrome by an interval that **excludes zero** (the table is
+−0.0642 [−0.1244, −0.0070] against it), and leads on point estimate on Edge
+(57.6% vs 52.9%, interval includes zero). Firefox is the one corpus where the table wins
+outright (+0.0984 [+0.0286, +0.1650]).
+
+So on the primary corpus the shipped transition table is beaten on point estimate by *both*
+rules that read almost nothing, and establishes an advantage over neither.
+
+#### The two units disagree, which D94 said would be a finding
+
+D94: *"both the declared unit and the category unit are reported side by side. If they
+disagree, that disagreement is the finding."* On Edge they do. Session-clustered
+**+0.0987 [+0.0202, +0.1725]** excludes zero over 124 clusters; source-category-clustered
+**+0.0987 [−0.1845, +0.3018]** does not, over 13. Same point estimate, three times the
+width — which is exactly the arithmetic D94 predicted when it changed the unit, and the
+first time the two have been printed side by side on a target that clears.
+
+**The session unit is the declared one and the verdict stands on it.** But 13 clusters
+cannot resolve this effect and never could, and that is a property of the old unit rather
+than of this result.
+
+#### What was decided before the run, and where it landed
+
+- **The rule was pre-registered; the 33.2% was not the number.** T19 measured that figure
+  for the always-the-mode rule over one primary category per session with self-transitions
+  permitted. T-C's labels are changes, so the same rule scores differently and its value is
+  measured here — 43.1% / 57.3% / 50.0%. Fixing the *number* would also have made D94's
+  adoption rule inapplicable: a paired bootstrap needs the reference's prediction on every
+  row and a constant has none. Both figures are printed so they cannot be confused.
+- **A label is a change, and that costs labels.** Consecutive same-category visits collapse
+  into one run, so a session boundary with no change produces no label — 130 of them on
+  Edge. The count is printed rather than asserted small.
+- **`unknown` is excluded from the answer, not from the question (D27).** No surface can
+  show a chip reading *unknown*; conditioning on it is kept. Edge: 905 changes, 792 after
+  the exclusion. The all-labels variant is printed for every corpus and the verdict does not
+  move (+0.0866 [+0.0171, +0.1514]).
+- **D94 predicted "T-C's within-session supply exceeds 1,500 labels per corpus."**
+  **It failed.** Within-session labels are **797** on Edge, **710** on Chrome and **192**
+  on Firefox — roughly half the predicted floor, and Firefox an eighth. The prediction was
+  made against T19's 238 between-session transitions and assumed an order of magnitude;
+  run-collapsing is why it is not there, and run-collapsing is what D94's own label
+  definition requires. Three of D94's four predictions have now been scored — 1 and 2 held
+  in D97 — and this is the first to miss.
+
+#### What this does not decide
+
+`block_volume` is the primary target and D91 fixed the only circumstance in which
+`next_category` can replace it: `block_volume` failing its gate on a real profile, **never**
+by scoring better. That exception was written down precisely to stop this fork, and nothing
+here touches it.
+
+Nor does this retire the transition table. It is a *displayed* surface, not a scored claim,
+and D88's replacement for abstention — show everything with its denominator — is what it
+would ship behind. What this entry establishes is that **the counts are not currently
+earning their place**: a rule that knows only "you will do something different" matches or
+beats them on every corpus. If the "what's next" chip ships, it should ship as
+`constrained_mode` until the table can be shown to beat it, and that is a smaller and more
+honest claim than the one this page could have made.
+
+#### The method note worth keeping
+
+Pre-registration stopped the bar being chosen after the fact. It did **not** stop the bar
+being structurally handicapped by the label definition, and that is a failure mode this
+project had not seen. D94 registered a bar and a label in the same entry without checking
+that the bar could satisfy the label's own constraint. **A floor should be asked one
+question before it is registered: can it produce a legal answer on every row?** `global_mode`
+cannot, and nothing in the process caught it until the numbers were strange enough to ask.
+
+`analysis/next_category.py` writes `docs/benchmarks/next-category.md`. New plumbing:
+`features/transitions.py`, `eval/multiclass.py` (paired clustered bootstrap on accuracy,
+with the sign convention inverted against `intervals.py` because accuracy is a score),
+`expanding_windows` extracted so both targets cut identical folds, `fit_transition_pairs`
+so the benchmarked table is the shipped one.
+
+**828 Python tests, 381 TypeScript, both linters clean.**

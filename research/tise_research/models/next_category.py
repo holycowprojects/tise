@@ -22,6 +22,24 @@ alone matches the fitted table, the table is not learning anything a two-line ru
 already know. **It is not the bar** — promoting it after seeing the scores would be choosing
 the rule from the result, which is the failure D91 and D94 exist to prevent. It is reported
 beside the verdict and never inside it, exactly as `domain_base_rate` is in T-A.
+
+**The second rival is `constrained_mode`, and it was added after seeing the result.** Said
+plainly, because that is the shape D94 confessed to and it is worth naming again.
+
+A label is a category *change*, so the answer can never equal the source. The bar does not
+know that: `global_mode` predicts one category regardless, and on the rows where the source
+*is* the global mode it is wrong before it starts — **31.9% of Edge's test rows**. The
+transition table never makes that mistake (0.0%), because a source's row holds no
+self-count. So an unknown share of the table's margin is not learning at all; it is the
+floor being handicapped by a constraint the label imposes and the floor cannot see.
+
+`constrained_mode` is the global mode **with the source category removed**. It isolates
+that: whatever the table beats it by is what the counts are worth on top of knowing only
+that you will do something different.
+
+**It cannot change the verdict.** D94 named `global_mode` before anything was fitted and
+that comparison stands as written. This one is a diagnostic reported beside it, discovered
+by asking why the floor was so low rather than by shopping for a better number.
 """
 
 from __future__ import annotations
@@ -41,10 +59,13 @@ __all__ = [
     "BAR_MODEL",
     "BOUNCE_BACK_MODEL",
     "CHALLENGER_MODEL",
+    "CONSTRAINED_MODEL",
     "BounceBack",
+    "ConstrainedMode",
     "GlobalMode",
     "TransitionRanker",
     "fit_bounce_back",
+    "fit_constrained_mode",
     "fit_global_mode",
     "fit_transition_ranker",
 ]
@@ -57,6 +78,10 @@ CHALLENGER_MODEL = "transition_table"
 
 #: Reported alongside, never as the bar. See the module docstring.
 BOUNCE_BACK_MODEL = "bounce_back"
+
+#: The post-hoc diagnostic. Reported alongside, never as the bar, and its lateness is
+#: stated wherever it appears.
+CONSTRAINED_MODEL = "constrained_mode"
 
 
 def _by_frequency(counts: dict[str, int]) -> tuple[str, ...]:
@@ -143,3 +168,24 @@ class BounceBack(MulticlassModel):
 
 def fit_bounce_back(transitions: Sequence[CategoryTransition]) -> BounceBack:
     return BounceBack(order=fit_global_mode(transitions).order)
+
+
+@dataclass(frozen=True, slots=True)
+class ConstrainedMode(MulticlassModel):
+    """The global mode with the source category removed, because it cannot be the answer.
+
+    This knows exactly one thing the bar does not, and it is a fact about the label rather
+    than about the person: a run ends when the category changes, so the answer is never the
+    category just finished. Everything the transition table beats this by is what the counts
+    are worth on top of that.
+    """
+
+    order: tuple[str, ...] = ()
+    name: str = CONSTRAINED_MODEL
+
+    def ranking(self, transition: CategoryTransition) -> tuple[str, ...]:
+        return tuple(name for name in self.order if name != transition.from_category)
+
+
+def fit_constrained_mode(transitions: Sequence[CategoryTransition]) -> ConstrainedMode:
+    return ConstrainedMode(order=fit_global_mode(transitions).order)
