@@ -39,6 +39,7 @@ __all__ = [
     "Fold",
     "FoldResult",
     "ModelResult",
+    "expanding_windows",
     "rolling_origin_folds",
     "run_backtest",
 ]
@@ -65,6 +66,46 @@ class Fold:
     test_end: datetime
 
 
+def expanding_windows(
+    n_items: int,
+    *,
+    n_folds: int = 5,
+    initial_train_fraction: float = DEFAULT_INITIAL_TRAIN_FRACTION,
+) -> list[tuple[int, int]]:
+    """`(train_stop, test_stop)` index pairs over a chronologically ordered sequence.
+
+    Fold *n* trains on `[0, train_stop)` and tests on `[train_stop, test_stop)`. The final
+    fold absorbs the remainder so no item is silently dropped.
+
+    **Extracted so a second target cannot cut its folds differently.** `run_backtest` is
+    binary-only, and T-C needed a multiclass backtest; a second copy of this arithmetic is
+    exactly the kind of thing that drifts by one item and produces two benchmark tables
+    that are not comparable. Both callers now cut identical boundaries by construction, and
+    `test_multiclass.py` asserts it against `rolling_origin_folds` directly.
+    """
+    if n_items < n_folds * 2:
+        raise ValueError(
+            f"{n_items} labels cannot support {n_folds} folds; "
+            "reduce n_folds or collect more history"
+        )
+
+    start = max(int(n_items * initial_train_fraction), n_folds)
+    remaining = n_items - start
+    if remaining < n_folds:
+        raise ValueError(
+            f"only {remaining} labels after the initial training window; "
+            f"cannot cut {n_folds} folds"
+        )
+
+    chunk = remaining // n_folds
+    windows: list[tuple[int, int]] = []
+    for index in range(n_folds):
+        train_stop = start + index * chunk
+        test_stop = n_items if index == n_folds - 1 else train_stop + chunk
+        windows.append((train_stop, test_stop))
+    return windows
+
+
 def rolling_origin_folds(
     labels: Sequence[Label],
     *,
@@ -79,26 +120,12 @@ def rolling_origin_folds(
     assumed.
     """
     ordered = sorted(labels, key=lambda label: (label.window_end, label.subject))
-    if len(ordered) < n_folds * 2:
-        raise ValueError(
-            f"{len(ordered)} labels cannot support {n_folds} folds; "
-            "reduce n_folds or collect more history"
-        )
+    windows = expanding_windows(
+        len(ordered), n_folds=n_folds, initial_train_fraction=initial_train_fraction
+    )
 
-    start = max(int(len(ordered) * initial_train_fraction), n_folds)
-    remaining = len(ordered) - start
-    if remaining < n_folds:
-        raise ValueError(
-            f"only {remaining} labels after the initial training window; "
-            f"cannot cut {n_folds} folds"
-        )
-
-    chunk = remaining // n_folds
     folds: list[Fold] = []
-    for index in range(n_folds):
-        train_stop = start + index * chunk
-        # The final fold absorbs the remainder so no label is silently dropped.
-        test_stop = len(ordered) if index == n_folds - 1 else train_stop + chunk
+    for index, (train_stop, test_stop) in enumerate(windows):
         train = tuple(ordered[:train_stop])
         test = tuple(ordered[train_stop:test_stop])
         folds.append(

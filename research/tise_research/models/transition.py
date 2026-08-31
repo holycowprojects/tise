@@ -32,6 +32,7 @@ from tise_research.features.sessions import Session
 __all__ = [
     "DEFAULT_SMOOTHING",
     "TransitionTable",
+    "fit_transition_pairs",
     "fit_transition_table",
     "primary_category",
 ]
@@ -112,23 +113,28 @@ class TransitionTable:
         return best, distribution[best]
 
 
-def fit_transition_table(
-    sessions: Sequence[Session], *, smoothing: float = DEFAULT_SMOOTHING
+def fit_transition_pairs(
+    pairs: Sequence[tuple[str, str]], *, smoothing: float = DEFAULT_SMOOTHING
 ) -> TransitionTable:
-    """Count consecutive session pairs. Sessions must already be in chronological order.
+    """Count `(from, to)` pairs that a caller has already decided on.
 
-    `sessionise` returns them that way, and re-sorting here would hide a caller that
-    handed over something out of order.
+    **Added for T-C, which changed what a pair is.** `fit_transition_table` derives pairs
+    from consecutive sessions, one primary category each; T-C's pairs are consecutive
+    *runs* of the same category, within sessions as well as across them (D94). The counting,
+    the smoothing and the vocabulary contract are identical, so they are written once here
+    and `fit_transition_table` delegates. Two copies would let the shipped table and the
+    benchmarked table drift, which would make the benchmark describe a model nobody runs.
+
+    `vocabulary` covers every category appearing on **either** side of a pair, so a category
+    that is only ever arrived at still receives probability mass and can be predicted.
     """
     counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     marginal: dict[str, int] = defaultdict(int)
     vocabulary: set[str] = set()
 
-    primaries = [primary_category(session) for session in sessions if session.events]
-    for category in primaries:
-        vocabulary.add(category)
-
-    for current, following in zip(primaries, primaries[1:], strict=False):
+    for current, following in pairs:
+        vocabulary.add(current)
+        vocabulary.add(following)
         counts[current][following] += 1
         marginal[following] += 1
 
@@ -137,4 +143,30 @@ def fit_transition_table(
         counts={key: dict(value) for key, value in sorted(counts.items())},
         marginal=dict(sorted(marginal.items())),
         smoothing=smoothing,
+    )
+
+
+def fit_transition_table(
+    sessions: Sequence[Session], *, smoothing: float = DEFAULT_SMOOTHING
+) -> TransitionTable:
+    """Count consecutive session pairs. Sessions must already be in chronological order.
+
+    `sessionise` returns them that way, and re-sorting here would hide a caller that
+    handed over something out of order.
+    """
+    primaries = [primary_category(session) for session in sessions if session.events]
+    table = fit_transition_pairs(
+        list(zip(primaries, primaries[1:], strict=False)), smoothing=smoothing
+    )
+    # A single session produces no pair, and one that is never left is still part of the
+    # vocabulary this table is a distribution over. `fit_transition_pairs` cannot know
+    # that, because it only ever sees pairs.
+    vocabulary = tuple(sorted(set(table.vocabulary) | set(primaries)))
+    if vocabulary == table.vocabulary:
+        return table
+    return TransitionTable(
+        vocabulary=vocabulary,
+        counts=table.counts,
+        marginal=table.marginal,
+        smoothing=table.smoothing,
     )

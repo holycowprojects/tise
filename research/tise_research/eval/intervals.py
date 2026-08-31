@@ -51,6 +51,7 @@ __all__ = [
     "brier_difference_interval",
     "rows_to_exclude_zero",
     "fold_win_probability",
+    "percentile",
 ]
 
 #: Declared, committed, and never tuned. The optimiser deliberately has no seed (D54) —
@@ -122,7 +123,7 @@ def brier_difference(
     return (sum(reference_errors) - sum(challenger_errors)) / len(outcomes)
 
 
-def _percentile(values: list[float], fraction: float) -> float:
+def percentile(values: list[float], fraction: float) -> float:
     """Linear-interpolated percentile of an already-sorted list."""
     if len(values) == 1:
         return values[0]
@@ -200,8 +201,8 @@ def brier_difference_interval(
     tail = (1.0 - level) / 2.0
     return Interval(
         point=point,
-        low=_percentile(draws, tail),
-        high=_percentile(draws, 1.0 - tail),
+        low=percentile(draws, tail),
+        high=percentile(draws, 1.0 - tail),
         level=level,
         resamples=resamples,
         unit=unit_name,
