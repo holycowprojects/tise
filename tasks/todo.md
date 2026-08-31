@@ -812,10 +812,24 @@ published as a failure.
 
 ## Phase 4 — Show it
 
-- [ ] **T14 · Dashboard** · M · deps: T13
-  - Probability, window, evidence, scorecard; abstained predictions hidden, not greyed
-  - Purchase intent labelled "not evaluated"
-  - Verify: `npm test && npm run build`
+- [x] **T14 · Dashboard** · M — **done, with three stated departures** (D104)
+  - Verify: `npm test` ✓ 437, `npm run build` ✓, ESLint clean. `ui/dashboard/`, registered
+    as the options page and opened from the popup
+  - Five panels: what comes next (a card per topic), what Tise has to work with, your
+    topics, the scorecard, and **what Tise claims and does not** — every target with its
+    real state and the awkward part spelled out
+  - **Does not list predictions** — they belong to `return_24h`, retired by D88; showing
+    them would put a retired question in front of a person as advice
+  - **Nothing hidden for being unconfident** — D88/D103; the only floor is on evidence
+  - **Purchase intent absent, not labelled "not evaluated"** (departs from T14 and D6): it
+    could never move off that label, and a permanent placeholder beside measured numbers
+    teaches the reader that the labels are decorative. The reason is printed instead
+  - `status.ts` is **pinned to `predict.ts` by a test**, and asserts that nothing is
+    `shipped` yet. When that test fails, T-G4 has landed
+  - **THE FINDING: 9 of his 10 topics lead most often to `search`**, two at 100%. The
+    hub-and-spoke shape of real browsing, invisible in any synthetic fixture — and the
+    **mechanism behind D102**, whose `constrained_mode` result was measured but unexplained
+  - **Owed by Akash: reload and open the dashboard.** Never seen in a browser
 
 - [ ] **T15 · Onboarding and privacy settings** · M · deps: T14
   - No source listed that V1 does not implement; nothing collected before consent

@@ -16,6 +16,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const VERBATIM: ReadonlyArray<readonly [string, string]> = [
   ["manifest.json", "manifest.json"],
   ["ui/popup/popup.html", "popup.html"],
+  ["ui/dashboard/dashboard.html", "dashboard.html"],
 ];
 
 function copyStaticFiles(): Plugin {
@@ -46,6 +47,7 @@ export default defineConfig({
       input: {
         background: resolve(here, "src/background.ts"),
         popup: resolve(here, "ui/popup/popup.ts"),
+        dashboard: resolve(here, "ui/dashboard/dashboard.ts"),
       },
       output: {
         format: "es",

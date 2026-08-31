@@ -4458,3 +4458,101 @@ failed has never been tested.
   profile the card should render immediately, and if it does not, that is the finding.
 
 403 TypeScript tests, 831 Python, both linters clean, builds.
+
+### D104 — The dashboard, and the shape of real browsing that it exposed
+
+T14 built. `ui/dashboard/` is a full page registered as the extension's options page and
+opened from the popup; the popup stays the developer surface it has always said it is.
+
+Four panels, every number traced to something stored: **what comes next** (a card per topic
+with enough history to answer for itself), **what Tise has to work with**, **your topics**,
+and **the scorecard**. Then a fifth that is the point of the whole page — **what Tise claims
+and what it does not**, listing every target this project has taken seriously with its real
+state and the awkward part spelled out.
+
+The arithmetic lives in `src/model/overview.ts` and the DOM lives in `ui/dashboard/`. That
+split is not tidiness: the suite runs in Node with no DOM, so anything computed inside a
+render function is untestable by construction, and a dashboard is where a wrong number is
+least likely to be noticed and most likely to be believed.
+
+#### The finding, and it was found by pointing the code at a real profile
+
+On Akash's 5,371 events — 856 category changes, 640 of them showable — ten topics have
+enough history for their own card. **Nine of the ten lead most often to `search`.** Two of
+them at 100%: after `travel` and after `news`, he searches, every recorded time.
+
+A board of ten cards mostly saying one word looks like a broken page. It is not broken. It is
+the **hub-and-spoke shape of real browsing**, where a search engine sits between everything
+else, and it is invisible in any synthetic fixture because nobody writes a fixture that
+boring.
+
+**It also explains a published result.** D102 found that `constrained_mode` — which ignores
+what you just left and only knows you will not resume it — beat the fitted transition table
+on all three corpora, and nobody could say *why*. A hub is exactly the shape that produces
+that: when the answer is the same regardless of the question, conditioning on the question
+buys nothing. D102's number was right and its mechanism was unexplained; this is the
+mechanism.
+
+**This is post-hoc and is labelled post-hoc.** It explains a result that was already
+measured under a pre-registered rule; it does not revise it, and no bar moves. What it
+changes is what a future target should be: "what comes next" is close to answered by naming
+one topic, and the interesting question is the one card that differs — *after `search`,
+where do you go?* (travel 20%, dev 19%, government 14% — the only topic on the board with a
+spread). That is a candidate, not a decision, and it is not registered.
+
+#### What the page does about it
+
+`hubTopic` names the hub when a **strict majority** of topics lead there, and the board's
+opening line says so: "9 of your 10 topics lead back to search more often than to anything
+else, so the rows worth reading are the ones that do not."
+
+The majority rule is declared, not tuned. Below half there is no hub, the board already tells
+its own story, and a sentence would be inventing a pattern out of the largest of several
+small numbers. **It never hides a card** — every topic is still listed with its own counts.
+It adds a sentence, and turns nine repetitive rows into one fact plus the row that differs.
+
+#### Three deliberate departures from what T14 asked for
+
+T14 was written when `return_24h` was the target and abstention still gated. Each departure
+follows a decision taken since, and each is stated rather than quietly dropped.
+
+- **It does not list predictions.** T14: *"every prediction shows probability, window and
+  evidence"*. Those predictions belong to `return_24h`, retired by D88. Showing them would
+  put a retired question in front of a person as though it were advice. They are kept and
+  scored and the scorecard says exactly that.
+- **Nothing is hidden for being unconfident.** T14: *"abstained predictions are absent, not
+  greyed out"*. D88 retired abstention and D103 implemented the replacement, so the only
+  thing withheld anywhere is a number with too little behind it — and the page says how much
+  is missing rather than going quiet.
+- **Purchase intent is absent, not labelled "not evaluated".** T14 and D6 both wanted it
+  displayed with a visible label. That is worse than leaving it out. Confirming purchase
+  intent means reading checkout pages, which the privacy design forbids outright, so it
+  could **never** move off that label — and a permanent placeholder beside measured numbers
+  teaches the reader that the labels are decorative. The reason is printed on the page
+  instead, which is the more useful thing to have said.
+
+#### The honesty panel is pinned to the code, not to my memory
+
+`src/model/status.ts` holds the target list and `SHIPPED_TARGET`, and a test asserts it
+equals `TARGET` in `predict.ts`. `research/tise_research/reports.py` anchors to the same
+file from the other language, so a change to the shipped target has to break something in
+both.
+
+**This defect has already happened once.** Between D88 and D97 `reports.py` said the project
+predicted `block_volume`, which D92 had retired, and eight generated reports told readers so
+— right numbers, wrong frame, inside the module written to prevent it. Those were benchmark
+pages read by a handful of people. This page says the same kind of thing to whoever installs
+the extension.
+
+Three of the panel's claims are asserted rather than written: exactly one target is
+`adopted`, it is not the shipped one, and **nothing is `shipped` yet**. When that last test
+starts failing, T-G4 has landed and the panel needs rewriting rather than the test relaxing.
+
+#### What is not done
+
+**It has not been seen in a browser.** The logic was checked against the real export and
+predicts ten cards, so it will render — but T5, T7 and T11 each had a documented-looking
+claim fail on contact with Chrome, and D101 ran two days behind a gate that could never open.
+**Owed by Akash: reload the extension and open the dashboard.**
+
+437 TypeScript tests, 831 Python, both linters clean, builds.

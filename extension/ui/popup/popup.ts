@@ -511,6 +511,12 @@ element("train").addEventListener("click", () => {
   void chrome.runtime.sendMessage({ type: "tise:train" }, () => void render());
 });
 
+element("dashboard").addEventListener("click", () => {
+  // `openOptionsPage` rather than a hand-built URL: it reuses an already-open tab, so
+  // clicking twice does not leave two copies of the same page behind.
+  void chrome.runtime.openOptionsPage();
+});
+
 element("export").addEventListener("click", async () => {
   const data = await buildExport({
     now: Date.now(),

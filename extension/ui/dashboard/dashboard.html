@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tise</title>
+    <style>
+      /*
+       * No framework and no animation budget (D5). This page is published source and is
+       * meant to be read as easily as it is used.
+       */
+      :root {
+        color-scheme: light dark;
+        --ink: #16181d;
+        --muted: #6b7280;
+        --faint: #9aa0a6;
+        --line: #e5e7eb;
+        --bg: #ffffff;
+        --panel: #fbfbfc;
+        --accent: #1f6feb;
+        --bar: #d7e3f7;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --ink: #e8eaed;
+          --muted: #9aa0a6;
+          --faint: #6b7280;
+          --line: #2c2f36;
+          --bg: #17181c;
+          --panel: #1d1f24;
+          --accent: #6ea8ff;
+          --bar: #24405f;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 32px 20px 64px;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          14px/1.5 system-ui,
+          -apple-system,
+          Segoe UI,
+          sans-serif;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+      }
+      header {
+        margin-bottom: 28px;
+      }
+      h1 {
+        font-size: 22px;
+        margin: 0 0 4px;
+        letter-spacing: -0.01em;
+      }
+      header p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      section {
+        margin-bottom: 32px;
+      }
+      h2 {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        margin: 0 0 10px;
+        font-weight: 600;
+      }
+      .lede {
+        margin: 0 0 14px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--panel);
+        padding: 14px 16px;
+      }
+      .panel + .panel {
+        margin-top: 10px;
+      }
+      .empty {
+        color: var(--muted);
+        font-size: 13px;
+        margin: 0;
+      }
+
+      /* The topic board. */
+      .topic h3 {
+        font-size: 14px;
+        margin: 0 0 8px;
+        font-weight: 600;
+      }
+      .topic h3 span {
+        color: var(--muted);
+        font-weight: 400;
+        font-size: 12px;
+      }
+      .answer {
+        display: grid;
+        grid-template-columns: 1fr 44px 74px;
+        align-items: center;
+        gap: 10px;
+        padding: 3px 0;
+      }
+      .answer .name {
+        position: relative;
+        padding: 2px 6px;
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      /* The bar is the share, drawn to scale. It carries no number of its own. */
+      .answer .name i {
+        position: absolute;
+        inset: 0 auto 0 0;
+        background: var(--bar);
+        border-radius: 4px;
+      }
+      .answer .name b {
+        position: relative;
+        font-weight: 400;
+      }
+      .answer .pct {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      .answer .of {
+        text-align: right;
+        color: var(--faint);
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* Plain fact tables. */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      td {
+        padding: 4px 0;
+        vertical-align: top;
+      }
+      td.k {
+        color: var(--muted);
+      }
+      td.v {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* The status list. */
+      .status {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 8px 12px;
+        align-items: baseline;
+      }
+      .tag {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 2px 8px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .tag.shipped,
+      .tag.adopted {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .status .q {
+        margin: 0;
+        font-weight: 600;
+      }
+      .status .n {
+        margin: 2px 0 0;
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+      footer {
+        margin-top: 40px;
+        padding-top: 14px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 12px;
+      }
+      footer p {
+        margin: 0 0 6px;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Tise</h1>
+        <p id="subtitle">Reading what is stored on this device…</p>
+      </header>
+
+      <section id="board-section">
+        <h2>What comes next</h2>
+        <p class="lede" id="board-lede"></p>
+        <div id="board"></div>
+      </section>
+
+      <section id="summary-section">
+        <h2>What Tise has to work with</h2>
+        <div class="panel" id="summary"></div>
+      </section>
+
+      <section id="topics-section">
+        <h2>Your topics</h2>
+        <div class="panel" id="topics"></div>
+      </section>
+
+      <section id="scorecard-section">
+        <h2>Scorecard</h2>
+        <p class="lede" id="scorecard-lede"></p>
+        <div class="panel" id="scorecard"></div>
+      </section>
+
+      <section id="claims-section">
+        <h2>What Tise claims, and what it does not</h2>
+        <p class="lede">
+          Every target this project has taken seriously, and where each one actually
+          stands. A target is <em>adopted</em> only after clearing a bar written down
+          before it was measured.
+        </p>
+        <div class="panel status" id="claims"></div>
+        <p class="lede" id="purchase-intent" style="margin-top: 12px"></p>
+      </section>
+
+      <footer>
+        <p id="privacy"></p>
+        <p>
+          Open source. Every number on this page is computed from data stored on this
+          device and traces to something you can export.
+        </p>
+      </footer>
+    </main>
+    <script type="module" src="dashboard.js"></script>
+  </body>
+</html>
