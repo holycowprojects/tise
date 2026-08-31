@@ -829,7 +829,11 @@ published as a failure.
   - **THE FINDING: 9 of his 10 topics lead most often to `search`**, two at 100%. The
     hub-and-spoke shape of real browsing, invisible in any synthetic fixture — and the
     **mechanism behind D102**, whose `constrained_mode` result was measured but unexplained
-  - **Owed by Akash: reload and open the dashboard.** Never seen in a browser
+  - **VERIFIED IN CHROME (D105).** Card, dashboard, hub sentence and claims panel all
+    render on his real profile. Attention is up to **60 spans / 44 pages / 107 minutes**
+  - The same screenshots found a prediction outage T-G1 shipped: `Preprocessor` gained a
+    `featureSet` and no migration, so the stored model threw on every `transform`. Fixed
+    by discarding rather than guessing; `tests/stale-model.test.ts` writes the old shape
 
 - [ ] **T15 · Onboarding and privacy settings** · M · deps: T14
   - No source listed that V1 does not implement; nothing collected before consent

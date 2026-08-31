@@ -19,7 +19,12 @@ import { currentCategory, nextCategoryCard } from "../../src/model/nextCategory"
 import { isCollecting, loadSettings, saveSettings } from "../../src/storage/settings";
 import { countLabels } from "../../src/storage/labels";
 import { allSpans } from "../../src/storage/spans";
-import { readJob, readModel } from "../../src/model/train";
+import {
+  isStaleModel,
+  readJob,
+  readModel,
+  readModelIncludingStale,
+} from "../../src/model/train";
 import { isIdentity } from "../../src/model/calibrate";
 import { allPredictions, predictionCounts } from "../../src/storage/predictions";
 
@@ -208,6 +213,17 @@ async function renderTraining(consented: boolean): Promise<void> {
 
   if (model === undefined) {
     const labels = await countLabels();
+    // A stale model reads as "no model" everywhere else on purpose, so every caller
+    // already handles it. Here — the one place offering the fix — it is named, because
+    // "no model yet" after a year of browsing would read as a bug rather than a retrain.
+    if (isStaleModel(await readModelIncludingStale())) {
+      status.textContent = "Model needs retraining";
+      detail.textContent =
+        `A model trained by an earlier build did not record which feature set it was ` +
+        `fitted on, so it cannot be used safely and was set aside rather than guessed at. ` +
+        `${labels.toLocaleString()} labels ready — press the button.`;
+      return;
+    }
     status.textContent = "No model yet";
     detail.textContent =
       labels === 0

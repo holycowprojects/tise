@@ -200,7 +200,41 @@ export async function readJob(): Promise<TrainingJob | undefined> {
   return readMeta<TrainingJob>(JOB_KEY);
 }
 
+/**
+ * True for a model stored before the preprocessor recorded which feature set it was fitted
+ * on. **Such a model is unusable and must not be guessed at.**
+ *
+ * T-G1 added `Preprocessor.featureSet` and a check in `transform`, because two feature sets
+ * can have the same width — so an `fs_3` row transforms cleanly through an `as_2`
+ * preprocessor and every coefficient after the first differing column lands on the wrong
+ * feature, silently. The check was right and the migration was missing: a model already in
+ * IndexedDB carried no `featureSet`, so `transform` threw on every prediction and the
+ * extension stopped predicting entirely. Found in a screenshot of `chrome://extensions`,
+ * not by a test — the same way D101 surfaced.
+ *
+ * **It is discarded rather than stamped with the current feature set.** Stamping would be a
+ * guess, and if it were ever wrong the result is not an error but a wrong probability
+ * produced silently, which is exactly what the check exists to prevent. Retraining costs
+ * under a minute on a real profile; guessing costs the guarantee.
+ */
+export function isStaleModel(model: TrainedModel | undefined): boolean {
+  if (model === undefined) return false;
+  // The type says `string`, and the stored object predates the type. Anything read back
+  // out of IndexedDB is whatever was written, not whatever the interface now promises —
+  // which is the whole class of bug this function exists for.
+  const fitted: unknown = model.preprocessor.featureSet;
+  return typeof fitted !== "string" || fitted.length === 0;
+}
+
 export async function readModel(): Promise<TrainedModel | undefined> {
+  const model = await readMeta<TrainedModel>(MODEL_KEY);
+  // Reported as "no model" rather than as a broken one, so every caller already handles
+  // it and the UI offers the retrain that fixes it.
+  return isStaleModel(model) ? undefined : model;
+}
+
+/** The stored model as-is, stale or not. For telling a person *why* they must retrain. */
+export async function readModelIncludingStale(): Promise<TrainedModel | undefined> {
   return readMeta<TrainedModel>(MODEL_KEY);
 }
 

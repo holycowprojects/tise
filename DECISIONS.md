@@ -4556,3 +4556,83 @@ claim fail on contact with Chrome, and D101 ran two days behind a gate that coul
 **Owed by Akash: reload the extension and open the dashboard.**
 
 437 TypeScript tests, 831 Python, both linters clean, builds.
+
+### D105 — T14 verified in Chrome, and the prediction outage the screenshots found
+
+Akash reloaded the extension and sent five screenshots. Four show the work of D103 and D104
+running on his real profile. The fifth is an error page, and it is the reason this entry
+exists.
+
+#### What works, seen rather than asserted
+
+- **The card renders in the popup.** *"After search, you usually go to… dev 31% (34 of 110),
+  travel 31% (34 of 110), ai 14% (15 of 110), video 7% (8 of 110). Counted from the 110
+  times you have left search. 7 other topics not shown."*
+- **The dashboard renders.** Topic cards with bars and denominators, the hub sentence
+  computed live — *"5 of your 6 topics lead back to search more often than to anything
+  else"* — the scorecard, and the claims panel with its six targets and their real states.
+- **Attention collection is working.** **60 spans over 44 pages, 107 minutes**, against the
+  5 spans and two and a half minutes D101 left it at. T-G4's gate is no longer theoretical.
+- The hub held on live data at a different corpus size than the export it was checked
+  against, which is the first independent confirmation of D104's finding.
+
+#### The bug: every prediction had been failing since T-G1
+
+```
+Uncaught (in promise) Error: row is fs_3 and this preprocessor was fitted on undefined;
+nothing downstream would notice.
+```
+
+T-G1 added `Preprocessor.featureSet` and a check in `transform`, and the check is right:
+two feature sets can have the same width, so an `fs_3` row transforms cleanly through an
+`as_2` preprocessor and every coefficient after the first differing column lands on the
+wrong feature, silently. **What T-G1 did not add was the migration.** The model already in
+IndexedDB had been written before the field existed, so it carried no `featureSet`,
+`transform` threw on every call, and the extension stopped predicting entirely.
+
+**D83 got this exactly right and D97 forgot it.** The `fs_2 → fs_3` migration exists
+precisely because a version bump would otherwise strand every stored row; `migrate.ts` runs
+inside `refreshDataset` and a test asserts a migrated row is identical to a recomputed one.
+Then T-G1 versioned the *preprocessor* and shipped no migration for it. The rule that was
+learned once did not transfer to the next thing that acquired a version.
+
+**Why no test caught it.** Every test in the suite trains its own model, so every
+preprocessor in the suite was written by the current build and none of them could be
+missing the field. The suite could not construct the failing state, which means it was not
+testing storage compatibility at all — it was testing one build against itself.
+`tests/stale-model.test.ts` writes the old shape deliberately, and was mutation-checked: with
+the fix reverted, two of its eight cases fail.
+
+#### The fix discards rather than guesses
+
+`readModel` treats a preprocessor with no feature set as **stale** and returns `undefined`.
+Every caller already handles "no model", and none of them handled a throw from deep inside
+`transform`.
+
+**Stamping it with today's feature set was the tempting fix and is the wrong one.** It would
+usually be right — a stored model was fitted on whatever was current then, and that was
+`fs_3`. When it was wrong the result would not be an error; it would be a wrong probability
+produced silently, which is the precise failure the check was added to prevent. A retrain
+costs under a minute on a real profile. The guarantee costs more than that.
+
+The stale model is **not deleted**, so the popup can name the state: *"Model needs
+retraining — a model trained by an earlier build did not record which feature set it was
+fitted on, so it cannot be used safely and was set aside rather than guessed at."* Deleting
+it would leave a person reading "no model yet" after months of browsing, which reads as a
+bug rather than as a one-off.
+
+#### The pattern worth naming, because this is now four for four
+
+T5, T7, T11 and now T-G1 each shipped a documented-looking claim that failed on contact with
+Chrome, and D101 ran two days behind a gate that could never open. **Every defect this
+project has found in the extension was found by looking at a browser, and none by a test.**
+That is not an argument against the tests — 445 of them hold real invariants — it is a
+statement about what they cover. They test one build against itself, and every one of these
+five bugs lived in the seam between a build and the state a previous build left behind.
+
+**What follows from it:** a stored shape that acquires a version needs a migration and a
+test that writes the *old* shape, in the same commit. `Preprocessor` now has both. The
+export schema, `FeatureRow` and `Prediction` already have theirs. Nothing else in storage is
+versioned, and if something acquires a version, this is the rule.
+
+445 TypeScript tests, 831 Python, both linters clean, builds.
