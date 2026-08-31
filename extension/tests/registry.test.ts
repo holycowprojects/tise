@@ -37,7 +37,7 @@ import {
 } from "../src/model/prediction";
 import type { Prediction } from "../src/model/prediction";
 import { resolveAll, resolveOutcome, type ResolutionContext } from "../src/model/resolve";
-import { updateRegistry } from "../src/model/registry";
+import { migrateResolutionRule, updateRegistry } from "../src/model/registry";
 import {
   MODEL_NAME,
   modelName,
@@ -249,14 +249,53 @@ describe("expired is not a miss", () => {
     );
   });
 
-  it("still calls a hit a hit, even through a gap", () => {
-    // A return that *was* observed is evidence regardless of what was missed around it.
-    // Only the negative needs full coverage to be trustworthy.
+  it("does not call a hit a hit through a gap — reversed, and here is what it cost", () => {
+    // **This test asserted the opposite until D107, and its old argument was not silly:**
+    // "a return that *was* observed is evidence regardless of what was missed around it;
+    // only the negative needs full coverage to be trustworthy."
+    //
+    // That reasoning holds for one row and fails for any *rate* computed over rows. If a
+    // hit scores under partial coverage and a miss does not, the scored set is biased
+    // toward positives by construction, and the scorecard's accuracy stops meaning
+    // anything. On a real profile it produced 192 hits against 1 miss — 99.5% — where the
+    // same target measured 73.2% on the same browsing.
+    //
+    // It also conflated two cases. Under a partial gap, a return seen in a covered stretch
+    // really was observed. But a window lying entirely *before consent* observed nothing at
+    // all: its "return" is read out of imported history, and D88 is explicit that an import
+    // may set the yardstick and only live collection may score. Every one of those 192 was
+    // the second case.
+    //
+    // What is given up is real: a genuinely observed return inside a partially covered
+    // window is now discarded rather than scored. That is the price of a scored set whose
+    // rate can be read, and it is paid knowingly.
     const gaps: CoverageGap[] = [
       { from: new Date(START + 2 * HOUR).toISOString(), to: new Date(START + 6 * HOUR).toISOString() },
     ];
     const events = [event("video", 1, "a")];
-    expect(resolveOutcome(prediction(), context({ gaps, events }))).toBe("hit");
+    expect(resolveOutcome(prediction(), context({ gaps, events }))).toBe("expired");
+  });
+
+  it("scores neither outcome for a window that opened before consent", () => {
+    // The case that actually happened. An imported history predates consent entirely, so
+    // nothing in it was ever observed by Tise — and a recurrence found there must not
+    // score, in either direction.
+    const before = context({
+      consentGrantedAt: new Date(START + 48 * HOUR).toISOString(),
+      events: [event("video", 5, "a")],
+    });
+    expect(resolveOutcome(prediction(), before)).toBe("expired");
+    expect(resolveOutcome(prediction(), { ...before, events: [] })).toBe("expired");
+  });
+
+  it("scores both outcomes for a window it did watch", () => {
+    // The symmetry the fix is for: with full coverage, the same context resolves to a hit
+    // or a miss according to the events alone.
+    const covered = context({ gaps: [] });
+    expect(resolveOutcome(prediction(), { ...covered, events: [event("video", 5, "a")] })).toBe(
+      "hit",
+    );
+    expect(resolveOutcome(prediction(), { ...covered, events: [] })).toBe("miss");
   });
 
   it("treats a gap that is still open as covering everything after it", () => {
@@ -617,5 +656,52 @@ describe("both training paths reach the same state", () => {
     // assertions above while leaving one path broken.
     const calls = SOURCE.split("updateRegistry(").length - 1;
     expect(calls).toBeGreaterThanOrEqual(2);
+  });
+});
+
+/**
+ * Dropping outcomes a superseded rule wrote.
+ *
+ * D105's rule, applied on the day it was written: a stored shape that acquires a version
+ * needs a migration **and a test that writes the old shape**, in the same commit. Every
+ * other test here creates its predictions through the current code, so none of them can
+ * construct a store left behind by an earlier build — which is exactly how the stale
+ * preprocessor and these outcomes both survived a full suite.
+ */
+describe("outcomes from a superseded resolution rule", () => {
+  it("drops them, because resolution never revisits a settled outcome", async () => {
+    // The rows written by rule 1: hits declared from imported evidence, before any
+    // coverage check. Nothing would ever have looked at them again.
+    await putPredictions([
+      prediction({ predictionId: "a", outcome: "hit", resolvedAt: CONSENT }),
+      prediction({ predictionId: "b", subject: "dev", outcome: "hit", resolvedAt: CONSENT }),
+    ]);
+    expect(await countPredictions()).toBe(2);
+
+    expect(await migrateResolutionRule()).toBe(2);
+    expect(await countPredictions()).toBe(0);
+  });
+
+  it("runs once, not on every pass", async () => {
+    await putPredictions([prediction({ outcome: "hit", resolvedAt: CONSENT })]);
+    expect(await migrateResolutionRule()).toBe(1);
+
+    await putPredictions([prediction({ predictionId: "fresh" })]);
+    // A migration that ran every time would delete rows the current rule just wrote.
+    expect(await migrateResolutionRule()).toBe(0);
+    expect(await countPredictions()).toBe(1);
+  });
+
+  it("repeats the clear if it was interrupted before the marker was written", async () => {
+    // The marker is written after the clear, so a worker killed between the two repeats
+    // the clear. Repeating costs a rebuild; skipping leaves wrong numbers on screen.
+    await putPredictions([prediction({ outcome: "hit", resolvedAt: CONSENT })]);
+    expect(await migrateResolutionRule()).toBe(1);
+    expect(await migrateResolutionRule()).toBe(0);
+  });
+
+  it("is harmless on a store that never held a prediction", async () => {
+    expect(await migrateResolutionRule()).toBe(0);
+    expect(await countPredictions()).toBe(0);
   });
 });

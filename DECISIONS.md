@@ -4705,3 +4705,101 @@ target the extension trains, `visit_engaged` is still adopted and unwired, and t
 still says so.
 
 448 TypeScript tests, 831 Python, both linters clean, builds.
+
+### D107 — The loop closed, and the first number it produced was wrong
+
+The registry fix landed and the full loop ran end to end for the first time in the project's
+life: **248 predictions — 192 hit, 1 miss, 7 pending, 48 expired.** Collection, import,
+sessions, features, training, calibration, prediction, resolution, scoring, all on a real
+profile, with "nothing withheld — every prediction is kept and scored" underneath it, which
+is D103 working.
+
+**192 hit against 1 miss is 99.5%, and it is wrong.**
+
+The same target measured on the same browsing has a base rate of **73.2%** — 265 of 362
+labels, computed by `analysis` code that has been stable since T2. A scored set that
+disagrees with its own base rate by twenty-six points is not a good model. It is a broken
+denominator.
+
+#### Resolution could not produce a `miss` on imported history
+
+`resolveOutcome` scanned for a recurrence **first** and checked coverage **afterwards**:
+
+```
+for (event of events) if (matches && inWindow) return "hit";   // no coverage check
+if (now <= end) return "pending";
+if (!isFullyCovered(...)) return "expired";                    // only the negative
+...
+return "miss";
+```
+
+`isFullyCovered` returns false for any window opening before `consentGrantedAt`, which is all
+of a 90-day imported history. So every historical window could resolve **`hit`** — from
+imported evidence — or **`expired`** when nothing recurred, and **never `miss`**. The
+negative branch was unreachable for exactly the rows that dominate the store.
+
+That is D88's rule broken in the direction nobody questions: *an import may set the yardstick,
+only live collection may score*.
+
+**The file's own docstring names the mirror image of this mistake.** It says counting an
+unwatched window as a miss "is the tempting shortcut, looks conservative, and manufactures a
+negative". Scanning for hits first manufactures a *positive* — the same error pointing the
+other way, and the one that flatters the project. The reasoning was written down, and only
+half of it was applied.
+
+#### The test that pinned it had a real argument
+
+`registry.test.ts` asserted the old behaviour, with a stated reason: *"a return that was
+observed is evidence regardless of what was missed around it; only the negative needs full
+coverage to be trustworthy."*
+
+That holds for **one row** and fails for any **rate** computed over rows. If a hit scores
+under partial coverage and a miss does not, the scored set is biased toward positives by
+construction and its accuracy means nothing. Since the scorecard is a rate, and the
+reliability curve in SPEC.md is a rate, symmetry is required.
+
+It also conflated two cases. Under a *partial* gap, a return seen in a covered stretch really
+was observed and the old argument applies. A window lying entirely **before consent** observed
+nothing at all. Every one of the 192 was the second case.
+
+**What the fix gives up is real and is paid knowingly:** a genuinely observed return inside a
+partially covered window is now discarded rather than scored. The alternative is a scored set
+whose rate cannot be read.
+
+Coverage is now decided **before** any outcome, on the *elapsed* part of the window — a gap
+that has already happened can never be filled, so an open window with a hole in it is
+unscoreable now rather than at its close. Early hits survive: the scan still runs before the
+`pending` check, but only for a window Tise actually watched.
+
+#### The stored outcomes had to be discarded, and that is a migration
+
+Resolution never revisits a settled outcome — by design, and it is the property that makes
+idempotence structural. So 192 wrong hits would have stayed on the scorecard forever.
+
+`RESOLUTION_RULE = 2` with a marker in `meta`. On the next pass, outcomes written by rule 1
+are **dropped and rebuilt**: a prediction is fully regenerable from the events and the
+coverage log, so nothing that was ever *measured* is lost — only what a rule now known to be
+wrong wrote down. The marker is written **after** the clear, so an interrupted run repeats it;
+repeating costs a rebuild, skipping leaves wrong numbers on screen.
+
+**This is D105's rule applied on the day it was written** — a stored shape that acquires a
+version needs a migration *and* a test that writes the old shape, in the same commit. Both
+are here.
+
+#### What this says about the last three entries
+
+D105 was a stale shape from an earlier build. D106 was two paths assumed equivalent. D107 is
+an ordering inside one function. Different mechanisms, one pattern: **each was invisible until
+something real ran, and each was caught by a number that looked wrong rather than by a test
+that failed.**
+
+The number that caught this one was 99.5%, and it only looked wrong because 73.2% had been
+measured, published and remembered. **A result is checkable to the extent that something else
+has already been measured to compare it against.** Every base rate this project has recorded
+since T2 was, in the end, a tripwire.
+
+**Nothing here changes any published result.** No benchmark in `docs/benchmarks/` reads the
+prediction registry; every one is computed from labels by `analysis/` scripts. The wrong
+number reached the popup and this entry, and nowhere else.
+
+454 TypeScript tests, 831 Python, both linters clean, builds.

@@ -52,30 +52,50 @@ export function resolveOutcome(
   const start = Date.parse(prediction.windowStart);
   const end = Date.parse(prediction.windowEnd);
 
-  for (const event of context.events) {
-    if (event.category !== prediction.subject) continue;
-    const at = Date.parse(event.occurredAt);
-    if (at > start && at <= end) return "hit";
-  }
-
-  // A hit can be declared the instant it happens; everything else waits for the window.
-  if (context.now <= end) return "pending";
-
-  if (!isFullyCovered(start, end, context.gaps, context.consentGrantedAt, context.now)) {
-    return "expired";
-  }
+  // **Coverage is decided before any outcome, and the order is the whole correctness
+  // argument.** This function used to scan for a recurrence first and check coverage
+  // afterwards, so a `hit` was declared from evidence a `miss` was not allowed to use.
+  // Every window that opened before Tise was collecting — which is all of an imported
+  // history — could therefore resolve `hit` or `expired` and never `miss`. On a real
+  // profile that produced 192 hits against 1 miss, a scorecard reading 99.5% where the
+  // measured base rate of the same target on the same data is 73.2%.
+  //
+  // The docstring above already names the mirror image of this mistake: counting an
+  // unwatched window as a miss "looks conservative and manufactures a negative". Scanning
+  // for hits first manufactures a positive, which is the same error pointing the other
+  // way and the one that flatters the project.
+  //
+  // It is also D88's rule — **an import may set the yardstick, only live collection may
+  // score** — which this violated in the direction nobody would question.
+  //
+  // The elapsed part of the window is what is checked, not the whole of it: a gap that
+  // has already happened can never be filled, so an open window with a hole in it is
+  // unscoreable now rather than at its close.
+  const elapsed = Math.min(end, context.now);
   if (
-    context.earliestRetained !== null &&
-    Date.parse(context.earliestRetained) > start
+    !isFullyCovered(start, elapsed, context.gaps, context.consentGrantedAt, context.now)
   ) {
-    // Retention removed the window's events before anyone looked. Rare with a 30-day
-    // window and a 24-hour horizon, and it is a real hole rather than an impossible one.
     return "expired";
   }
   if (context.earliestRetained === null) {
     // Nothing is stored at all, so there is nothing to have found. Cannot be a miss.
     return "expired";
   }
+  if (Date.parse(context.earliestRetained) > start) {
+    // Retention removed the window's events before anyone looked. Rare with a 30-day
+    // window and a 24-hour horizon, and it is a real hole rather than an impossible one.
+    return "expired";
+  }
+
+  for (const event of context.events) {
+    if (event.category !== prediction.subject) continue;
+    const at = Date.parse(event.occurredAt);
+    if (at > start && at <= end) return "hit";
+  }
+
+  // A hit can still be declared the instant it happens — the scan above runs before this
+  // — but only for a window Tise actually watched.
+  if (context.now <= end) return "pending";
   return "miss";
 }
 

@@ -8,9 +8,11 @@
  * something to test for and hope.
  */
 import { allEvents, earliestEventAt } from "../storage/events";
+import { readMeta, writeMeta } from "../storage/db";
 import { coverageGaps } from "../storage/coverage";
 import {
   allPredictions,
+  clearPredictions,
   pendingPredictions,
   putPredictions,
 } from "../storage/predictions";
@@ -20,12 +22,50 @@ import type { Prediction } from "./prediction";
 import { resolveAll, type ResolutionContext } from "./resolve";
 import { readModel } from "./train";
 
+/**
+ * Which version of the resolution rule produced the stored outcomes.
+ *
+ * **Rule 2 (D107) fixed a resolution that could not produce a `miss`.** Version 1 scanned
+ * for a recurrence before checking coverage, so a window Tise never watched — all of an
+ * imported history — resolved `hit` from imported evidence or `expired` from its absence,
+ * and never `miss`. On a real profile that read 192 hits against 1 miss, against a measured
+ * base rate of 73.2% for the same target on the same browsing.
+ *
+ * Resolution never revisits a settled outcome, by design and for good reason, so those rows
+ * would have stayed wrong forever. They are **discarded and rebuilt** rather than re-read:
+ * a prediction is fully regenerable from the events and the coverage log, so nothing is
+ * lost that was ever measured — only outcomes a rule now known to be wrong wrote down.
+ *
+ * This is D105's rule applied on the day it was written: a stored shape that acquires a
+ * version needs a migration and a test that writes the old shape, in the same commit.
+ */
+export const RESOLUTION_RULE = 2;
+
+const RULE_KEY = "resolution:rule";
+
+/**
+ * Drop outcomes written by a superseded resolution rule, once.
+ *
+ * Returns how many were discarded. Writes the marker **after** clearing, so an interrupted
+ * run repeats the clear rather than skipping it — the pass is idempotent either way, and
+ * clearing twice costs a rebuild while skipping it leaves wrong numbers on screen.
+ */
+export async function migrateResolutionRule(): Promise<number> {
+  const stored = await readMeta<number>(RULE_KEY);
+  if (stored === RESOLUTION_RULE) return 0;
+  const dropped = await clearPredictions();
+  await writeMeta(RULE_KEY, RESOLUTION_RULE);
+  return dropped;
+}
+
 export interface RegistryOutcome {
   readonly created: number;
   readonly resolved: number;
   readonly pending: number;
   readonly counts: Record<string, number>;
   readonly reason?: "no-model" | "not-consented";
+  /** Rows dropped because a superseded resolution rule wrote them. One-off; see below. */
+  readonly discarded?: number;
 }
 
 /**
@@ -53,6 +93,9 @@ export async function updateRegistry(options: {
       reason: "not-consented",
     };
   }
+
+  // Before anything reads them: outcomes from a superseded rule are dropped and rebuilt.
+  const discarded = await migrateResolutionRule();
 
   const model = await readModel();
   if (model === undefined) {
@@ -92,5 +135,6 @@ export async function updateRegistry(options: {
     resolved: resolved.length,
     pending: counts.pending,
     counts: { ...counts },
+    ...(discarded > 0 ? { discarded } : {}),
   };
 }
