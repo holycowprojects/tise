@@ -4636,3 +4636,72 @@ export schema, `FeatureRow` and `Prediction` already have theirs. Nothing else i
 versioned, and if something acquires a version, this is the rule.
 
 445 TypeScript tests, 831 Python, both linters clean, builds.
+
+### D106 — The retrain worked, and found the next defect in the same seam
+
+The stale-model fix landed and Akash retrained. The popup now reports a real model:
+
+> 362 labels, 74% positive. feature set `fs_3`. final gradient 5.8e-6. platt `cal_1`, slope
+> 0.77 on 109 held-out rows. no confidence threshold reached 90% on held-out data, which is
+> a measurement rather than a reason to say nothing.
+
+Three things confirmed at once: D105's discard-and-retrain works end to end, the model
+**converged** (5.8e-6), and there was enough held-out data to calibrate for once — slope 0.77
+on 109 rows, not the identity calibrator that D64's run fell back to. The last sentence is
+D103's rewording, running: the abstention curve is reported as a measurement instead of
+announcing that Tise predicts nothing.
+
+**And the panel underneath still said "No predictions yet."**
+
+#### The alarm path used the model. The button did not.
+
+`background.ts` has two ways to train. The **alarm** advances one chunk per wake-up and then
+calls `updateRegistry` — predict for newly closed sessions, resolve what has come due. The
+**`tise:train` message**, which is what "Train now" sends, runs chunks back to back until
+the job finishes and then stops.
+
+So pressing the button produced a fresh model, no predictions, and a wait of up to
+`TRAINING_PERIOD_MINUTES` — **six hours** — before anything used it, with nothing on screen
+explaining the wait.
+
+**The module's own docstring asserted the opposite**, and its reasoning is the interesting
+part: *"Both go through the same `runTrainingChunk`, so the model this produces is the model
+the alarm would have produced, arrived at sooner."* That sentence is true and it is not the
+claim that matters. **Producing the same model is not reaching the same state.** The comment
+established equivalence on the step the two paths shared and said nothing about the step only
+one of them had.
+
+`updateRegistry` is idempotent by design — no cursor, no partial progress — which is exactly
+why calling it from the second path costs nothing and was safe to add.
+
+#### The test is a source guard, and says why
+
+The service worker registers its listeners against the real `chrome` object at module load,
+so there is nothing to call from a test. What can be checked is the wiring, and the wiring is
+what was wrong. `tests/registry.test.ts` now slices `background.ts` at the train listener and
+asserts `updateRegistry` appears inside it, asserts it still appears on the alarm path, and
+asserts there are **at least two** call sites — because a single call in the shared prefix
+would satisfy the first two while leaving one path broken. That third assertion exists
+because D101's first manifest guard passed with the bug reintroduced.
+
+#### The seam, again
+
+D105 named the pattern: every extension defect this project has found was found by looking at
+a browser, and each lived in the seam between a build and the state a previous build left
+behind. **This one is the same shape rotated ninety degrees** — not the seam between builds
+but the seam between two code paths that were assumed equivalent because they shared their
+expensive step.
+
+The generalisation worth keeping: **when two paths are documented as equivalent, the
+documentation names what they share. Check what only one of them does.** A shared subroutine
+is evidence about the subroutine, never about the callers.
+
+#### What is now true on a real profile
+
+Collection, import, sessions, features, attention (60 spans / 44 pages / 107 minutes),
+training, calibration, retention, export, parity, the card, the dashboard — and, after this,
+prediction. **Nothing here changes what Tise claims:** `return_24h` is still the retired
+target the extension trains, `visit_engaged` is still adopted and unwired, and the dashboard
+still says so.
+
+448 TypeScript tests, 831 Python, both linters clean, builds.

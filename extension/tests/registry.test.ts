@@ -9,6 +9,8 @@
  */
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
 import { closeTiseDb } from "../src/storage/db";
 import { deleteEverything, isEmpty } from "../src/storage/delete";
@@ -568,5 +570,52 @@ describe("evidence", () => {
     const lines = evidenceFor(row({ daysSeen7d: 1, eventCount30d: 1 }));
     expect(lines).toContain("seen on 1 day in the last week");
     expect(lines).toContain("1 visit in the last 30 days");
+  });
+});
+
+/**
+ * Both ways of training must end in the same state, not merely produce the same model.
+ *
+ * This is a source guard rather than a behavioural test, for the same reason
+ * `manifest.test.ts` is one: the service worker registers its listeners against the real
+ * `chrome` object at module load, so there is nothing here to call. What can be checked is
+ * the wiring, and the wiring is exactly what was wrong.
+ *
+ * The alarm path trained and then called `updateRegistry`. The "Train now" button trained
+ * and stopped, so pressing it produced a fresh model, no predictions, and a wait of up to
+ * `TRAINING_PERIOD_MINUTES` — six hours — with nothing on screen explaining it. The
+ * background module's own docstring claimed the two paths were equivalent because both go
+ * through `runTrainingChunk`; they produced the same model, and only one of them used it.
+ */
+describe("both training paths reach the same state", () => {
+  const SOURCE = readFileSync(
+    fileURLToPath(new URL("../src/background.ts", import.meta.url)),
+    "utf8",
+  );
+
+  /** The body of the `tise:train` message listener, from its type guard to end of file. */
+  function trainListener(): string {
+    const start = SOURCE.indexOf("isTrainMessage(message)");
+    expect(start, "the train listener moved; this guard needs updating").toBeGreaterThan(0);
+    return SOURCE.slice(start);
+  }
+
+  it("updates the registry after on-demand training", () => {
+    expect(trainListener()).toContain("updateRegistry");
+  });
+
+  it("still updates the registry on the alarm path", () => {
+    const alarms = SOURCE.slice(
+      SOURCE.indexOf("chrome.alarms.onAlarm.addListener"),
+      SOURCE.indexOf("interface ImportMessage"),
+    );
+    expect(alarms).toContain("updateRegistry");
+  });
+
+  it("calls it from both places rather than one", () => {
+    // A single call site that happened to sit in the shared prefix would satisfy both
+    // assertions above while leaving one path broken.
+    const calls = SOURCE.split("updateRegistry(").length - 1;
+    expect(calls).toBeGreaterThanOrEqual(2);
   });
 });

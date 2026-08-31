@@ -172,6 +172,11 @@ function isTrainMessage(message: unknown): message is TrainMessage {
  * surface needs and **not** how the alarm path works — the alarm advances one chunk and
  * lets the worker die. Both go through the same `runTrainingChunk`, so the model this
  * produces is the model the alarm would have produced, arrived at sooner.
+ *
+ * **And then it updates the registry, which it used not to.** Producing the same model is
+ * not the same as reaching the same state: the alarm path predicts and resolves after
+ * training, so a button that only trained left the person with a fresh model, no
+ * predictions, and a six-hour wait for the next alarm to use it.
  */
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (!isTrainMessage(message)) return false;
@@ -200,7 +205,25 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     while (outcome.state === "training") {
       outcome = await runTrainingChunk({ timeoutSeconds: settings.sessionTimeoutSeconds });
     }
-    sendResponse({ ok: outcome.state === "done", outcome, elapsedMs: Date.now() - started });
+
+    // **The alarm path does this and this path did not**, so pressing the button produced
+    // a model and no predictions, and the popup said "No predictions yet" until the next
+    // training alarm — up to six hours later, with nothing on screen explaining the wait.
+    // Found in a screenshot immediately after the retrain D105 required.
+    //
+    // The docstring above claimed the two paths were equivalent because both go through
+    // `runTrainingChunk`. They produced the same *model*; only one of them then used it.
+    // `updateRegistry` is idempotent by design, so running it here costs nothing when
+    // there is nothing new.
+    const registry =
+      outcome.state === "done" ? await updateRegistry({ now: Date.now() }) : undefined;
+
+    sendResponse({
+      ok: outcome.state === "done",
+      outcome,
+      registry,
+      elapsedMs: Date.now() - started,
+    });
   })();
 
   return true; // keep the message channel open for the async reply
