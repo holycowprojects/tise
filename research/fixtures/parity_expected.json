@@ -741,6 +741,110 @@
       }
     }
   ],
+  "transitions": {
+    "boundariesWithoutChange": 6,
+    "transitions": [
+      {
+        "transitionId": "evt-002",
+        "at": "2026-06-01T09:50:00+00:00",
+        "fromCategory": "video",
+        "toCategory": "search",
+        "withinSession": true,
+        "previousCategory": null,
+        "fromRunEvents": 2
+      },
+      {
+        "transitionId": "evt-003",
+        "at": "2026-06-01T10:20:01+00:00",
+        "fromCategory": "search",
+        "toCategory": "dev",
+        "withinSession": false,
+        "previousCategory": "video",
+        "fromRunEvents": 1
+      },
+      {
+        "transitionId": "evt-004",
+        "at": "2026-06-01T10:25:00+00:00",
+        "fromCategory": "dev",
+        "toCategory": "government",
+        "withinSession": true,
+        "previousCategory": "search",
+        "fromRunEvents": 1
+      },
+      {
+        "transitionId": "evt-005",
+        "at": "2026-06-01T10:30:00+00:00",
+        "fromCategory": "government",
+        "toCategory": "work",
+        "withinSession": true,
+        "previousCategory": "dev",
+        "fromRunEvents": 1
+      },
+      {
+        "transitionId": "evt-006",
+        "at": "2026-06-01T10:35:00+00:00",
+        "fromCategory": "work",
+        "toCategory": "unknown",
+        "withinSession": true,
+        "previousCategory": "government",
+        "fromRunEvents": 1
+      },
+      {
+        "transitionId": "evt-007",
+        "at": "2026-06-02T09:00:00+00:00",
+        "fromCategory": "unknown",
+        "toCategory": "video",
+        "withinSession": false,
+        "previousCategory": "work",
+        "fromRunEvents": 1
+      },
+      {
+        "transitionId": "evt-008",
+        "at": "2026-06-02T09:05:00+00:00",
+        "fromCategory": "video",
+        "toCategory": "search",
+        "withinSession": true,
+        "previousCategory": "unknown",
+        "fromRunEvents": 1
+      },
+      {
+        "transitionId": "evt-009",
+        "at": "2026-06-03T12:00:00+00:00",
+        "fromCategory": "search",
+        "toCategory": "dev",
+        "withinSession": false,
+        "previousCategory": "video",
+        "fromRunEvents": 1
+      },
+      {
+        "transitionId": "evt-015",
+        "at": "2026-06-10T16:00:00+00:00",
+        "fromCategory": "dev",
+        "toCategory": "video",
+        "withinSession": false,
+        "previousCategory": "search",
+        "fromRunEvents": 6
+      },
+      {
+        "transitionId": "evt-016",
+        "at": "2026-06-10T16:05:00+00:00",
+        "fromCategory": "video",
+        "toCategory": "dev",
+        "withinSession": true,
+        "previousCategory": "dev",
+        "fromRunEvents": 1
+      },
+      {
+        "transitionId": "evt-017",
+        "at": "2026-06-12T10:00:00+00:00",
+        "fromCategory": "dev",
+        "toCategory": "video",
+        "withinSession": false,
+        "previousCategory": "video",
+        "fromRunEvents": 1
+      }
+    ]
+  },
   "attention": {
     "featureSet": "as_2",
     "featureNames": [

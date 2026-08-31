@@ -119,6 +119,40 @@ class TestFixtureCoversWhatItClaimsTo:
             for session in _load(EXPECTED_PATH)["sessions"]
         )
 
+    def test_the_transitions_section_reaches_the_cases_it_exists_for(self):
+        """A fixture that only ever changes topic inside one session tests half of it.
+
+        `withinSession` would then be a constant on both sides, and the TypeScript mirror
+        could compute it any way at all and still agree.
+        """
+        section = _load(EXPECTED_PATH)["transitions"]
+        transitions = section["transitions"]
+        assert transitions, "no category changes to compare"
+
+        flags = {item["withinSession"] for item in transitions}
+        assert flags == {True, False}, "needs a change inside a session and across one"
+
+        assert any(item["previousCategory"] is None for item in transitions), (
+            "the start of the stream, where there is no previous run, is not exercised"
+        )
+        assert any(item["previousCategory"] is not None for item in transitions)
+        assert any(item["fromRunEvents"] > 1 for item in transitions), (
+            "every run is one event long, so run-collapsing is never actually tested"
+        )
+
+    def test_a_change_never_lands_on_the_category_it_left(self):
+        """The invariant the whole label definition rests on (D94, D102).
+
+        Runs are maximal, so `from` and `to` cannot match. If they ever do, the collapse
+        is broken and every count built on it is wrong by an unknown amount.
+        """
+        for item in _load(EXPECTED_PATH)["transitions"]["transitions"]:
+            assert item["fromCategory"] != item["toCategory"], item["transitionId"]
+
+    def test_the_cost_of_the_change_rule_is_recorded(self):
+        """Boundaries the collapse absorbed. Reported so the rule can be argued with."""
+        assert _load(EXPECTED_PATH)["transitions"]["boundariesWithoutChange"] >= 0
+
 
 class TestFixtureIsSynthetic:
     """SPEC.md permits synthetic data as a fixture and forbids it as a benchmark.

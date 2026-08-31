@@ -4341,3 +4341,120 @@ with the sign convention inverted against `intervals.py` because accuracy is a s
 so the benchmarked table is the shipped one.
 
 **828 Python tests, 381 TypeScript, both linters clean.**
+
+### D103 — Tise shows a person something about themselves, for the first time
+
+Until now the extension collected, imported, sessionised, computed features, trained,
+predicted, resolved, retained and exported — and displayed **nothing**. Three independent
+reasons, all recorded in D101 and the product-state review: the shipped target was retired,
+abstention withheld everything by design, and the adopted target was not wired.
+
+This entry closes the second reason and routes around the other two.
+
+#### The card, and why it is counts rather than a model
+
+**"After `news`, you usually go to… `video` 41% — 9 of 22."**
+
+That is the whole surface. It reads the event stream, collapses it into runs, counts what
+followed what, and shows each answer with the denominator behind it. **No model is loaded,
+no target is adopted, nothing is trained, and no dwell is needed** — which is why it can
+ship today rather than after T-G4.
+
+**D102 is the reason it is not the fitted table.** That entry benchmarked
+`TransitionTable` for the first time in the project's life. It cleared its pre-registered
+bar on Edge, and a rule knowing only that you will not resume what you just stopped scored
+**higher** — 57.1% against 52.9% — with the table's point estimate losing on all three
+corpora and its interval excluding zero against that rule on none of them. A card showing
+the table's smoothed probability would have been presenting a number whose skill is not
+established.
+
+What *is* established is what the person did. A frequency shown with its denominator is
+either true of their data or it is not; it claims no skill, so it cannot overclaim.
+
+**Smoothing is therefore deliberately absent**, unlike the shipped table it sits beside.
+Smoothing is right for a model and wrong here: **the percentage shown must equal the
+fraction shown**, or the denominator stops being evidence and becomes decoration.
+
+#### D88's replacement, implemented on both halves
+
+D88 retired abstention and replaced it with *show everything, always with its denominator —
+one floor only, a minimum number of prior observations*. The card is the "denominator" half.
+The other half was owed and was found by checking what the product actually shows rather
+than by any test failing.
+
+`predict.ts` still called `shouldAnswer(model.policy, …)`. D70 had certified **no confidence
+threshold on any fold** — the margin needed >12,800 answered rows against calibration slices
+of 61-133 — so the policy reported `targetMet: false` and the extension withheld *every*
+prediction, permanently and by construction. That call is gone. **`abstained` is now always
+false on new rows.**
+
+The field stays rather than being renamed, and that is a deliberate call about a schema this
+project treats as expensive to change. It is a true record of rows written under the old
+policy, so it is not overloaded — it counts down into history rather than up, and the popup
+says which rule wrote them.
+
+**`abstain.ts` and `abstain.py` are kept, not deleted.** D88 explicitly keeps the
+accuracy-versus-coverage curve as a published result; it is no longer a gate.
+`selectThreshold` still runs at training time so the trade stays measurable, and the model
+panel now reports what a threshold *would* buy instead of announcing that it predicts
+nothing. Both modules carry a header saying so, because every mention of "showing" and
+"answering" in them now describes a curve rather than the UI.
+
+#### Two floors, both declared, both on evidence
+
+The one gate D88 permits. Neither is fitted, and both have the same status as the 30-minute
+session timeout (D17) — declared, arguable, and written down.
+
+- **`MIN_TOTAL_CHANGES = 20`.** Below this the card shows nothing and says how many more
+  changes are needed, rather than a confident-looking 2 of 3.
+- **`MIN_CONDITIONAL_CHANGES = 10`.** Below this the conditional counts are too thin to
+  lead with, so the card falls back to the overall rates **and says which it used**. Ten is
+  the smallest denominator at which one more observation moves the displayed percentage by
+  less than ten points.
+
+The difference from what it replaced is the whole point: this withholds a number for having
+**too little behind it**, never for being insufficiently confident. Twenty changes that all
+went the same way would have been withheld by the old rule and are shown by this one.
+
+#### `unknown` is a question and never an answer, and a test caught the second half
+
+D27's rule applied to a surface: no chip can read *unknown*, and roughly a fifth of visits
+land there by design, because the public category map excludes employer, school, council and
+neighbourhood domains — a domain list is a profile. Conditioning **on** it is kept, because
+"you were on something uncategorised, next you went to X" is answerable.
+
+**It also does not count toward the evidence floor**, and that was not in the first
+implementation. A test written to check the display rule failed for the other reason, which
+exposed it: forty changes into `unknown` are forty changes nothing can display, so counting
+them would have unlocked a card resting on ten real observations while telling the reader it
+rested on fifty.
+
+#### Parity, and breaking it on purpose
+
+`extension/src/features/transitions.ts` mirrors the `features/transitions.py` that D102
+built, and the oracle grew a `transitions` section. The TypeScript key-set guard **failed
+the moment Python grew it**, which is the second time that guard has done its job.
+
+Session ids are absent from the oracle: D36 makes them locally assigned and opaque, so
+comparing them would pin an implementation detail rather than a behaviour.
+`withinSession` survives, because it compares two ids inside one language.
+
+The suite was **broken deliberately once** — `previousCategory` re-pointed one run forward —
+and it failed on transition 1 with the expected value named. A parity suite that has never
+failed has never been tested.
+
+#### What this does not claim
+
+- **No target is adopted or shipped by this.** `predict.ts` still trains `return_24h`, which
+  D88 retired; `visit_engaged` is adopted (D97) and replicated (D100) and still not wired,
+  because it needs live attention spans (T-G4). The card sidesteps all of that by not being
+  a prediction.
+- **The card is TypeScript only.** There is no Python twin, deliberately: nothing scores it,
+  so a mirror would have no consumer and would rot. `transitions.ts` — the part that feeds
+  research — *is* mirrored and is in the oracle.
+- **It has not been seen in a browser.** T5, T7 and T11 each had a documented-looking claim
+  fail on contact with Chrome, and the D101 defect ran for two days behind a gate that could
+  never open. **Owed by Akash: load the build and open the popup.** With 5,371 events on his
+  profile the card should render immediately, and if it does not, that is the finding.
+
+403 TypeScript tests, 831 Python, both linters clean, builds.

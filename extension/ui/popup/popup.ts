@@ -12,7 +12,10 @@ import { rejectionCounts } from "../../src/collect/collector";
 import { DEFAULT_IMPORT_DAYS, importProgress } from "../../src/collect/import";
 import { deleteEverything } from "../../src/storage/delete";
 import { buildExport, exportFilename, serialiseExport } from "../../src/storage/export";
-import { countsByCategory, countEvents, recentEvents } from "../../src/storage/events";
+import { allEvents, countsByCategory, countEvents, recentEvents } from "../../src/storage/events";
+import { sessionise } from "../../src/features/sessions";
+import { categoryTransitions } from "../../src/features/transitions";
+import { currentCategory, nextCategoryCard } from "../../src/model/nextCategory";
 import { isCollecting, loadSettings, saveSettings } from "../../src/storage/settings";
 import { countLabels } from "../../src/storage/labels";
 import { allSpans } from "../../src/storage/spans";
@@ -234,19 +237,22 @@ async function renderTraining(consented: boolean): Promise<void> {
         `${model.calibrator.a.toFixed(2)} on ${model.nCalibration} held-out rows`,
   );
 
+  // The accuracy-versus-coverage curve is still measured and still published (D88); it no
+  // longer decides whether anything is shown. Reporting it as a gate — which this panel
+  // did until the D88 replacement was finally implemented — described a rule the shipped
+  // path had stopped applying.
   const policy = model.policy;
   if (policy !== null && policy.targetMet) {
     facts.push(
-      `answers above ${policy.threshold.toFixed(2)} confidence — ` +
+      `at ${policy.threshold.toFixed(2)} confidence it would answer ` +
         `${(policy.coverage * 100).toFixed(0)}% of cases at ` +
         `${(policy.accuracy * 100).toFixed(0)}% on validation`,
     );
   } else {
-    // The branch the author's own browsing takes. Saying so plainly is the point: a
-    // prediction shown anyway would be a promise the measurement did not support.
     facts.push(
-      `predicts nothing — no confidence threshold reached the ` +
-        `${((policy?.targetAccuracy ?? 0.9) * 100).toFixed(0)}% target on held-out data`,
+      `no confidence threshold reached ` +
+        `${((policy?.targetAccuracy ?? 0.9) * 100).toFixed(0)}% on held-out data, which is ` +
+        `a measurement rather than a reason to say nothing`,
     );
   }
 
@@ -254,12 +260,99 @@ async function renderTraining(consented: boolean): Promise<void> {
 }
 
 /**
- * The registry panel. Counts only — no prediction is shown here.
+ * The card. **The first thing Tise has ever shown a person about their own browsing.**
  *
- * That is not a placeholder for T14. On this data every prediction is abstained (D70), so
- * a panel listing "what Tise thinks you will do next" would be listing things the
- * measurement said not to claim. What can honestly be shown today is how many predictions
- * exist and how they resolved, including how many were withheld.
+ * It answers "what comes next?" with counts, not with a model, and every row carries the
+ * denominator behind it — D88's replacement for abstention, which was retired because
+ * D70 found no confidence threshold that certified the target on any fold and the
+ * extension consequently answered nothing at all.
+ *
+ * **No model is loaded here and that is the point.** D102 benchmarked the fitted
+ * transition table for the first time: it cleared its pre-registered bar and still lost,
+ * on every corpus, to a rule that knows only that you will not carry on doing what you
+ * just stopped. So the card shows what the person actually did — a frequency with its
+ * denominator is either true of their data or it is not — and claims no skill it has not
+ * established. That also means it works the moment there is history, with no training run,
+ * no adopted target and no dwell.
+ */
+async function renderCard(consented: boolean, timeoutSeconds: number): Promise<void> {
+  const block = element("card-block");
+  block.hidden = !consented;
+  if (!consented) return;
+
+  const status = element("card-status");
+  const detail = element("card-detail");
+  const answers = element("card-answers");
+  const caveat = element("card-caveat");
+  caveat.textContent = "";
+
+  const sessions = sessionise(await allEvents(), timeoutSeconds);
+  const transitions = categoryTransitions(sessions);
+  const from = currentCategory(transitions);
+
+  if (from === null) {
+    status.textContent = "What comes next";
+    detail.textContent =
+      "Nothing yet. This needs at least one change of topic to have something to count.";
+    replace(answers, null, "");
+    return;
+  }
+
+  const card = nextCategoryCard(transitions, from);
+  if (card.kind === "not-enough-history") {
+    status.textContent = "What comes next";
+    detail.textContent =
+      `${card.changes} topic ${card.changes === 1 ? "change" : "changes"} so far. ` +
+      `${card.needed} more and this starts answering.`;
+    replace(answers, null, "");
+    // The one gate D88 permits is a floor on evidence, and saying which floor and how far
+    // off it is turns waiting into something the person can see the end of.
+    caveat.textContent =
+      "The only thing held back is a number with too little behind it to be worth showing.";
+    return;
+  }
+
+  status.textContent = `After ${from}, you usually go to…`;
+  const shown = card.answers.slice(0, 4);
+  const rows = document.createElement("table");
+  for (const answer of shown) {
+    const tr = rows.insertRow();
+    tr.insertCell().textContent = answer.category;
+    const share = tr.insertCell();
+    share.className = "share";
+    // Whole numbers (D88). A card reading 47.3% invites a precision the denominator
+    // underneath it does not support.
+    share.textContent = `${Math.round(answer.share * 100)}%`;
+    const of = tr.insertCell();
+    of.className = "of";
+    of.textContent = `${answer.count} of ${answer.denominator}`;
+  }
+  replace(answers, rows, "");
+
+  const remaining = card.answers.length - shown.length;
+  const others = remaining > 0 ? ` ${remaining} other ${remaining === 1 ? "topic" : "topics"} not shown.` : "";
+  detail.textContent =
+    card.basis === "conditional"
+      ? `Counted from the ${card.denominator} times you have left ${from}.` + others
+      : `Counted from all ${card.denominator} of your topic changes — you have not left ` +
+        `${from} often enough yet for its own count to mean much.` + others;
+
+  caveat.textContent =
+    "Measured on your browsing, on this device. These are counts of what you did, not a " +
+    "prediction: a model that conditions on what you just left has not been shown to beat " +
+    "them.";
+}
+
+/**
+ * The registry panel. Counts only — no individual prediction is shown here.
+ *
+ * Not for the reason it used to be. Until D88's replacement was implemented, every
+ * prediction was abstained (D70) and listing them would have meant showing things the
+ * measurement said not to claim. Nothing is withheld now — but these rows still belong to
+ * `return_24h`, which D88 retired as the product target, so listing them individually
+ * would put a retired question in front of the person. The card above is the one Tise
+ * actually stands behind. What belongs here is the scorecard: how many exist and how they
+ * resolved.
  */
 async function renderRegistry(consented: boolean): Promise<void> {
   const block = element("registry-block");
@@ -288,7 +381,11 @@ async function renderRegistry(consented: boolean): Promise<void> {
     // `expired` is called out rather than folded in, because a reader who assumes it is a
     // miss will read a fabricated negative into the score.
     `${scoreable} scored — expired means Tise was not watching, so it counts as nothing`,
-    `${withheld} withheld below the confidence threshold, kept so it can be checked later`,
+    // Non-zero only for rows written before D88's replacement landed. New predictions are
+    // never withheld, so this counts down into history rather than up.
+    withheld > 0
+      ? `${withheld} withheld by the retired confidence rule, kept so they can still be checked`
+      : "nothing withheld — every prediction is kept and scored",
   ];
   detail.textContent = parts.join(". ") + ".";
 }
@@ -323,6 +420,7 @@ async function render(): Promise<void> {
   toggle.disabled = false;
   toggle.dataset["collecting"] = String(collecting);
 
+  await renderCard(settings.consentGrantedAt !== null, settings.sessionTimeoutSeconds);
   await renderImport(settings.consentGrantedAt !== null);
   await renderAttention(settings.consentGrantedAt !== null);
   await renderTraining(settings.consentGrantedAt !== null);

@@ -431,15 +431,14 @@ published as a failure.
   - **Bar is the rhythm, not a flat rate** — beating a flat rate would be trivial
   - Cluster unit: calendar day. D94 predicts this one **fails** its bar
 
-- [ ] **OWED — D88's abstention replacement was never implemented** · S — found while
-      reviewing the product state, 2026-08-29
-  - `predict.ts` still calls `shouldAnswer(model.policy, …)`. D70 found **no confidence
-    threshold certified the 90% target on any fold**, so the shipped path abstains from
-    everything by design
-  - **D88 said to replace abstention with "show everything with its denominator"** and that
-    was never done. So there are *two* independent reasons the extension shows nothing, and
-    only one of them (no adopted target wired in) was being tracked
-  - Blocks any UI work: T14 and T23 both have nothing to render until this is settled
+- [x] **OWED — D88's abstention replacement** · S — **done** (D103)
+  - `predict.ts` no longer calls `shouldAnswer`. `abstained` is **always false on new
+    rows**; the field stays as a true record of rows written under the old policy, so it
+    counts down into history rather than up
+  - `abstain.ts` / `abstain.py` **kept, not deleted** — D88 keeps the accuracy-versus-
+    coverage curve as a published result. The model panel now reports what a threshold
+    *would* buy instead of announcing that Tise predicts nothing
+  - Found by checking what the product actually shows, not by a failing test
 
 - [x] **T-C · `next_category`** · L · deps: D94 — **clears its bar, and the bar was not worth
       clearing** (D102)
@@ -495,14 +494,23 @@ published as a failure.
   - D91 also fixed the only circumstance in which it can become primary, so a good score
     cannot become a route to shipping it
 
-- [ ] **T23 · Ship the base-rate card** · M · deps: T21
-  - D92: the card works without a model. Per-topic rate, denominator shown, computed
-    on-device. This is shippable now and does not wait on T22
-  - D81's discipline. Argument, exact definition, predictions and adoption rule committed
-    **before** any model is fitted — git holds the order
-  - Sets the **performance** bar. The **data-sufficiency** gate is set from T19 (D88 splits
-    these deliberately: one has no score available to bias it, the other does)
-  - Must state plainly that T19 may kill `block_volume` and promote another candidate
+- [x] **T23 · Ship the base-rate card** · M — **done, and re-aimed** (D103)
+  - Verify: `npm test` ✓ 403, `npm run build` ✓, `uv run pytest` ✓ 831, both linters clean
+  - **Written for `block_volume`, which D92 retired**, and `block_volume` has no TypeScript
+    implementation at all. Re-aimed at the question the extension can already answer:
+    **"after `news`, you usually go to…"**, counts with denominators
+  - **Not the fitted table, because of D102** — `constrained_mode` beat it on every corpus,
+    so a card showing the table's probability would present unestablished skill. Counts are
+    descriptive and cannot overclaim
+  - **No smoothing**, unlike the shipped table: the percentage must equal the fraction, or
+    the denominator is decoration
+  - Two declared floors, both on **evidence** and never on confidence — `MIN_TOTAL_CHANGES`
+    20, `MIN_CONDITIONAL_CHANGES` 10, falls back to overall rates and says which it used
+  - `unknown` is a question and never an answer (D27), **and does not count toward the
+    floor** — the second half was found by a test failing for the other reason
+  - `transitions.ts` mirrors the Python, oracle extended, **parity broken deliberately once
+    and confirmed failing**
+  - **Owed by Akash: load the build and open the popup.** Never seen in a browser
 
 - [ ] ~~**T21 · Build the new target end to end**~~ · **RETIRED — superseded by T-G.**
       Written for `block_volume`, which D92 retired. Its shipping work is now T-G1/2/3

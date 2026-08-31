@@ -111,6 +111,30 @@
         color: var(--muted);
         font-size: 12px;
       }
+      /*
+       * The card. Every row shows the count behind its percentage (D88): a share without a
+       * denominator is a claim, and a share with one is a description the reader can check.
+       */
+      #card-answers table {
+        margin-top: 6px;
+      }
+      #card-answers td.share {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      #card-answers td.of {
+        text-align: right;
+        color: var(--muted);
+        font-size: 11px;
+        white-space: nowrap;
+        padding-left: 8px;
+      }
+      #card-caveat {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 11px;
+      }
       footer {
         margin-top: 14px;
         padding-top: 10px;
@@ -133,6 +157,13 @@
       <button id="toggle" class="primary" disabled>…</button>
       <button id="export">Export</button>
       <button id="clear">Delete all</button>
+    </div>
+
+    <div class="state" id="card-block" hidden>
+      <strong id="card-status">What comes next</strong>
+      <p id="card-detail"></p>
+      <div id="card-answers"></div>
+      <p id="card-caveat"></p>
     </div>
 
     <div class="state" id="import-block" hidden>

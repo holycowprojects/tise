@@ -21,6 +21,10 @@ import { advanceSession, type SessionCursor } from "../src/collect/session";
 import { resolve } from "../src/collect/resolver";
 import { hoursSinceLastSeen } from "../src/features/recency";
 import { sessionise } from "../src/features/sessions";
+import {
+  categoryTransitions,
+  sessionBoundariesWithoutChange,
+} from "../src/features/transitions";
 import { return24hLabels } from "../src/features/labels";
 import { dayOfWeek } from "../src/features/context";
 import {
@@ -185,6 +189,18 @@ interface FixtureExpected {
     };
   };
   summary: Record<string, number>;
+  transitions: {
+    boundariesWithoutChange: number;
+    transitions: Array<{
+      transitionId: string;
+      at: string;
+      fromCategory: string;
+      toCategory: string;
+      withinSession: boolean;
+      previousCategory: string | null;
+      fromRunEvents: number;
+    }>;
+  };
   attention: {
     featureSet: string;
     featureNames: string[];
@@ -279,6 +295,9 @@ describe("the fixture itself", () => {
       "sessions",
       "summary",
       "timeoutSeconds",
+      // Added when the "what comes next" card shipped. This guard failed the moment
+      // Python grew the section, which is the second time it has done its job.
+      "transitions",
     ]);
   });
 
@@ -949,5 +968,56 @@ describe("attention parity (as_2)", () => {
     // `sessionPosition` and `isSessionStart` are constant if every example shares a
     // session, so the fixture would be comparing two implementations of a constant.
     expect(new Set(A.examples.map((e) => e.label.sessionId)).size).toBeGreaterThan(1);
+  });
+});
+
+describe("category transition parity", () => {
+  const T = EXPECTED.transitions;
+  const SESSIONS = sessionise(EVENTS, INPUT.timeoutSeconds);
+  const ACTUAL = categoryTransitions(SESSIONS);
+
+  it("finds the same number of changes Python found", () => {
+    expect(ACTUAL.length).toBe(T.transitions.length);
+  });
+
+  it("agrees on every field the two languages can compare", () => {
+    // `sessionId` is absent from the oracle on purpose: D36 makes ids locally assigned
+    // and opaque, so comparing them would pin an implementation detail. `withinSession`
+    // stays, because it compares two ids inside one language.
+    T.transitions.forEach((expected, index) => {
+      const actual = ACTUAL[index];
+      expect(actual, `transition ${index} missing`).toBeDefined();
+      expect(actual?.transitionId, `transition ${index} id`).toBe(expected.transitionId);
+      expect(actual?.fromCategory, `transition ${index} from`).toBe(expected.fromCategory);
+      expect(actual?.toCategory, `transition ${index} to`).toBe(expected.toCategory);
+      expect(actual?.withinSession, `transition ${index} within`).toBe(
+        expected.withinSession,
+      );
+      expect(actual?.previousCategory ?? null, `transition ${index} previous`).toBe(
+        expected.previousCategory,
+      );
+      expect(actual?.fromRunEvents, `transition ${index} run length`).toBe(
+        expected.fromRunEvents,
+      );
+      expect(Date.parse(actual?.at ?? ""), `transition ${index} at`).toBe(
+        Date.parse(expected.at),
+      );
+    });
+  });
+
+  it("agrees on what the change rule costs", () => {
+    expect(sessionBoundariesWithoutChange(SESSIONS)).toBe(T.boundariesWithoutChange);
+  });
+
+  it("actually exercises both sides of the session boundary", () => {
+    // A fixture whose changes are all within one session would compare two
+    // implementations of a constant, and `withinSession` would never be tested.
+    const flags = new Set(ACTUAL.map((item) => item.withinSession));
+    expect(flags.has(true), "fixture needs a within-session change").toBe(true);
+    expect(flags.has(false), "fixture needs a change across a boundary").toBe(true);
+  });
+
+  it("never emits a change to the category it came from", () => {
+    for (const item of ACTUAL) expect(item.fromCategory).not.toBe(item.toCategory);
   });
 });

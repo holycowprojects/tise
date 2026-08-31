@@ -470,14 +470,27 @@ describe("the whole loop, with a real trained model", () => {
     }
   });
 
-  it("stores the abstained ones too", async () => {
-    // On real browsing every prediction is abstained (D70). A registry that kept only the
-    // displayed ones would be empty and could never say whether the silence was right.
+  it("withholds nothing on confidence any more (D88)", async () => {
+    // This test used to assert the opposite, and asserting the opposite was correct at the
+    // time: D70 found no threshold that certified the 90% target on any fold, so every
+    // prediction was abstained and a registry keeping only the displayed ones would have
+    // been empty. D88 retired that rule — show everything, always with its denominator —
+    // and this half of the replacement was owed until now. The floor that remains is on
+    // evidence, and it lives in `model/nextCategory.ts`, not on a probability.
     await trainedProfile();
     await updateRegistry({ now: NOW });
     const stored = await allPredictions();
     expect(stored.length).toBeGreaterThan(0);
-    expect(stored.some((p) => p.abstained)).toBe(true);
+    expect(stored.every((p) => !p.abstained)).toBe(true);
+  });
+
+  it("still stores every category in a closed session", async () => {
+    // The reason the registry exists is unchanged by D88: a scorecard that kept only the
+    // rows someone chose to look at could never say whether the choosing was right.
+    await trainedProfile();
+    await updateRegistry({ now: NOW });
+    const stored = await allPredictions();
+    expect(new Set(stored.map((p) => p.subject)).size).toBeGreaterThan(1);
   });
 });
 

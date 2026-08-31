@@ -351,6 +351,7 @@ def build_expected_document() -> dict:
         "sessions": sessions,
         "labels": labels,
         "features": features,
+        "transitions": build_transitions_section(),
         "attention": build_attention_section(),
         "model": build_model_section(
             events, feature_rows, [label.outcome for label in label_objects]
@@ -528,6 +529,42 @@ def build_model_section(events: list[Event], feature_rows: list, outcomes: list[
             },
             "unseenDistribution": table.distribution("__never-seen__"),
         },
+    }
+
+
+def build_transitions_section() -> dict:
+    """Category changes. The oracle for `extension/src/features/transitions.ts`.
+
+    **`sessionId` is deliberately absent.** D36 makes session ids locally assigned and
+    opaque, so comparing them across languages would pin an implementation detail rather
+    than a behaviour. `withinSession` survives, because it compares two ids inside one
+    language and the answer is a property of the data.
+
+    `boundariesWithoutChange` is here because it is the number that says what the
+    "a transition is a change" rule costs, and a rule with an unmeasured cost is a rule
+    nobody can argue with.
+    """
+    from tise_research.features.sessions import sessionise
+    from tise_research.features.transitions import (
+        category_transitions,
+        session_boundaries_without_change,
+    )
+
+    sessions = sessionise(build_events(), timeout_seconds=TIMEOUT_SECONDS)
+    return {
+        "boundariesWithoutChange": session_boundaries_without_change(sessions),
+        "transitions": [
+            {
+                "transitionId": item.transition_id,
+                "at": item.at.isoformat(),
+                "fromCategory": item.from_category,
+                "toCategory": item.to_category,
+                "withinSession": item.within_session,
+                "previousCategory": item.previous_category,
+                "fromRunEvents": item.from_run_events,
+            }
+            for item in category_transitions(sessions)
+        ],
     }
 
 

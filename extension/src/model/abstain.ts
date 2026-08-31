@@ -1,9 +1,23 @@
 /**
- * Deciding when not to answer.
+ * Deciding when not to answer. **Retired as a gate (D88); kept as a measurement.**
+ *
+ * Nothing in the shipped path calls `shouldAnswer` any more. D70 measured that no
+ * confidence threshold certified the 90% target on any fold — certifying a margin that
+ * thin needed >12,800 answered rows against calibration slices of 61-133 — so the policy
+ * reported `targetMet: false` and the extension withheld every prediction, permanently and
+ * by design. D88 retired that rule and replaced it with *show everything, always with its
+ * denominator*; `model/nextCategory.ts` is the replacement, and the only floor that remains
+ * is on evidence rather than on confidence.
+ *
+ * This module survives because D88 also kept the accuracy-versus-coverage curve as a
+ * **published result**. `selectThreshold` still runs at training time so the trade stays
+ * measurable and the model panel can report what a threshold *would* buy. Read every
+ * mention of "showing" and "answering" below as describing that curve, not the UI.
  *
  * PARITY-CRITICAL: `research/tise_research/eval/abstain.py` is the mirror.
  *
- * Abstention is a headline capability of this project, not a fallback. A forecaster that
+ * The original argument, kept because it is still why the curve is worth publishing:
+ * abstention is a headline capability of this project, not a fallback. A forecaster that
  * says "I don't know" on the third of cases it would have got wrong is more useful than
  * one that answers everything at the same average accuracy — and far more useful than one
  * that answers everything and is silently wrong a third of the time.
@@ -180,7 +194,8 @@ export function selectThreshold(
   }
 
   // Nothing reached it. Report the strictest point tried, marked as not meeting the
-  // target, so the caller shows nothing rather than quietly lowering the bar.
+  // target. Reported as unmet rather than quietly lowering the bar; no caller gates on
+  // it now, and the number is what the model panel shows.
   const last = curve[curve.length - 1] as CoveragePoint;
   const accuracy = last.accuracy ?? 0;
   return {
