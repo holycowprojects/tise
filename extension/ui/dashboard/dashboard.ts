@@ -298,6 +298,21 @@ function renderScorecard(card: Scorecard): void {
       ? "nothing scored yet"
       : `${percent(card.accuracy)} — ${card.correct.toLocaleString()} of ${card.scored.toLocaleString()}`,
   );
+  // D24: a score without a baseline is a number with nothing underneath it. Guessing
+  // "came back" every time already scores `outcomeRate`, so this row is what the model
+  // actually adds — and on a target that is positive most of the time it is usually
+  // very little.
+  if (card.outcomeRate !== null) {
+    factRow(
+      facts,
+      "…against always guessing “came back”",
+      `${percent(card.outcomeRate)} — the model is ` +
+        (card.aheadOfAlwaysYes === 0
+          ? "level with it"
+          : `${card.aheadOfAlwaysYes > 0 ? "ahead" : "behind"} by ` +
+            `${Math.abs(card.aheadOfAlwaysYes)} of ${card.scored}`),
+    );
+  }
   factRow(facts, "Still open", card.pending.toLocaleString());
   factRow(facts, "Expired — Tise was not watching", card.expired.toLocaleString());
   if (card.withheldByRetiredRule > 0) {

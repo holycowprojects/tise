@@ -335,3 +335,62 @@ describe("the hub", () => {
     expect(board(transitions)).toHaveLength(3);
   });
 });
+
+/**
+ * A score with nothing underneath it.
+ *
+ * D24 makes a baseline mandatory in every report, and the dashboard shipped without one:
+ * it read "Tise called it correctly — 100%, 20 of 20" on a real profile, which says the
+ * model is perfect. Guessing "came back" every single time would have scored 95% of the
+ * same 20, so the model's entire contribution was **one row**.
+ *
+ * This is D92 and D102's finding arriving at the interface. Both entries concluded that a
+ * base-rate table matches or beats the fitted model; a dashboard that prints accuracy
+ * without the baseline hides exactly the comparison those entries exist to make.
+ */
+describe("the baseline the accuracy is measured against", () => {
+  it("is level when the model calls every row positive", () => {
+    // Always-yes and a model that always says yes are the same predictor, so the lead is
+    // zero however good the accuracy looks.
+    const card = scorecard([
+      prediction("hit", false, 0.9),
+      prediction("hit", false, 0.9),
+      prediction("hit", false, 0.9),
+      prediction("miss", false, 0.9),
+    ]);
+    expect(card.accuracy).toBe(0.75);
+    expect(card.outcomeRate).toBe(0.75);
+    expect(card.aheadOfAlwaysYes).toBe(0);
+  });
+
+  it("is ahead by exactly the negatives the model called right", () => {
+    // The real profile's shape: nineteen recurrences all called positive, and one
+    // non-recurrence called negative. 100% against a baseline of 95%, and the whole of
+    // the difference is that single row.
+    const card = scorecard([
+      ...Array.from({ length: 19 }, () => prediction("hit", false, 0.9)),
+      prediction("miss", false, 0.3),
+    ]);
+    expect(card.accuracy).toBe(1);
+    expect(card.outcomeRate).toBe(0.95);
+    expect(card.aheadOfAlwaysYes).toBe(1);
+  });
+
+  it("goes negative when the model is worse than guessing", () => {
+    // Displayable, and it must be: a model behind the trivial baseline is the single most
+    // important thing a scorecard can say.
+    const card = scorecard([
+      prediction("hit", false, 0.2),
+      prediction("hit", false, 0.2),
+      prediction("hit", false, 0.9),
+      prediction("miss", false, 0.9),
+    ]);
+    expect(card.outcomeRate).toBe(0.75);
+    expect(card.accuracy).toBe(0.25);
+    expect(card.aheadOfAlwaysYes).toBe(-2);
+  });
+
+  it("is zero when nothing has been scored", () => {
+    expect(scorecard([prediction("pending")]).aheadOfAlwaysYes).toBe(0);
+  });
+});

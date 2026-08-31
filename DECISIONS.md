@@ -4876,3 +4876,69 @@ every one was checkable only because something else had been measured first. The
 caught against **73.2%**, recorded in T2 and never since touched.
 
 457 TypeScript tests, 831 Python, both linters clean, builds.
+
+### D109 — 100% of 20, and the baseline that was missing beside it
+
+The dashboard rendered D108's separation and produced the first honest accuracy this project
+has ever displayed:
+
+| | |
+|---|---:|
+| Predictions made | 248 |
+| Topic came back / did not | 19 / 1 |
+| …so it happened this often | 95% of 20 |
+| **Tise called it correctly** | **100% — 20 of 20** |
+| Still open | 7 |
+| Expired — Tise was not watching | 221 |
+
+**100% of 20, printed with nothing to compare it against.** A reader concludes the model is
+perfect. The correct reading is on the line above it, and no reader will make the connection.
+
+#### Always guessing "came back" scores 95% of the same twenty
+
+That is what `outcomeRate` is: a predictor that says yes to everything gets every recurrence
+right and every non-recurrence wrong, so its accuracy *is* the base rate. The model scored
+100%. **The whole of its contribution is one row** — the single non-recurrence it called
+negative.
+
+D24 has required a baseline in every report since T2. The dashboard shipped without one,
+which is D92 and D102's finding arriving at the interface: both entries concluded that a
+base-rate table matches or beats the fitted model, and a panel printing accuracy alone hides
+precisely the comparison they exist to make.
+
+The scorecard now prints the baseline underneath, in rows rather than points — *"against
+always guessing 'came back': 95% — the model is ahead by 1 of 20"*. Rows because a percentage
+difference of five points sounds like a margin and one row out of twenty does not, and the
+second description is the true one.
+
+**Always-positive rather than the majority class**, deliberately. The majority class is
+chosen after seeing the outcomes and would be in-sample, the defect D91 named when it refused
+the 44.5% per-category mode. This target's base rate has been measured at 65-72% since T1, so
+"mostly yes" is knowable in advance, and it is what a model has to beat.
+
+The lead can go **negative**, and it renders. A model behind the trivial baseline is the
+single most important thing a scorecard can say, and a display that could only show a lead
+would be unable to say it.
+
+#### What 20 of 20 is worth
+
+Nothing yet, and the page should not imply otherwise. Twenty rows, all from days Tise watched
+without interruption — which D108 recorded are the days with the most browsing and therefore
+the most recurrence — on a target D88 retired. The model beat the trivial baseline by one row
+of twenty.
+
+That is not a disappointing result. It is the fourth time in this project that a
+model-versus-baseline comparison has come back "not distinguishable" (D80, D92, D102, and
+now), and the consistency is itself the finding: **`return_24h` was retired for being
+measurable and uninteresting, and its own scorecard now says so on the extension's front
+page.**
+
+#### Five entries in one day
+
+D105 a stale shape, D106 two paths assumed equivalent, D107 an ordering inside one function,
+D108 a label on a number, D109 a number without its baseline. Each surfaced from a real run
+and a number that looked wrong. **Each fix made the displayed numbers worse and the page more
+honest**, which is the direction this project has committed to and the reason the sequence was
+worth publishing rather than squashing.
+
+461 TypeScript tests, 831 Python, both linters clean, builds.

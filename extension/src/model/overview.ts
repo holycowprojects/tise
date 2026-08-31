@@ -209,6 +209,22 @@ export interface Scorecard {
   readonly accuracy: number | null;
   /** Scored windows where the model called it the other way. `scored - correct`. */
   readonly correct: number;
+  /**
+   * How many rows the model is ahead of **always saying the topic comes back**.
+   *
+   * **D24 makes a baseline mandatory in every report, and the dashboard had none.** With a
+   * target that is positive most of the time, guessing "yes" every single time already
+   * scores `outcomeRate` — on a real profile, 95% of 20 — so a model reading 100% is ahead
+   * by exactly **one row**. Printed alone, 100% says the model is perfect; printed beside
+   * its baseline, it says the model got the one negative right and nothing else is known.
+   *
+   * Always-positive is the right baseline here rather than the majority class, which would
+   * be chosen after seeing the outcomes: this target's base rate has been measured at
+   * 65-73% since T1, so "mostly yes" is knowable in advance and is what a model has to beat.
+   *
+   * Negative when the model is behind it, which is a thing worth being able to display.
+   */
+  readonly aheadOfAlwaysYes: number;
 }
 
 export function scorecard(predictions: readonly Prediction[]): Scorecard {
@@ -239,6 +255,9 @@ export function scorecard(predictions: readonly Prediction[]): Scorecard {
     outcomeRate: scored > 0 ? hit / scored : null,
     accuracy: scored > 0 ? correct / scored : null,
     correct,
+    // Always-yes gets exactly the hits right and every miss wrong, so its correct count is
+    // `hit`. The difference is the model's whole contribution, in rows rather than points.
+    aheadOfAlwaysYes: correct - hit,
   };
 }
 
