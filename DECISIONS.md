@@ -4942,3 +4942,100 @@ honest**, which is the direction this project has committed to and the reason th
 worth publishing rather than squashing.
 
 461 TypeScript tests, 831 Python, both linters clean, builds.
+
+### D110 — The seam audit: three defects, one latent hazard, and a list of what is not covered
+
+Akash's call, after five defects in one day all lived in the same place: the seam between a
+build and the state a previous build left behind. This is the deliberate pass over that
+class rather than waiting for the next screenshot.
+
+**The rule of the audit, and the reason the existing suite could never do this:** every one
+of the 461 tests already here writes its own state with the current build and reads it back
+with the current build. They test one build against itself, so the seam is invisible from
+inside. `tests/seams.test.ts` does the opposite — it writes the **old** shape directly into
+storage and then uses the current code on it. Nothing in it goes through the normal API,
+because going through the normal API is precisely what hides the problem.
+
+#### What was audited
+
+Everything Tise persists, enumerated rather than sampled: five object stores (`events`,
+`features`, `labels`, `predictions`, `attention`) and the nine unrelated shapes stored under
+nine keys in `meta` (settings, coverage log, session cursor, import progress, rejection
+counts, training job, trained model, resolution rule, and the two attention keys).
+
+#### Three real defects
+
+**1. A settings object from an older build could erase a default.** `loadSettings` returned
+`{ ...DEFAULT_SETTINGS, ...stored }`. An own property whose value is `undefined` **overwrites**
+rather than falls back, and IndexedDB preserves `undefined` through structured clone. A build
+that ever wrote `overrides: undefined` would leave it undefined here, and every
+`settings.overrides[domain]` lookup downstream throws. Fixed by dropping undefined values
+before the merge.
+
+**2. A coverage gap with no end read as *closed*.** `gap.to === null ? now : Date.parse(gap.to)`
+— a gap written without a `to` at all takes the second branch, `Date.parse(undefined)` is NaN,
+and every comparison against NaN is false, so the gap silently stops disqualifying anything.
+
+**That is D107 again, in a second place.** D107 was about resolution scoring windows Tise
+never watched; this is the coverage log failing to report that it wasn't watching. Same
+consequence, different function, found three hours later by looking rather than by waiting.
+`== null` now catches both.
+
+**3. `assertStorable` checked for unexpected fields and never for missing ones.** Only half
+the guard existed, and it was the half that stops a *new* field getting in rather than the
+half that stops an *old* row being incomplete.
+
+#### The latent hazard that made #3 worth fixing properly
+
+`occurredAt` is the `events` index. **IndexedDB omits a row from an index it has no key for.**
+So a row written without a timestamp sits in the store — counted by `countEvents`, which reads
+the store — while being invisible to `allEvents`, absent from every export, and unreachable by
+`enforceRetention`, which walks the same index.
+
+Such a row would **survive "delete everything older than 30 days" forever and never appear
+anywhere**. On a project whose first invariant is about what it stores, a permanently
+undeletable invisible row is the worst shape a bug can have.
+
+No build has ever written one, so this is a hazard rather than an incident. It is closed at
+the write guard rather than papered over at the readers, and the test asserts both halves:
+that the store really does hide such a row, and that `assertStorable` now refuses to make one.
+
+#### What passed, and is now pinned
+
+- **A database left at v4 upgrades to v5**, gains `attention`, and **keeps every event and
+  setting the older version wrote**. `openTiseDb` creates only stores it does not find, so
+  this was always true — but nothing had ever opened a database that was actually at an
+  earlier version, so "it upgrades" was a reading of the code and not a result. An upgrade
+  that recreated a store would have deleted a person's entire history silently, on the update
+  that introduced it.
+- The upgraded database is still **writable**, which a read-only test would not have noticed.
+- Settings written before a field existed fill from defaults, and `saveSettings` writes the
+  complete object back so the gap does not persist.
+- Absent meta keys read as absence rather than as a value: no import, no rejections, no job,
+  no model, no coverage.
+- An event missing `source` is counted as **imported, not live** — D88's rule holds even for a
+  row that predates the field, and guessing "live" would move it to the side allowed to score.
+
+#### What this audit did **not** cover, said plainly
+
+- **Export v1 and v2 read by the current loader.** The extension never imports its own export;
+  `research/tests/test_export_load.py` covers that from the Python side, and it stays there.
+- **A `features` row from before `fs_2`.** `migrate.ts` handles `fs_2 → fs_3` and is tested.
+  Anything older predates the feature store itself.
+- **Labels.** The shape has never changed and has no version. If one is ever added, D105's
+  rule applies and this file is where the test goes.
+- **Two Chrome profiles, or a profile restored from a backup mid-upgrade.** Out of scope, and
+  named so that "we checked the seams" is not read as more than it is.
+
+#### The rule this makes permanent
+
+D105 wrote it and D107 applied it the same day: **a stored shape that acquires a version needs
+a migration and a test that writes the old shape, in the same commit.** `tests/seams.test.ts`
+is now where that test goes, and its docstring enumerates what is covered so the next person
+can see the gaps rather than infer them.
+
+Six defects in one day, and the ratio worth recording: five were found by a person looking at
+a real browser, one by deliberately going to look. **The audit cost about an hour and found
+three. That is a better rate than the screenshots.**
+
+480 TypeScript tests, 831 Python, both linters clean, builds.

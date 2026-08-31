@@ -78,7 +78,12 @@ export function isFullyCovered(
 
   for (const gap of gaps) {
     const gapFrom = Date.parse(gap.from);
-    const gapTo = gap.to === null ? now : Date.parse(gap.to);
+    // `== null` catches both null and undefined, deliberately. A gap written without a
+    // `to` at all would otherwise take the `Date.parse(undefined)` branch, produce NaN,
+    // and every comparison against NaN is false — so the gap would silently stop
+    // disqualifying anything and Tise would score windows it never watched. That is the
+    // D107 defect in a second place, found by the D110 seam audit.
+    const gapTo = gap.to == null ? now : Date.parse(gap.to);
     // Any overlap at all disqualifies the window. A partial gap is still a hole, and a
     // rule that tolerated "mostly watched" would need a threshold nobody measured.
     if (gapFrom < to && gapTo > from) return false;

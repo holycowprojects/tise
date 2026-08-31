@@ -119,6 +119,17 @@ export function assertStorable(event: TiseEvent): void {
   if (unexpected.length > 0) {
     throw new Error(`refusing to store unexpected fields: ${unexpected.join(", ")}`);
   }
+  // **Missing is as dangerous as unexpected, and only one of the two was checked.**
+  // `occurredAt` is the `events` index, and IndexedDB simply omits a row from an index it
+  // has no key for — so a row written without it is in the store, invisible to
+  // `allEvents`, absent from every export, and unreachable by retention, which walks the
+  // same index. It would survive "delete everything older than 30 days" forever without
+  // ever appearing anywhere. Nothing has written such a row, and now nothing can. Found
+  // by the D110 seam audit.
+  const missing = EVENT_FIELDS.filter((field) => !(field in event));
+  if (missing.length > 0) {
+    throw new Error(`refusing to store an event missing: ${missing.join(", ")}`);
+  }
   if (!event.domain || URL_STRUCTURE.test(event.domain)) {
     throw new Error(`refusing to store a domain that looks like a URL: ${event.domain}`);
   }

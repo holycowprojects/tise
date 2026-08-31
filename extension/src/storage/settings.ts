@@ -38,7 +38,16 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
 
 export async function loadSettings(): Promise<Settings> {
   const stored = await readMeta<Partial<Settings>>(SETTINGS_KEY);
-  return { ...DEFAULT_SETTINGS, ...(stored ?? {}) };
+  // **Spreading the stored object directly is not enough.** An own property whose value is
+  // `undefined` overwrites the default rather than falling back to it, and IndexedDB
+  // preserves `undefined` values through structured clone — so a build that ever wrote
+  // `overrides: undefined` would leave it undefined here and every `overrides[domain]`
+  // lookup downstream would throw. Found by the D110 seam audit, which wrote the old
+  // shape rather than going through `saveSettings`.
+  const present = Object.fromEntries(
+    Object.entries(stored ?? {}).filter(([, value]) => value !== undefined),
+  ) as Partial<Settings>;
+  return { ...DEFAULT_SETTINGS, ...present };
 }
 
 /**

@@ -524,6 +524,25 @@ published as a failure.
   - Cold start: bootstrap from import; describe-don't-predict as the fallback for a thin
     import (57 days on this profile; someone else's may return ten)
 
+- [x] **Seam audit — every stored shape, written as an older build wrote it** · M —
+      **done** (D110), Akash's call after five defects in one day all lived in that seam
+  - `tests/seams.test.ts` writes the **old** shape directly into storage, then uses current
+    code. The existing 461 tests could not catch this class: each writes its own state with
+    the current build and reads it back with the current build
+  - **Three defects:** settings could be erased by an explicit `undefined` from an older
+    build; a coverage gap with no `to` read as **closed** (D107 again, second location, same
+    consequence — scoring windows Tise never watched); `assertStorable` checked unexpected
+    fields and never missing ones
+  - **One latent hazard closed at the source:** `occurredAt` is the `events` index and
+    IndexedDB omits a row with no key for it — such a row is invisible to every reader and
+    unreachable by retention, so it would survive "delete everything older than 30 days"
+    forever. No build ever wrote one; now none can
+  - **Pinned as passing:** a v4 database upgrades to v5 keeping every event and setting, and
+    stays writable. Absent meta keys read as absence. A source-less event counts as imported,
+    never live (D88)
+  - **Explicitly not covered**, and the entry says so: export v1/v2 (Python's side), pre-`fs_2`
+    feature rows, labels, and multi-profile or restored-backup upgrades
+
 - [ ] **Owed check — the import-vs-live offset** · S · deps: T21
   - **Never measured.** D65's 7.7% was research-view vs extension-view, a research bug
     D78/D79 fixed. Live uses `webNavigation` and drops redirect hops natively; import reads
@@ -806,7 +825,10 @@ published as a failure.
     what it was before, **not** reset to the last 30 days. `skipped` must be 0
   - An export afterwards also re-checks D76's loader against a profile that has migrated
 
-- [ ] **CHECKPOINT D** — the extension scores itself; reliability curve exists
+- [x] **CHECKPOINT D** — **MET 2026-08-31.** The extension scores itself on a real profile
+      (D107-D109: 248 predictions, 221 correctly refusing to score, 20 scored, base rate and
+      accuracy reported as separate things beside their baseline). Reliability curve exists at
+      `docs/benchmarks/calibration.md` (T12). First checkpoint passed since the target changed
 
 ---
 
