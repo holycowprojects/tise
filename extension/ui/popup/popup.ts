@@ -1,7 +1,15 @@
 /**
- * A developer surface, not the product. T14 builds the dashboard and T15 builds real
- * onboarding; this exists so T6 can be verified by hand — browse ten sites, open this,
- * see ten events with the right domains and categories.
+ * The toolbar popup: status, the card, and the way into everything else.
+ *
+ * **It stopped being a developer-only surface at T14 and said otherwise until T15.** The
+ * subtitle read "Developer view — the real interface arrives at T14" for two days after
+ * T14 shipped the dashboard, which is the first sentence anyone installing Tise would
+ * read. Same defect class as T18b's README and D98's report banners: a hand-written
+ * sentence about a system that had moved. It is now derived from the actual state.
+ *
+ * The lower half — categories, most recent, filtered out — is still a developer surface
+ * and is still here on purpose: it is how T6 was verified by hand, and it is the cheapest
+ * way to see that collection is working at all.
  *
  * It reads IndexedDB directly. A popup runs in the extension's own origin, so it opens
  * the same database the service worker writes to; there is no message passing to get
@@ -421,19 +429,26 @@ async function render(): Promise<void> {
   const detail = element("detail");
   const toggle = element("toggle") as HTMLButtonElement;
 
+  const sub = element("sub");
   if (settings.consentGrantedAt === null) {
     status.textContent = "Not collecting";
     detail.textContent =
-      "Tise has stored nothing. It will not begin until you turn it on here.";
+      "Tise has stored nothing. Read what it would store before turning it on.";
     toggle.textContent = "Start collecting";
+    // Before consent the popup is not the place to make the argument — 340 pixels is not
+    // where you explain what an extension will record. D33 measured that Chrome focuses
+    // Deny on its permission dialog, so the persuading has to happen on a page with room.
+    sub.textContent = "Learns from your browsing, on this device only.";
   } else if (settings.paused) {
     status.textContent = "Paused";
     detail.textContent = `${total} events kept. Nothing new is being written.`;
     toggle.textContent = "Resume";
+    sub.textContent = "Everything stays on this device.";
   } else {
     status.textContent = "Collecting";
     detail.textContent = `${total} events, session timeout ${settings.sessionTimeoutSeconds / 60} minutes.`;
     toggle.textContent = "Pause";
+    sub.textContent = "Everything stays on this device.";
   }
   toggle.disabled = false;
   toggle.dataset["collecting"] = String(collecting);
@@ -527,6 +542,13 @@ element("train").addEventListener("click", () => {
 
   // The worker owns the run, so closing the popup does not stop it.
   void chrome.runtime.sendMessage({ type: "tise:train" }, () => void render());
+});
+
+element("welcome").addEventListener("click", () => {
+  // The full disclosure lives on its own page, and stays reachable after consent: someone
+  // who has just agreed is exactly the person most likely to want to re-read what they
+  // agreed to.
+  void chrome.tabs.create({ url: chrome.runtime.getURL("welcome.html") });
 });
 
 element("dashboard").addEventListener("click", () => {

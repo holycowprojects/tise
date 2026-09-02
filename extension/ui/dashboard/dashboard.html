@@ -93,6 +93,101 @@
         font-size: 13px;
         margin: 0;
       }
+      /* T15 — the settings panel. */
+      .field {
+        padding: 12px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .field:first-child {
+        padding-top: 0;
+      }
+      .field label {
+        display: block;
+        font-weight: 600;
+        font-size: 14px;
+        margin-bottom: 6px;
+      }
+      .field input {
+        padding: 6px 8px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--bg);
+        color: var(--ink);
+        font: inherit;
+        font-size: 13px;
+      }
+      .field input[type="number"] {
+        width: 88px;
+      }
+      .field input[type="text"] {
+        width: 170px;
+      }
+      .unit {
+        color: var(--muted);
+        font-size: 13px;
+        margin-left: 8px;
+      }
+      .hint {
+        color: var(--muted);
+        font-size: 12.5px;
+        margin: 6px 0 0;
+        max-width: 62ch;
+      }
+      #settings-error:not(:empty) {
+        color: #b42318;
+        font-weight: 600;
+        margin-top: 12px;
+      }
+      @media (prefers-color-scheme: dark) {
+        #settings-error:not(:empty) {
+          color: #ff8b80;
+        }
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+      }
+      .actions button,
+      #override-add {
+        padding: 7px 12px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--bg);
+        color: var(--ink);
+        font: inherit;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .actions button.danger {
+        border-color: #b42318;
+        color: #b42318;
+      }
+      @media (prefers-color-scheme: dark) {
+        .actions button.danger {
+          border-color: #ff8b80;
+          color: #ff8b80;
+        }
+      }
+      #overrides {
+        margin-top: 10px;
+      }
+      #overrides table {
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      #overrides td {
+        padding: 2px 14px 2px 0;
+      }
+      #overrides button {
+        border: none;
+        background: none;
+        color: var(--muted);
+        cursor: pointer;
+        font: inherit;
+        text-decoration: underline;
+      }
 
       /* The topic board. */
       .topic h3 {
@@ -243,6 +338,64 @@
         </p>
         <div class="panel status" id="claims"></div>
         <p class="lede" id="purchase-intent" style="margin-top: 12px"></p>
+      </section>
+
+      <section id="settings-section">
+        <h2>Your data</h2>
+        <p class="lede">
+          Everything here takes effect immediately and applies to what is already stored,
+          not only to what comes next.
+        </p>
+        <div class="panel">
+          <div class="field">
+            <label for="retention">Delete raw visits after</label>
+            <div>
+              <input id="retention" type="number" min="0" step="1" />
+              <span class="unit">days — <strong>0 keeps them forever</strong></span>
+            </div>
+            <p class="hint">
+              What Tise has learned survives either way: it is arithmetic over your
+              browsing, not a copy of it (D11).
+            </p>
+          </div>
+
+          <div class="field">
+            <label for="timeout">A new sitting starts after a gap of</label>
+            <div>
+              <input id="timeout" type="number" min="1" step="1" />
+              <span class="unit">minutes</span>
+            </div>
+            <p class="hint">
+              Everything on this page is grouped by this number, so changing it changes
+              every count above. Thirty minutes is a declared guess, not a measurement —
+              this project looked for a natural gap in real browsing and did not find one.
+            </p>
+          </div>
+
+          <div class="field">
+            <label for="override-domain">Tise has a site wrong</label>
+            <div>
+              <input id="override-domain" type="text" placeholder="example.com" />
+              <input id="override-category" type="text" placeholder="topic" />
+              <button id="override-add">Add</button>
+            </div>
+            <p class="hint">
+              You are always right about your own browsing. The site map ships deliberately
+              small — it excludes employers, schools and neighbourhoods, because a list of
+              those is a profile — so your own sites often land in <code>unknown</code>.
+            </p>
+            <div id="overrides"></div>
+          </div>
+
+          <p class="hint" id="settings-error" role="alert"></p>
+
+          <div class="actions">
+            <button id="pause"></button>
+            <button id="export">Export everything</button>
+            <button id="delete" class="danger">Delete everything</button>
+          </div>
+          <p class="hint" id="settings-note"></p>
+        </div>
       </section>
 
       <footer>

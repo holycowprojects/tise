@@ -40,7 +40,15 @@ import { PURCHASE_INTENT_NOTE, TARGET_STATUS } from "../../src/model/status";
 import { allEvents } from "../../src/storage/events";
 import { allPredictions } from "../../src/storage/predictions";
 import { allSpans } from "../../src/storage/spans";
-import { loadSettings } from "../../src/storage/settings";
+import {
+  isCollecting,
+  loadSettings,
+  saveSettings,
+  settingsError,
+  type Settings,
+} from "../../src/storage/settings";
+import { deleteEverything } from "../../src/storage/delete";
+import { buildExport, exportFilename, serialiseExport } from "../../src/storage/export";
 
 function element(id: string): HTMLElement {
   const found = document.getElementById(id);
@@ -371,7 +379,9 @@ async function render(): Promise<void> {
       note(element(id), "Nothing collected.");
     }
     renderClaims();
-    element("privacy").textContent =
+    renderSettings(settings);
+
+  element("privacy").textContent =
       "Nothing has been collected, and nothing is ever sent anywhere.";
     return;
   }
@@ -396,10 +406,185 @@ async function render(): Promise<void> {
   renderScorecard(scorecard(await allPredictions()));
   renderClaims();
 
+  renderSettings(settings);
+
   element("privacy").textContent =
     "Tise has never sent any of this anywhere. There is no server, no account and no " +
     "network request in the extension at all. Web addresses are reduced to a site name " +
     "before anything is written down — no page contents, no search terms, no form fields.";
 }
+
+/**
+ * The settings panel (T15). **Everything here is a promise the rest of the page relies on.**
+ *
+ * Values are written back through `saveSettings`, which validates, and which is also the
+ * choke point where a pause is recorded into the coverage log (D72). Nothing writes
+ * settings directly — a second write path would mean a pause that no prediction knew about,
+ * and windows would resolve to `miss` for hours nobody watched.
+ *
+ * Errors are shown next to the fields rather than thrown: this runs behind a number input,
+ * where the answer to bad input is to say so, not to break the page.
+ */
+function renderSettings(settings: Settings): void {
+  const retention = element("retention") as HTMLInputElement;
+  const timeout = element("timeout") as HTMLInputElement;
+  const pause = element("pause") as HTMLButtonElement;
+
+  retention.value = String(settings.rawRetentionDays);
+  // Stored in seconds, shown in minutes: a person thinks in minutes and the store has to
+  // stay in the unit every feature already uses.
+  timeout.value = String(Math.round(settings.sessionTimeoutSeconds / 60));
+
+  pause.textContent = settings.paused ? "Resume collecting" : "Pause collecting";
+  element("settings-note").textContent = isCollecting(settings)
+    ? "Collecting. Pausing keeps everything already stored."
+    : settings.consentGrantedAt === null
+      ? "Not collecting — Tise has never been turned on."
+      : "Paused. Nothing new is being written, and nothing has been deleted.";
+
+  renderOverrides(settings);
+}
+
+function renderOverrides(settings: Settings): void {
+  const host = element("overrides");
+  host.textContent = "";
+  const entries = Object.entries(settings.overrides).sort();
+  if (entries.length === 0) {
+    const p = document.createElement("p");
+    p.className = "empty";
+    p.textContent = "No corrections yet.";
+    host.append(p);
+    return;
+  }
+
+  const table = document.createElement("table");
+  for (const [domain, category] of entries) {
+    const row = table.insertRow();
+    row.insertCell().textContent = domain;
+    row.insertCell().textContent = category;
+    const remove = document.createElement("button");
+    remove.textContent = "remove";
+    remove.addEventListener("click", async () => {
+      const current = await loadSettings();
+      const next = { ...current.overrides };
+      delete next[domain];
+      await saveSettings({ overrides: next });
+      await render();
+    });
+    row.insertCell().append(remove);
+  }
+  host.append(table);
+}
+
+/** Show a validation message, or clear it. */
+function showError(message: string | null): void {
+  element("settings-error").textContent = message ?? "";
+}
+
+async function commit(patch: Partial<Settings>): Promise<void> {
+  const error = settingsError(patch);
+  showError(error);
+  if (error !== null) return;
+  await saveSettings(patch);
+  await render();
+}
+
+element("retention").addEventListener("change", (event) => {
+  const value = Number((event.target as HTMLInputElement).value);
+  void commit({ rawRetentionDays: value });
+});
+
+element("timeout").addEventListener("change", (event) => {
+  const minutes = Number((event.target as HTMLInputElement).value);
+  // Guarded here as well as in `settingsError`, because `minutes * 60` on a fractional
+  // input would produce a non-integer number of seconds and the message would be about
+  // seconds when the person typed minutes.
+  if (!Number.isInteger(minutes)) {
+    showError("The session gap must be a whole number of minutes.");
+    return;
+  }
+  void commit({ sessionTimeoutSeconds: minutes * 60 });
+});
+
+element("override-add").addEventListener("click", async () => {
+  const domainInput = element("override-domain") as HTMLInputElement;
+  const categoryInput = element("override-category") as HTMLInputElement;
+  const domain = domainInput.value.trim().toLowerCase();
+  const category = categoryInput.value.trim().toLowerCase();
+
+  const current = await loadSettings();
+  const next = { ...current.overrides, [domain]: category };
+  const error = settingsError({ overrides: next });
+  showError(error);
+  if (error !== null) return;
+
+  await saveSettings({ overrides: next });
+  domainInput.value = "";
+  categoryInput.value = "";
+  await render();
+});
+
+element("pause").addEventListener("click", async () => {
+  const settings = await loadSettings();
+  if (settings.consentGrantedAt === null) {
+    showError("Tise is not collecting. Open it from the toolbar to turn it on.");
+    return;
+  }
+  await commit({ paused: !settings.paused });
+});
+
+element("export").addEventListener("click", async () => {
+  const data = await buildExport({
+    now: Date.now(),
+    extensionVersion: chrome.runtime.getManifest().version,
+  });
+  // A blob URL and an anchor: no `downloads` permission, and the file is written by the
+  // browser's own save flow rather than by anything Tise controls.
+  const blob = new Blob([serialiseExport(data)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = exportFilename(Date.now());
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  element("settings-note").textContent =
+    `Exported ${data.events.length.toLocaleString()} events. It is a readable JSON file.`;
+});
+
+/**
+ * Two clicks, no dialog — the same rule the popup uses.
+ *
+ * `confirm()` is unavailable to an extension page in some contexts and dismisses a popup
+ * on some platforms, and a destructive action whose confirmation can eat itself is worse
+ * than no confirmation at all.
+ */
+let deleteArmed = false;
+
+element("delete").addEventListener("click", async () => {
+  const button = element("delete") as HTMLButtonElement;
+  if (!deleteArmed) {
+    deleteArmed = true;
+    button.textContent = "Really delete everything?";
+    element("settings-note").textContent =
+      "This removes every visit, every setting, and Tise's permission to read your " +
+      "history. It leaves the extension exactly as it installed: able to store nothing.";
+    setTimeout(() => {
+      deleteArmed = false;
+      button.textContent = "Delete everything";
+    }, 6000);
+    return;
+  }
+
+  deleteArmed = false;
+  button.textContent = "Delete everything";
+  const outcome = await deleteEverything();
+  // Hand the capabilities back too. Keeping a granted permission after "delete everything"
+  // would leave Tise able to read a history it has just promised to have forgotten.
+  await chrome.permissions.remove({ permissions: ["history", "tabs", "idle"] });
+  await render();
+  element("settings-note").textContent =
+    `Deleted ${outcome.eventsDeleted.toLocaleString()} visits and every setting. ` +
+    "Tise is back to its install state.";
+});
 
 void render();

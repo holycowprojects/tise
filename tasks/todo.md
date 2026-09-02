@@ -901,9 +901,35 @@ published as a failure.
     `featureSet` and no migration, so the stored model threw on every `transform`. Fixed
     by discarding rather than guessing; `tests/stale-model.test.ts` writes the old shape
 
-- [ ] **T15 · Onboarding and privacy settings** · M · deps: T14
-  - No source listed that V1 does not implement; nothing collected before consent
-  - Verify: fresh profile install; confirm zero writes pre-consent
+- [x] **T15 · Onboarding and privacy settings** · M · deps: T14 — **done** (D114)
+  - Verify: `npm test` ✓ 509, `npm run lint` ✓, `npm run build` ✓ (`dist/welcome.html`)
+  - **`ui/welcome/` — a real page, opened once on a genuine first install.** 340 pixels is
+    not where you explain what an extension will record, and D33 measured that Chrome
+    focuses **Deny**, so the argument has to be made before the dialog
+  - **Every factual claim on it is generated from the manifest, not typed.**
+    `src/model/disclosure.ts` explains each permission in plain language; a permission with
+    no entry **fails the build**, and so does an entry for a permission no longer requested.
+    Same for stored fields against `EVENT_FIELDS`. This is T18b's README defect and D98's
+    stale banners in the one artifact whose whole job is to be believed before it can be
+    checked — **broken deliberately** (added `bookmarks`) and 4 of 14 tests failed
+  - Each permission says **what it does *not* allow**, and each optional one says what
+    declining costs — a page that only argues one way is a sales pitch
+  - **Nothing is written before consent, including no "seen it" flag.** That flag is the
+    obvious way to open a page once and it would be a stored fact about someone who has
+    not agreed to Tise storing facts. `onInstalled` reason `"install"` costs nothing and
+    stores nothing; a test asserts no marker is written and that updates never reopen it
+  - **Settings panel on the dashboard**: retention (0 = forever), session gap in minutes,
+    pause, export, delete-everything, and the **site-override editor** — `overrides` has
+    been in `Settings` since T6 with no way to set it, so the field was dead
+  - **`settingsError` validates at the choke point**, not in the UI: a page that forgot to
+    check would write a one-second session gap and every feature would silently start
+    describing something else. A URL in an override is refused — settings ride in the
+    export (D45) and invariant 2 has no exception for a path someone typed themselves
+  - **The popup's subtitle said "Developer view — the real interface arrives at T14"** for
+    two days after T14 shipped it. Now derived from state
+  - **OWED BY AKASH: install on a fresh profile.** T15's own verification is a real
+    install; the automated half asserts the store is empty, and only a browser can show
+    that the welcome tab actually opens
 
 ---
 

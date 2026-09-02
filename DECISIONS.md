@@ -5375,3 +5375,105 @@ candidates are now measured and closed**, which is the result: the outside plan'
 untested recommendations should be read against these two before any of them is adopted.
 
 893 Python tests, 480 TypeScript, both linters clean.
+
+### D114 — T15: the disclosure is generated from the manifest, because this project has shipped the alternative twice
+
+Onboarding and privacy settings. The interesting decision is not that a welcome page exists;
+it is that **nothing derivable on it is typed**.
+
+#### The defect this is built to prevent, which has already happened twice
+
+T18b found the README describing a `service/ Local Python service` that does not exist and
+was explicitly rejected — so a reader auditing the privacy claim saw a local server in the
+layout. D98 found `reports.py` labelling twelve benchmarks with a target D92 had retired two
+decisions earlier. Both were hand-written statements about a system that had moved out from
+under them, and both were caught late by someone reading rather than by anything failing.
+
+**An onboarding page is the worst possible place for that failure**, because it is the one
+artifact whose entire job is to be believed *before* the reader can check anything. Everyone
+else in this repository can go and look at the code; the person deciding whether to install
+cannot.
+
+So `src/model/disclosure.ts` holds the permission explanations as data, and
+`disclosure.test.ts` checks them against `manifest.json` **in both directions**:
+
+* a permission the manifest requests with no plain-language entry **fails the build**;
+* an entry for a permission no longer requested fails too — a stale paragraph claims access
+  the extension does not have, which is the mirror of the dangerous case and still false.
+
+The same rule covers what is stored: `STORED_FIELDS` is checked against `EVENT_FIELDS`, so a
+new field on `TiseEvent` cannot reach the database without reaching this page. And the
+never-requested list is pinned to `manifest.test.ts`'s own forbidden list, so a capability
+cannot be added to the guard while the page carries on not mentioning it.
+
+**Broken deliberately**: adding `bookmarks` to `optional_permissions` failed 4 of 14 tests,
+including *"names nothing the manifest actually requests"* — the assertion that catches a
+page telling a reader Tise does not do something it does.
+
+#### What is not derivable, and how it is guarded instead
+
+"Tise never transmits anything" is not a property of the manifest — no permission is needed
+to call `fetch`. It cannot be derived, so it is stated and pinned by the existing source scan.
+The file says which of its claims are generated and which are asserted, rather than presenting
+both as one kind of promise.
+
+#### Three smaller decisions inside it
+
+**Every permission says what it does *not* allow.** Every Chrome permission grants more than
+any one extension uses, and the gap between what the permission can do and what Tise does
+with it is exactly what a careful reader wants and almost never gets.
+
+**Every optional permission says what declining costs.** D33 measured that Chrome focuses
+**Deny** on its dialog. A page that only argues for "yes" is a sales pitch, and someone
+deciding needs the price of "no" as plainly as the price of "yes". The test asserts each
+optional capability carries one and each required capability does not — there is no choice to
+describe for a permission granted at install.
+
+**The page stays reachable after consent, and does not replace itself with a success screen.**
+Someone who has just agreed to something is exactly the person most likely to want to re-read
+what they agreed to.
+
+#### Nothing is written before consent, and that included the obvious flag
+
+The install state has to be genuinely empty, not merely unused. The obvious way to open a
+welcome page once is to write down that you have opened it — **and that flag would be a stored
+fact about a person who has not agreed to Tise storing facts about them**, indistinguishable
+from consent to anyone reading the database.
+
+Chrome's `onInstalled` reason does the job for free. `reason === "install"` only: an update
+must not reopen it, because reopening a consent page every release trains a person to dismiss
+it, which is the opposite of informed. `onboarding.test.ts` asserts no marker is written, that
+updates cannot reopen it, and — driving the real storage layer through the real gate — that
+after a refused navigation there is **no settings row at all**, not a settings row saying no.
+
+That last one is stronger than what was previously asserted. "Nothing is stored before consent"
+has been a claim since D37, and the tests behind it were about the collector refusing an event.
+
+#### The settings panel, and a field that had been dead since T6
+
+Retention (0 = forever), the session gap in minutes, pause, export, delete-everything, and the
+**site-override editor**. `overrides` has been on `Settings` since T6, is carried by the export
+(D45), and had **no way to set it** — so "the user is always right about their own browsing"
+was a comment rather than a feature.
+
+**`settingsError` validates at the choke point rather than in the UI.** A page that forgot to
+check would write a one-second session gap, and every session-derived feature in the project
+would silently start describing something else — D17 declared that timeout a hyperparameter,
+and D97 made it load-bearing a second way by clustering intervals on sessions. A URL in an
+override is refused for the same reason: settings ride in the export, and invariant 2 has no
+exception for a path someone typed themselves.
+
+Retention above ten years is refused rather than accepted, so "keep forever" keeps exactly one
+representation. Two ways to say almost the same thing drift apart in every place that
+special-cases zero.
+
+#### And the popup was lying
+
+*"Developer view — the real interface arrives at T14"* was the first sentence anyone installing
+Tise would read, and it stayed there for two days after T14 shipped the dashboard. Same defect
+class as the two above, in the smallest possible form. It is derived from state now.
+
+**Owed by Akash: install on a fresh profile.** T15's own verification is a real install. The
+automated half proves the store is empty; only a browser can show the welcome tab opening.
+
+509 TypeScript tests, 893 Python, both linters clean, builds.

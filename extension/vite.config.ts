@@ -17,6 +17,7 @@ const VERBATIM: ReadonlyArray<readonly [string, string]> = [
   ["manifest.json", "manifest.json"],
   ["ui/popup/popup.html", "popup.html"],
   ["ui/dashboard/dashboard.html", "dashboard.html"],
+  ["ui/welcome/welcome.html", "welcome.html"],
 ];
 
 function copyStaticFiles(): Plugin {
@@ -48,6 +49,7 @@ export default defineConfig({
         background: resolve(here, "src/background.ts"),
         popup: resolve(here, "ui/popup/popup.ts"),
         dashboard: resolve(here, "ui/dashboard/dashboard.ts"),
+        welcome: resolve(here, "ui/welcome/welcome.ts"),
       },
       output: {
         format: "es",

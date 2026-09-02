@@ -56,6 +56,29 @@ chrome.runtime.onInstalled.addListener(scheduleAlarms);
 chrome.runtime.onStartup.addListener(scheduleAlarms);
 
 /**
+ * Open the welcome page once, on a genuine first install (T15).
+ *
+ * **The reason this is not left to the popup.** Tise installs able to store nothing and
+ * stays that way until someone consents, so an install with no onboarding is an extension
+ * that silently does nothing until the person happens to open a 340-pixel popup and press
+ * a button whose consequences it has no room to explain. D33 measured that Chrome focuses
+ * **Deny** on its permission dialog — the argument has to be made before the dialog, and
+ * a popup is not where you make an argument.
+ *
+ * `reason === "install"` only. An update must not reopen it: the person consented once and
+ * reopening a consent page every release trains them to dismiss it, which is the opposite
+ * of informed. `onInstalled` also fires for `"update"` and `"chrome_update"`.
+ *
+ * **Nothing is written here.** No "seen the welcome page" flag, because that would be a
+ * stored fact about someone who has not yet agreed to Tise storing facts about them — the
+ * install state has to remain genuinely empty, and `zero-writes.test.ts` asserts it.
+ */
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason !== "install") return;
+  void chrome.tabs.create({ url: chrome.runtime.getURL("welcome.html") });
+});
+
+/**
  * Attention listeners, registered at the top level for the same reason the navigation
  * listener is: MV3 reads the registration to decide which events wake the worker, so one
  * added inside a callback would stop firing after the first termination.
