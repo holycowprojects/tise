@@ -491,18 +491,41 @@ published as a failure.
   - Work: optional `tabs` permission in the manifest, consent-gated exactly as `history` is;
     tab activation/deactivation collection; then wait for data
 
-- [ ] **T-E · Session intent clustering** · M — **from D95, descriptive**
-  - Unsupervised clustering of *sessions* into recurring types (research, routine checking,
-    entertainment, exploration) from session-level features: domain count, duration,
-    transition distribution, navigation entropy, idle periods
-  - **A different shape from everything tried** — it describes a session rather than
-    predicting a topic, and needs no labels. Same machinery as T10b's domain clustering
-  - **Descriptive, so it ships without clearing a prediction bar.** That matters given D92:
-    the base-rate table is hard to beat, and this does not have to beat it
+- [x] **T-E · Session intent clustering** · M — **a real split, and it is size not kind**
+      (D113)
+  - Verify: `uv run python analysis/session_types.py` ✓ — 893 Python, 480 TypeScript, both
+    linters clean. Report at `docs/benchmarks/session-types.md`
+  - **All three corpora give the same two clusters at k=2**: brief single-domain check-ins
+    (2–3 visits, 1 domain, ~0 min) against long multi-domain sittings (14–26 visits, 3–4
+    domains, 17–46 min). **Stability 0.90–0.97** — the same sessions land together again
+  - **But every separating feature moves the same way at once**, which the script computes
+    rather than leaving to a reader: one behaviour at two scales. D95's guessed types —
+    research, routine checking, entertainment, exploration — are differences of *kind*, and
+    **nothing here distinguishes kind**. No cluster is named, deliberately
+  - **They happen at the same times.** Time of day was held out of the clustering on purpose
+    so the question could be asked; evening shares differ by 1–6 points
+  - **The first null was too weak and every k passing it is what exposed it.** Permuting
+    columns destroys correlations, and correlated features raise a silhouette on their own.
+    Added `gaussian_null_band` — a **single** multivariate normal matching the observed
+    covariance, one mode, hand-written Cholesky. Both bands printed; they answer different
+    questions
 
-- [ ] **T-F · Domain association rules** · S — **from D95, descriptive**
-  - Which domains co-occur within a session. Association rules / FP-Growth
-  - Uses `domain`, stored since T1 and read by **zero** features. Needs no model
+- [x] **T-F · Domain association rules** · S — **nothing beats chance, anywhere** (D113)
+  - Verify: `uv run python analysis/domain_associations.py` ✓ → report at
+    `docs/benchmarks/domain-associations.md`, domain rules to gitignored `data/`
+  - **No corpus beats chance at either level.** Chrome 8 domain rules against a chance band
+    [1, 9]; Edge **2 against [2, 12]** — fewer than chance; Firefox 4 against [0, 4]
+  - **Categories are the clean result**: strongest lift at any confidence **1.37 / 1.24 /
+    1.00** against a 1.5 threshold. An absence, not a near miss
+  - **That is D104's hub finding from a second direction.** An item in most sessions
+    co-occurs with everything at its own base rate, which is lift 1.0 by definition — a hub
+    flattens co-occurrence *structure*, not just conditional prediction
+  - **The domain level is starved rather than negative**, and the report says which: 226
+    domains over 88 multi-domain sessions leaves **15 pairs** dense enough to judge
+  - **The privacy split is the design, not a caveat.** Counts, spreads, coverage and the
+    chance comparison are published; **category rules in full** (a public vocabulary); the
+    domain rules go to gitignored `data/domain-rules.md`, as D100 did for the replication
+  - **Nothing ships from either.** D95's two candidates are now measured and closed
 
 ---
 

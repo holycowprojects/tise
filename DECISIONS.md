@@ -5253,3 +5253,125 @@ third reason: it is keyed on the subject, which for this target is the hour of d
 repeats what happened at 3pm *yesterday* rather than what happened an hour ago.
 
 858 Python tests, 480 TypeScript, both linters clean.
+
+### D113 — T-E and T-F: one real split that is not a type, and one clean absence
+
+Both were adopted in D95 from an outside plan, both **descriptive**, and neither has a
+prediction bar to clear — which D95 named as the point of them, given D92's finding that a
+per-topic rate table is very hard to beat. **D24 still applies**, and most of the work in both
+was building the baseline an unsupervised method needs, because neither has an obvious one.
+
+Reports: `docs/benchmarks/session-types.md`, `docs/benchmarks/domain-associations.md`.
+
+---
+
+#### T-E — the sessions do split, and the split is size, not kind
+
+**All three corpora give the same two clusters at k=2**, with the same story: brief
+single-domain check-ins against long multi-domain sittings.
+
+| | Chrome | Edge | Firefox |
+|---|---|---|---|
+| Check-ins | 2 visits, 1 domain, 0 min (52%) | 3 visits, 1 domain, 1 min (47%) | 2 visits, 1 domain, 0 min (61%) |
+| Sittings | 20 visits, 4 domains, 24 min (48%) | 26 visits, 3 domains, 46 min (53%) | 14 visits, 4 domains, 17 min (39%) |
+
+**Stability 0.90-0.97** — the same sessions land together again across subsamples, which is
+the property the word *recurring* asserts and a silhouette does not test.
+
+**But it is a magnitude split, and the script computes that rather than leaving it to a
+reader.** Every separating feature moves the same way at once: the cluster with more visits
+also has more domains, runs longer, revisits more and spreads across more categories. That is
+one behaviour at two scales. D95's outside plan guessed the types would be *research, routine
+checking, entertainment, exploration* — differences of **kind**, in what the person was
+doing. **Nothing here distinguishes kind.** The report names no cluster, deliberately: a name
+printed beside a measurement reads as part of it.
+
+**And they happen at the same times.** Evening shares differ by 1-6 points and weekend shares
+disagree in direction across corpora. Time of day was **held out of the clustering on purpose**
+so that this question could be asked at all — a clustering handed the clock recovers
+morning-versus-evening and presents it as a discovery about session types. Holding it out
+converted an input into a question, and the answer is no.
+
+#### The first null was too weak, and every k passing it is what exposed it
+
+The obvious baseline permutes each feature column independently: every marginal kept, every
+correlation destroyed. **Every k from 2 to 8 cleared it on every corpus**, which is not a
+finding, it is a warning. Visits, domains and duration all move together, and correlated
+features concentrate the points near a lower-dimensional surface — that **raises the
+silhouette on its own, with no discrete groups anywhere**. Clearing that band says the
+features are related, which was never in doubt.
+
+So `gaussian_null_band` was added: draws from a **single** multivariate normal matching the
+observed mean and covariance — one mode, same shape, same correlations, via a hand-written
+Cholesky. Excess above *that* is evidence of more than one group, which is the claim a
+"type" makes. Edge k=2 is 0.346 against a one-mode band of [0.238, 0.297]. Both bands are
+printed, because they answer different questions and one number would conflate them.
+
+**The remaining confound is stated on the page**: the one-mode null matches the covariance,
+not the marginal shapes, and session features are skewed and partly discrete — a one-visit
+session has a repeat rate of exactly zero, so there is a real point mass in a corner. Some
+excess may be skewness rather than a second mode. **Stability has no such assumption and is
+the sturdier number.**
+
+---
+
+#### T-F — nothing co-occurs more than independence predicts, anywhere
+
+**No corpus beats chance, at either level.** Chrome 8 domain rules against a chance band of
+[1, 9]; Edge **2 against [2, 12]** — fewer than chance; Firefox 4 against [0, 4].
+
+**Categories are the cleaner result because they are the level with enough data.** Strongest
+lift at any confidence: **1.37 / 1.24 / 1.00**. Not a near miss against the 1.5 threshold — an
+absence. Category co-occurrence inside a session is essentially independent.
+
+**That is D104's hub finding arriving from a second direction.** D104 found 9 of 10 topics
+lead most often to `search`. An item present in most sessions co-occurs with everything at
+roughly its own base rate, which is lift 1.0 by definition. A hub does not merely make
+conditioning useless for *prediction* (D102's mechanism); it flattens co-occurrence
+*structure* too. Two analyses, different methods, same shape underneath.
+
+**The domain level is starved rather than negative, and the report says which.** 226 domains
+over 88 multi-domain sessions leaves **15 pairs** dense enough to judge at all. The high lifts
+there (up to 9.6 on Chrome) are ratios of small integers, and the count sits inside the chance
+band. Coverage is the number that settles it: rules speak to **7-51%** of sessions, and on
+Edge to 7%.
+
+#### The privacy split is the design of T-F, not a caveat on it
+
+A ranked list of a person's domains **is a profile of that person** (invariant 2, D22), and
+this repository is public. So the committed report carries counts, spreads, coverage and the
+comparison against chance, plus **category rules in full** — the fifteen categories are a
+public vocabulary shipped in `domains.json`, not a fact about anyone. The domain rules
+themselves go to gitignored `data/domain-rules.md`, the split D100 used for the replication
+report. `test_published_reports.py` passes on both new reports, and the committed pages were
+grepped for host-shaped strings by hand as well.
+
+The public half is also the half that generalises: *how much co-occurrence structure does one
+person's browsing contain* is answerable without naming a single site.
+
+---
+
+#### What both have in common, and it is the transferable part
+
+**Neither method can fail on its own.** k-means always returns k clusters and gives noise a
+positive silhouette; a rule miner always returns rules and confidence is high for free
+whenever the consequent is common. Both would have produced a page of confident-looking
+output on data containing nothing. **The entire value of both analyses is in the null**, and
+in T-E's case the first null was wrong and only the implausibility of the result — every k
+clearing on every corpus — said so.
+
+**A method that cannot come back empty has not been tested; it has been run.** Every test file
+here therefore asserts both directions: the null is beaten when structure was planted, and
+*not* beaten when it was not. Writing the second half caught a bad fixture immediately — an
+arithmetic pairing meant as "unstructured" pairs each item with exactly one other, and the
+null correctly found 16 rules against a band topping out at 2. The fixture was wrong and the
+baseline was right, which is the outcome that pair of tests exists to be able to produce.
+
+#### Nothing ships from either
+
+T-E's split is real and is "long sessions are long". T-F found nothing above chance. Neither
+needs a permission, both are `history`-class, and neither is worth a surface. **D95's two
+candidates are now measured and closed**, which is the result: the outside plan's remaining
+untested recommendations should be read against these two before any of them is adopted.
+
+893 Python tests, 480 TypeScript, both linters clean.
