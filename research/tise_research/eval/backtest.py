@@ -203,6 +203,11 @@ class BacktestResult:
     #: interval was built from 9-12 things regardless of how many rows it held. Kept
     #: alongside rather than instead of the subject so both bounds stay available.
     pooled_sessions: tuple[str, ...] = ()
+    #: The `label_id` of each pooled row, aligned with `pooled_outcomes`. Without it a
+    #: pooled row cannot be mapped back to the feature that produced it, so an analysis
+    #: can report a score over every test row and never over an interesting *slice* of
+    #: them. Empty for emitters that supply no id — `return_24h` predates the field.
+    pooled_label_ids: tuple[str, ...] = ()
 
 
 def run_backtest(
@@ -231,6 +236,7 @@ def run_backtest(
     pooled_probabilities: dict[str, list[float]] = defaultdict(list)
     pooled_subjects: list[str] = []
     pooled_sessions: list[str] = []
+    pooled_label_ids: list[str] = []
     by_category: dict[str, dict[str, list]] = defaultdict(
         lambda: {"outcomes": [], "probabilities": defaultdict(list)}
     )
@@ -257,6 +263,7 @@ def run_backtest(
                         pooled_outcomes["_"].append(label.outcome)
                         pooled_subjects.append(label.subject)
                         pooled_sessions.append(label.session_id)
+                        pooled_label_ids.append(label.label_id)
 
         fold_results.append(
             FoldResult(
@@ -325,6 +332,7 @@ def run_backtest(
         pooled_outcomes=tuple(headline_outcomes),
         pooled_subjects=tuple(pooled_subjects),
         pooled_sessions=tuple(pooled_sessions),
+        pooled_label_ids=tuple(pooled_label_ids),
         pooled_probabilities={
             name: tuple(pooled_probabilities[name]) for name in fitters
         },

@@ -336,3 +336,32 @@ def test_a_row_from_another_set_is_refused() -> None:
     )
     with pytest.raises(ValueError, match="fitted on"):
         preprocessor.transform(foreign)
+
+
+# --------------------------------------------------------------------------------------
+# The pooled rows can be sliced (added for T-B; `run_backtest` gained `pooled_label_ids`)
+# --------------------------------------------------------------------------------------
+
+
+def test_pooled_label_ids_align_with_pooled_outcomes() -> None:
+    """Without this a pooled row cannot be mapped back to the feature that produced it.
+
+    T-B's most important number is a *slice* — the model's score on hours that follow a
+    quiet hour — and computing it needs the pooled rows to still know which label they are.
+    """
+    from tise_research.eval.backtest import run_backtest
+
+    examples = presence_examples(corpus(list(range(0, 400, 3))))
+    rows = {example.label.label_id: example.row for example in examples}
+    result = run_backtest([example.label for example in examples], n_folds=5)
+
+    assert len(result.pooled_label_ids) == len(result.pooled_outcomes)
+    assert set(result.pooled_label_ids) <= set(rows)
+    assert len(set(result.pooled_label_ids)) == len(result.pooled_label_ids)
+
+    # The outcome carried alongside an id must be that label's own outcome.
+    outcomes = {example.label.label_id: example.label.outcome for example in examples}
+    for label_id, outcome in zip(
+        result.pooled_label_ids, result.pooled_outcomes, strict=True
+    ):
+        assert outcomes[label_id] == outcome

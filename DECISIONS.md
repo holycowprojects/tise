@@ -5141,3 +5141,115 @@ descriptive card.
 
 25 tests, and the leakage guard was broken deliberately once — widening the count window past
 the boundary — and confirmed failing before it was reverted.
+
+### D112 — T-B clears its bar, and 79% of the rows say otherwise
+
+`analysis/browsing_next_hour.py` ran against the three corpora. Report at
+`docs/benchmarks/browsing-next-hour.md`.
+
+**Edge, the adoption corpus D94 named before anything was fitted: +0.0546 [+0.0383,
++0.0724]**, day-clustered, n=55, 5 of 5 folds. The interval excludes zero in the model's
+favour, which is D94's rule verbatim. Chrome clears it too (+0.0190 [+0.0063, +0.0341],
+n=35). Firefox does not (+0.0023 [-0.0034, +0.0078], n=24), and on Firefox the model does
+not separate from *anything*, including a flat rate — 915 events over 38 days is a browser
+barely used.
+
+**So D94's third prediction is wrong**, and D94 named it as the one most likely to
+embarrass: *"circadian rhythm is nearly all of the signal, and a model that adds
+recent-activity features on top of it will find little left."*
+
+#### Then the slice, and it changes what the number means
+
+`minutesSinceLast` came out at **-1.312 on Edge, three times the next largest weight**, so
+the report asks the question that invites: *isn't this just "were you browsing a minute
+ago"?* Two post-hoc checks answer it, both labelled post-hoc, neither able to touch the
+verdict — D102's rule, applied.
+
+**`previous_hour`, a two-cell rate table** — the rate given the previous hour held a visit,
+and given it did not — **beats the 24-cell rhythm on all three corpora**, and beats the
+fitted model on Firefox. The model separates from it on Edge alone, and the margin collapses
+from **+0.0546 against the bar to +0.0109 against two cells**.
+
+**And splitting the test rows says where the rest of it lives.** 276 of Edge's 1,290 pooled
+test rows follow an hour that already held a visit: the person is mid-session and the
+per-hour rate has no way to know. On the **other 1,014 — where *will you be here?* is a real
+question — the model does not separate from the bar at all:** -0.0018 [-0.0052, +0.0016].
+The entire pre-registered margin is earned on the 21% of hours whose answer was already
+obvious.
+
+**D94's prediction is therefore wrong on the letter and right on the substance.** Circadian
+rhythm plus *are you here right now* is the whole signal, and the second half is the half
+that answers itself.
+
+#### The method note, and it is the one this run is worth keeping for
+
+D102 left one: *ask a floor one question before registering it — can it produce a legal
+answer on every row?* This run adds its sibling:
+
+**Ask whether the rows a bar is scored over include rows where the question answers
+itself.** A bar is beaten either by being better on hard rows or by there being enough easy
+ones, and a single pooled interval cannot tell those apart. Both bars this project has now
+registered were sound as *definitions* and wrong about **which rows would decide them** —
+D94's floor was handicapped by the label definition, and this one is diluted by the row
+population. Registering the bar is not enough; the slice has to be registered with it.
+
+#### The declared two-line rule lost, and that is informative
+
+`rhythm_7d` — this clock hour's trailing seven-day rate, declared in D111 *before* the run
+specifically because D92 and D102 both ended with a simple rule winning — **lost, on all
+three corpora, and lost to the bar as well.** Seven binary observations per estimate against
+the bar's ninety days: it is a noisier version of the same rhythm, not a smarter one.
+
+That is the argument for declaring rivals in advance rather than constructing them
+afterwards. A post-hoc rival is only ever built when it looks like it will win, so a
+project that only builds them post-hoc learns nothing on the runs where the simple rule is
+bad. This is the first such run, and it is only visible because the rule was written down
+first.
+
+#### D111's five predictions: none held cleanly, one held on the adoption corpus
+
+1. **Failed.** Separation from a flat rate on all three — Firefox includes zero.
+2. **Failed.** It cleared the bar on Edge.
+3. **Failed.** `rhythm_7d` was not merely distinguishable, it was beaten decisively.
+4. **Held on Edge, failed elsewhere.** `minutesSinceLast` is the largest weight on Edge
+   (-1.312); on Chrome and Firefox the two hour terms are larger and recency is third. The
+   risky prediction, and the corpus split is itself a finding: the browser he uses most is
+   the one where presence beats rhythm.
+5. **Failed.** Base rates are **16.3% / 13.0% / 11.2%**, against a predicted 25-45%. A
+   sanity check on the span rather than a claim, and it says the span is being labelled
+   correctly — most hours of most days hold no browsing at all in any single browser.
+
+D100 recorded that a pre-registration where everything lands is evidence the predictions
+were too cautious. This is the opposite case and the same lesson: five wrong predictions
+bought a sharper result than five right ones would have.
+
+#### What ships: nothing
+
+`pr_1` is `history` compat — no dwell, no permission — so unlike `as_2` it is shippable the
+day it is worth shipping. **It is not worth shipping.** The surface a person would want is
+*"you'll be back around 9"* after a quiet stretch, which is exactly the slice where the
+model does not beat a per-hour rate that needs no training at all. If any of this reaches
+the extension it should be the rhythm table, for the same reason D103 shipped counts rather
+than the fitted transition table.
+
+**D94's stopping rule is not triggered and was not going to be** — T-A separated at D97, so
+the rule retired before T-B ran. T-B is recorded as an adoption under the rule as written,
+with this entry as what the adoption is worth. Nothing about what Tise trains or shows
+changes.
+
+#### Machinery
+
+`BacktestResult` gains `pooled_label_ids`, aligned with `pooled_outcomes`. Without it a
+pooled row could not be mapped back to the feature that produced it, so any analysis could
+score every test row and never an interesting *slice* of them — which is the number this
+entry turns on. Empty for emitters that supply no id.
+
+Also worth recording: `same_as_last` scores **0.2932 on Chrome against a 0.1377 flat rate**,
+its worst showing in the project. D92 found the same baseline failing at the daily-block
+level and concluded "above your usual" is close to independent day to day. At the hourly
+level persistence is enormous — `previous_hour` is the second-best model on every corpus.
+**Same mechanism, opposite sign, one timescale apart**, and `same_as_last` fails here for a
+third reason: it is keyed on the subject, which for this target is the hour of day, so it
+repeats what happened at 3pm *yesterday* rather than what happened an hour ago.
+
+858 Python tests, 480 TypeScript, both linters clean.

@@ -55,6 +55,7 @@ from tise_research.eval.intervals import (  # noqa: E402
     fold_win_probability,
     rows_to_exclude_zero,
 )
+from tise_research.eval.metrics import brier_score  # noqa: E402
 from tise_research.features.labels import Label  # noqa: E402
 from tise_research.features.presence import (  # noqa: E402
     ACTIVITY_WINDOW_HOURS,
@@ -66,7 +67,7 @@ from tise_research.features.presence import (  # noqa: E402
     presence_examples,
 )
 from tise_research.features.vector import FeatureRow  # noqa: E402
-from tise_research.models.baselines import Baseline  # noqa: E402
+from tise_research.models.baselines import Baseline, fit_per_key  # noqa: E402
 from tise_research.models.logreg import DEFAULT_SPEC, predict_proba, train  # noqa: E402
 from tise_research.models.prep import design_columns, fit_preprocessor  # noqa: E402
 
@@ -82,6 +83,18 @@ FLAT_MODEL = "global_base_rate"
 #: the trailing seven-day rate for this clock hour and nothing else.
 RHYTHM_RIVAL = "rhythm_7d"
 
+#: **Added after seeing the coefficients, and labelled post-hoc everywhere it appears.**
+#: `minutesSinceLast` came out three times larger than any other weight, which makes
+#: "isn't this just *were you browsing a minute ago*?" the first question a sceptical reader
+#: has, and D24 makes the baseline that answers it mandatory. It is a two-cell rate table:
+#: the training-window rate given the previous hour held a visit, and given it did not.
+#:
+#: **It is not the bar and cannot change the verdict.** D94 fixed the bar before anything was
+#: fitted, and D102 is the entry about a rival constructed after the fact — there
+#: `constrained_mode` beat the adopted model and still could not touch it. Same rule here,
+#: applied to a rival that happens to lose.
+PERSISTENCE_RIVAL = "previous_hour"
+
 #: The corpus the adoption rule is stated over. Named in D94 before anything was fitted.
 ADOPTION_CORPUS = "history-edge"
 
@@ -90,6 +103,9 @@ ADOPTION_CORPUS = "history-edge"
 #: expected to be quiet, and it is printed anyway: a check that only runs when it fires is
 #: a check nobody can tell is working.
 CONCENTRATION_FLAG = 0.20
+
+#: Matches `category_base_rate`, so the rate tables differ only in what they key on.
+BASELINE_SMOOTHING = 5.0
 
 MODEL_NAME = f"logreg_{PRESENCE_FEATURE_SET.replace('_', '')}"
 
@@ -149,6 +165,26 @@ def _rhythm_fitter(rows: dict[str, FeatureRow]):
     return fit
 
 
+def _persistence_fitter(rows: dict[str, FeatureRow]):
+    """Two cells: was the previous hour active, or was it not. Post-hoc — see the constant.
+
+    Smoothing matches `category_base_rate` so the two rate tables differ only in what they
+    key on, which is the same reason D97 shared `fit_per_key` for the per-domain rival.
+    """
+
+    def fit(labels):
+        return fit_per_key(
+            labels,
+            name=PERSISTENCE_RIVAL,
+            key=lambda label: (
+                "active" if rows[label.label_id].values["visitsLastHour"] else "quiet"
+            ),
+            smoothing=BASELINE_SMOOTHING,
+        )
+
+    return fit
+
+
 @dataclass(frozen=True, slots=True)
 class CorpusResult:
     name: str
@@ -161,8 +197,19 @@ class CorpusResult:
     flat_interval: Interval | None
     #: Against the declared two-line rule.
     rhythm_interval: Interval | None
+    #: Against the post-hoc persistence rival. Beside the verdict, never inside it.
+    persistence_interval: Interval | None
     #: Rows, the optimistic bound. Reported for the ladder, never for a claim.
     row_interval: Interval | None
+    #: The pooled test rows split by whether the previous hour held a visit, and the
+    #: model's and the bar's Brier on each half. **Post-hoc**, and reported as a candidate
+    #: for a future pre-registration rather than as a finding — D104's rule for a question
+    #: the numbers raise but nothing registered in advance.
+    quiet_rows: int
+    quiet_model: float | None
+    quiet_bar: float | None
+    quiet_interval: Interval | None
+    busy_rows: int
     coefficients: tuple[tuple[str, float], ...]
     test_days: int
     largest_day_share: float
@@ -209,6 +256,7 @@ def measure(copy_path: Path, *, view: str) -> CorpusResult:
         extra_models={
             MODEL_NAME: _fitter(rows),
             RHYTHM_RIVAL: _rhythm_fitter(rows),
+            PERSISTENCE_RIVAL: _persistence_fitter(rows),
         },
     )
 
@@ -226,8 +274,27 @@ def measure(copy_path: Path, *, view: str) -> CorpusResult:
         and scores[MODEL_NAME] < scores[BAR_MODEL]
     )
 
+    # The slice, post-hoc: an hour after a quiet hour is where "will you be here?" is a
+    # real question, and an hour mid-session is where it answers itself.
+    quiet = [
+        index
+        for index, label_id in enumerate(result.pooled_label_ids)
+        if not rows[label_id].values["visitsLastHour"]
+    ]
+    quiet_outcomes = tuple(outcomes[index] for index in quiet)
+    quiet_model = tuple(model[index] for index in quiet)
+    quiet_bar = tuple(result.pooled_probabilities[BAR_MODEL][index] for index in quiet)
+    quiet_days = tuple(result.pooled_sessions[index] for index in quiet)
+
     fitted = _fitter(rows)(labels)
     return CorpusResult(
+        quiet_rows=len(quiet),
+        quiet_model=brier_score(quiet_outcomes, quiet_model),
+        quiet_bar=brier_score(quiet_outcomes, quiet_bar),
+        quiet_interval=brier_difference_interval(
+            quiet_outcomes, quiet_model, quiet_bar, subjects=quiet_days, unit="day"
+        ),
+        busy_rows=len(outcomes) - len(quiet),
         name=copy_path.stem,
         events=len(events),
         span_hours=len(examples),
@@ -250,6 +317,13 @@ def measure(copy_path: Path, *, view: str) -> CorpusResult:
             outcomes,
             model,
             result.pooled_probabilities[RHYTHM_RIVAL],
+            subjects=result.pooled_sessions,
+            unit="day",
+        ),
+        persistence_interval=brier_difference_interval(
+            outcomes,
+            model,
+            result.pooled_probabilities[PERSISTENCE_RIVAL],
             subjects=result.pooled_sessions,
             unit="day",
         ),
@@ -281,6 +355,7 @@ def _section(item: CorpusResult) -> str:
         BAR_MODEL: " *(the bar — the per-hour rate)*",
         FLAT_MODEL: " *(a flat rate, not the bar)*",
         RHYTHM_RIVAL: " *(the declared two-line rule)*",
+        PERSISTENCE_RIVAL: " *(post-hoc rival, not the bar)*",
     }
     for model in sorted(item.result.models.values(), key=lambda m: m.brier):
         skill = "reference" if model.skill is None else f"{model.skill:+.3f}"
@@ -307,6 +382,25 @@ def _section(item: CorpusResult) -> str:
                 "is not known: if the true difference is zero, no sample size ever "
                 "excludes it.\n"
             )
+
+    total = len(item.result.pooled_outcomes)
+    if item.quiet_model is None or item.quiet_bar is None:
+        quiet = "No test row followed a quiet hour, so the slice does not exist here."
+    else:
+        quiet = (
+            f"An hour that follows a *busy* hour answers itself — the person is mid-session "
+            f"and the model says so. **{item.busy_rows:,} of {total:,} pooled test rows are "
+            f"that case.** The other **{item.quiet_rows:,}** follow an hour with no visit at "
+            f"all, and that is where *will you be here?* is a real question:\n\n"
+            f"| On the {item.quiet_rows:,} rows after a quiet hour | Brier |\n|---|---:|\n"
+            f"| `{MODEL_NAME}` | {item.quiet_model:.4f} |\n"
+            f"| `{BAR_MODEL}` (the bar) | {item.quiet_bar:.4f} |\n\n"
+            f"{_described(item.quiet_interval)}\n\n"
+            "**Post-hoc, and a candidate rather than a finding.** Nothing registered this "
+            "split in advance, so it is written down the way D104's *after search, where do "
+            "you go* was: the question the numbers raise, for a future pre-registration to "
+            "answer."
+        )
 
     chance = fold_win_probability(item.model_fold_wins, len(item.result.folds))
     fold_line = (
@@ -358,6 +452,22 @@ else. `{MODEL_NAME}` against it, day-clustered:
 
 {_described(item.rhythm_interval)}
 
+#### Isn't this just "were you browsing a minute ago"?
+
+The question `minutesSinceLast` invites, and the one this page would be dishonest without.
+`{PERSISTENCE_RIVAL}` is a two-cell rate table: how often the next hour holds a visit given
+the previous hour did, and given it did not. Same smoothing as the bar.
+`{MODEL_NAME}` against it, day-clustered:
+
+{_described(item.persistence_interval)}
+
+**Added after seeing the coefficients, labelled post-hoc, and it cannot change the verdict** —
+D94 fixed the bar before anything was fitted, and D102 is the entry about exactly this.
+
+#### Where the question is actually a question
+
+{quiet}
+
 #### How the clusters are spread
 
 {concentration}
@@ -396,6 +506,21 @@ def write_report(items: list[CorpusResult], *, out_dir: Path) -> Path:
             "prediction — that this target would not beat the rhythm — is wrong**, and "
             "the entry recording it named it as the one most likely to embarrass."
         )
+        if adoption.quiet_interval is not None and not adoption.quiet_interval.excludes_zero:
+            outcome += (
+                f"\n\n**And almost all of that margin comes from hours whose answer was "
+                f"already obvious.** {adoption.busy_rows:,} of the "
+                f"{len(adoption.result.pooled_outcomes):,} pooled test rows follow an hour "
+                f"that already held a visit — the person is mid-session, and the per-hour "
+                f"rate has no way to know it. On the other "
+                f"{adoption.quiet_rows:,}, where *will you be here?* is a real question, "
+                f"the model **does not separate from the bar**: "
+                f"{adoption.quiet_interval.describe()}. So D94's prediction is wrong on the "
+                "letter and right on the substance — circadian rhythm plus *are you here "
+                "right now* is the whole signal, and the second half is the part that "
+                "answers itself. The adoption rule was fixed before any of this was fitted "
+                "and it fires; this paragraph is why the number is worth less than it looks."
+            )
     else:
         outcome = (
             f"**`{PRESENCE_FEATURE_SET}` does not clear the bar on `{ADOPTION_CORPUS}`.** "
@@ -409,6 +534,11 @@ def write_report(items: list[CorpusResult], *, out_dir: Path) -> Path:
     beat_flat = [item.name for item in items if item.beats_flat]
     beat_rhythm = [
         item.name for item in items if item.brier(MODEL_NAME) < item.brier(RHYTHM_RIVAL)
+    ]
+    beat_persistence = [
+        item.name
+        for item in items
+        if item.brier(MODEL_NAME) < item.brier(PERSISTENCE_RIVAL)
     ]
     bar_beats_flat = [
         item.name for item in items if item.brier(BAR_MODEL) < item.brier(FLAT_MODEL)
@@ -454,6 +584,8 @@ a simple rule matching or beating the fitted model, and in D102 the rule was onl
 - `{MODEL_NAME}` has a lower Brier than the bar (`{BAR_MODEL}`) on: {listed(beat_bar)}
 - It **separates** from a flat rate (`{FLAT_MODEL}`) on: {listed(beat_flat)}
 - It has a lower Brier than the two-line rule (`{RHYTHM_RIVAL}`) on: {listed(beat_rhythm)}
+- It has a lower Brier than the post-hoc persistence rival (`{PERSISTENCE_RIVAL}`) on:
+  {listed(beat_persistence)}
 - The bar itself beats a flat rate on: {listed(bar_beats_flat)} — this is the circadian
   rhythm's own effect size, and it is the reason the bar is what it is.
 
@@ -505,6 +637,11 @@ found empty.
   hold the first and last visit of the corpus by definition.
 - **Retention shapes the span.** Chrome's history file holds nothing before a certain date
   (D64), so the span is what the browser kept, not what the person did.
+- **Hours are UTC**, because every timestamp in this project is (`chrome_history.py`). For a
+  reader in a half-hour offset zone, "hour 14" is not 2pm local — it is a fixed one-hour
+  local window that begins on the half hour. The bar and the model use the same buckets, so
+  nothing here is biased by it, but no hour number on this page should be read as a clock
+  time. A shipped surface would have to bucket in local time.
 - **In-sample weights.** The coefficient table is fitted on everything and is for reading
   which features carry the model, not for scoring it.
 """,

@@ -425,11 +425,32 @@ published as a failure.
     stays the definition. One test deletes the module if it stops being faster
   - Verify: `uv run pytest` ✓ **761 Python**, 356 TypeScript, both linters clean, builds
 
-- [ ] **T-B · `browsing_next_hour`** — "will you be here?"
-  - **Subject is the hour-of-day bucket**, so `category_base_rate` becomes the per-hour rate
-    automatically and needs no new baseline code
-  - **Bar is the rhythm, not a flat rate** — beating a flat rate would be trivial
-  - Cluster unit: calendar day. D94 predicts this one **fails** its bar
+- [x] **T-B · `browsing_next_hour`** · L · deps: D94 — **clears its bar, and 79% of the rows
+      say otherwise** (D111 declared the feature set unrun, D112 recorded the result)
+  - Verify: `uv run python analysis/browsing_next_hour.py` ✓ — 858 Python, 480 TypeScript,
+    both linters clean. Report at `docs/benchmarks/browsing-next-hour.md`
+  - **Edge clears D94's rule: +0.0546 [+0.0383, +0.0724]** day-clustered (n=55), 5 of 5
+    folds. Chrome clears (+0.0190). Firefox separates from **nothing**, not even a flat rate
+  - **D94's prediction 3 is wrong** — the one it named as most likely to embarrass
+  - **And the entire margin is earned on 21% of the rows.** On the 1,014 Edge rows that
+    follow a *quiet* hour — where "will you be here?" is a real question — the model does
+    **not** separate from the bar: −0.0018 [−0.0052, +0.0016]. All of it lives in the 276
+    rows where the person was already mid-session
+  - **`previous_hour`, a two-cell table, beats the 24-cell rhythm on all three corpora** and
+    beats the model on Firefox. Against it the margin collapses +0.0546 → +0.0109. Post-hoc,
+    labelled post-hoc, cannot change the verdict (D102's rule)
+  - **`rhythm_7d`, declared in advance, LOST** — the first time a simple rule has. Seven
+    binary observations per estimate against the bar's ninety days: a noisier rhythm, not a
+    smarter one. Only visible *because* it was declared before the run
+  - **Method note to carry:** D102 said ask a floor whether it can answer every row. This
+    adds — **ask whether the rows a bar is scored over include rows where the question
+    answers itself.** Registering the bar is not enough; the slice has to be registered too
+  - **None of D111's five predictions held cleanly**, one held on Edge only. Base rates
+    16.3% / 13.0% / 11.2% against a predicted 25–45%
+  - **Nothing ships.** `pr_1` is `history` compat and shippable, and is not worth shipping:
+    the surface a person would want is the slice where it does not beat a per-hour rate
+  - New plumbing: `features/presence.py`, `pr_1` in `vector.py`/`prep.py`, and
+    `BacktestResult.pooled_label_ids` so a pooled row can be mapped back to its feature
 
 - [x] **OWED — D88's abstention replacement** · S — **done** (D103)
   - `predict.ts` no longer calls `shouldAnswer`. `abstained` is **always false on new
