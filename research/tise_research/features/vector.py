@@ -215,6 +215,46 @@ def _without_arrival(names: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(name for name in names if name not in ARRIVAL_FEATURES)
 
 
+#: `pr_1` — the first feature set for `browsing_next_hour` (T-B). **Declared before any model
+#: was fitted to it**, and computed from clock hours rather than from a category, so nothing
+#: in `fs_*` or `as_*` applies: those describe a topic, and this target has no topic in it at
+#: all. One row per hour boundary, asking only whether the person will be here.
+#:
+#: D94 fixed T-B's label, subject, cluster unit and bar in advance and left the features
+#: open, so this list is the part that needed declaring, and it is committed unrun.
+#:
+#: **The rhythm has to be in the set.** D94 made the bar the per-hour rate precisely because
+#: a flat rate would be trivial to beat — so a model denied the hour of day could not beat
+#: the bar even in principle, and the test would be rigged rather than hard. `hourSin` and
+#: `hourCos` are the rhythm as a smooth cycle against the bar's 24 independent buckets: the
+#: cyclic pair is the encoding D86 established a plain integer cannot represent, first used
+#: in `bs_1`.
+#:
+#: What the model has that the per-hour bar does not, and the only places it can win:
+#:
+#: * **The week** — `isWeekend`. The bar pools every Tuesday 10am with every Sunday 10am.
+#: * **Right now** — `minutesSinceLast`, `visitsLastHour`, `visitsLastSixHours`. Whether
+#:   the person is *at the machine* is the one fact a rhythm cannot hold, and it is the
+#:   reason this target is worth asking at all.
+#: * **Their own recent rhythm** — `sameHourRate7d`, `activeHourShare7d`. A trailing
+#:   seven-day version of the bar, which moves when a person's routine does. It is the
+#:   feature most likely to make the fitted model redundant rather than better, and it is
+#:   in the set for that reason: if it carries everything, that is the finding.
+#:
+#: All `history` compat class. Unlike `as_2` this needs no dwell and no permission, so it is
+#: shippable the day it clears a bar. **No TypeScript twin yet** — the parity contract binds
+#: features the extension computes, and nothing ships until the target is adopted.
+_PR1: tuple[str, ...] = (
+    "hourSin",
+    "hourCos",
+    "isWeekend",
+    "minutesSinceLast",
+    "visitsLastHour",
+    "visitsLastSixHours",
+    "sameHourRate7d",
+    "activeHourShare7d",
+)
+
 #: `as_1n` / `as_2n` — `as_1` and `as_2` for a corpus with **n**o transition column (D99).
 #: Registered before the replication run and never fitted on Akash's corpora, which do have
 #: the column: mixing them would compare two different models under one name.
@@ -229,6 +269,7 @@ FEATURE_SETS: dict[str, tuple[str, ...]] = {
     "as_2": _AS2,
     "as_1n": _AS1N,
     "as_2n": _AS2N,
+    "pr_1": _PR1,
 }
 
 FEATURE_NAMES: tuple[str, ...] = FEATURE_SETS[DEFAULT_FEATURE_SET]

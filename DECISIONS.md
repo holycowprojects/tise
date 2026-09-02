@@ -5039,3 +5039,105 @@ a real browser, one by deliberately going to look. **The audit cost about an hou
 three. That is a better rate than the screenshots.**
 
 480 TypeScript tests, 831 Python, both linters clean, builds.
+
+### D111 — T-B's feature set, declared and committed unrun
+
+D94 fixed T-B's label, subject, cluster unit, bar and adoption rule before any of it existed.
+**It did not fix the feature set**, and that gap is the one this entry closes. Choosing
+features after seeing what scores is the forking path pre-registration exists to shut, so
+`pr_1` is declared here and the code is committed **before it is run** — the same order D81
+used for `fs_3` and D99 for the replication.
+
+#### The label, restated because the details decide the base rate
+
+One label per clock hour boundary `t`: positive if any visit falls in `[t, t + 1h)`.
+
+**Both boundary hours are excluded.** The first labelled hour of a corpus holds the first
+visit and the last holds the last visit, so each is positive *by where the data was cut*
+rather than by anything the person did. Scoring them would put two free correct answers into
+every corpus.
+
+**An empty hour is a label, not a gap.** It is most of this target — a person sleeps — and
+dropping empty hours is the T19b defect in a new place, where a block nobody browsed vanished
+and lifted every median after it. It is also why D94 made the bar the rhythm: on a target
+where a third of the rows are hours somebody was asleep, beating a constant proves nothing.
+
+**The subject is the hour of day *being predicted*.** That is what makes `category_base_rate`
+the per-hour rate with no new baseline code, which D94 chose the subject for. Keyed on the
+hour Tise stands *in*, the bar would be a rhythm lagged by an hour — a different and weaker
+baseline wearing the same name.
+
+**`session_id` carries the calendar day**, because `run_backtest` clusters on that field and
+D94's unit is the day. A session is meaningless here: a label exists for 3am whether or not
+anyone was awake. Every interval built from it prints `unit="day"`, so the name on the number
+is the thing that was resampled — D86 and D87 are both about a right number under a wrong
+label.
+
+#### `pr_1` — eight features, and where the model is allowed to win
+
+The set **has to contain the rhythm**. The bar *is* the rhythm, so a model denied the hour of
+day could not beat it even in principle, and a test rigged that way is worth nothing in
+either direction. `hourSin`/`hourCos` are the cyclic encoding D86 established a plain integer
+cannot represent, first used in `bs_1`.
+
+What the model has that the per-hour bar does not, and the only three places it can win:
+
+* **The week** — `isWeekend`. The bar pools every Tuesday 10am with every Sunday 10am.
+* **Right now** — `minutesSinceLast`, `visitsLastHour`, `visitsLastSixHours`. Whether the
+  person is *at the machine* is the one fact a rhythm cannot hold, and it is the entire
+  reason this target is worth asking rather than reading off a clock.
+* **Their own recent rhythm** — `sameHourRate7d`, `activeHourShare7d`. A trailing seven-day
+  version of the bar, which moves when a routine does. **This is the feature most likely to
+  make the fitted model redundant rather than better, and it is in the set for that reason:
+  if it carries everything, that is the finding.**
+
+Every scale declared and not fitted (D81); everything unbounded saturated. Only
+`sameHourRate7d` is nullable, and its absence is one of *corpus* rather than of behaviour —
+in a corpus's first day none of the previous seven days was observed, and filling it with
+zero would say the person was reliably absent then, which is the opposite of unknown (D51).
+The visit counts are measured zeros: a quiet hour was counted and found empty.
+
+**All `history` compat class.** Unlike `as_2` this needs no dwell and no permission, so it is
+shippable the day it clears a bar rather than blocked on T-G. **No TypeScript twin** — the
+parity contract binds features the extension computes, and nothing ships until a target is
+adopted. Same position `bs_1` was left in at D91.
+
+#### One rival, declared in advance rather than found afterwards
+
+`rhythm_7d` predicts this hour's trailing seven-day rate directly, with no parameters. It is
+the two-line-rule version of the whole model.
+
+**This is D102's correction, applied.** D92 and D102 both ended with a simple rule matching or
+beating the fitted model, and in D102 `constrained_mode` was only constructed *after* seeing
+the result, so it was labelled post-hoc and could not touch the verdict. Writing this one down
+first means that if it wins, the win counts.
+
+It is **not** the bar. D94 fixed the bar before anything was fitted, and promoting a rival
+afterwards would be choosing the rule from the result.
+
+#### Predictions, recorded now
+
+1. **The model separates from a flat rate on all three corpora**, by day-clustered intervals
+   excluding zero. D94 said this half is easy, which is why it is not the bar.
+2. **It does not clear the bar on Edge.** This is D94's prediction 3 restated so this run
+   scores it automatically. D94 also named it as the prediction most likely to embarrass.
+3. **`rhythm_7d` is not distinguishable from the fitted model on any corpus.** That would be
+   the fifth time a model-versus-simple-rule comparison came back not distinguishable (D80,
+   D92, D102, D109's scorecard, this) — and the consistency has become the project's most
+   replicated finding.
+4. **`minutesSinceLast` is the largest single coefficient, larger than either hour term.**
+   This is the risky one. If the rhythm terms dominate, the target is a clock and the model is
+   decoration; if recency dominates, the model is measuring presence and the interesting
+   question is why that is not enough to clear the bar.
+5. **The base rate lands between 25% and 45% on every corpus.** A sanity check on the span
+   rather than a claim: much higher and empty hours are being dropped somewhere.
+
+#### What this cannot decide
+
+T-B is not a route around D94's stopping rule. **T-A already separated**, so the rule is not
+triggered either way, and a T-B failure is published as a failure exactly as D92 and D102's
+were. Nothing here changes what Tise ships: the extension trains `return_24h` and shows a
+descriptive card.
+
+25 tests, and the leakage guard was broken deliberately once — widening the count window past
+the boundary — and confirmed failing before it was reverted.

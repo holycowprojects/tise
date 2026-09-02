@@ -100,6 +100,17 @@ NULLABLE_BY_SET: dict[str, tuple[str, ...]] = {
     # is one rename away from being wrong.
     "as_1n": (),
     "as_2n": ("domainDwellLevel", "prevDwellRatio"),
+    # `pr_1` has exactly one legitimate absence, and it is an absence of *corpus*, not of
+    # behaviour: `sameHourRate7d` asks what happened at this clock hour on the previous
+    # seven days, and in the first day of any corpus none of those hours was observed.
+    # Zero would say the person was reliably absent then, which is the opposite of unknown.
+    #
+    # `activeHourShare7d` is deliberately **not** nullable even though it uses the same
+    # clamp: a boundary is only labelled once it is at least an hour past the corpus start,
+    # so its window always holds at least one observed hour and the share is always a
+    # measurement. The two features differ here because one looks back in days and the
+    # other in hours, and only the first can find nothing.
+    "pr_1": ("sameHourRate7d",),
 }
 
 NULLABLE_FEATURES: tuple[str, ...] = NULLABLE_BY_SET[DEFAULT_FEATURE_SET]
