@@ -1,5 +1,31 @@
 # Tise V1 — Task List
 
+## ▶ RESUME HERE — 2026-09-02, end of day
+
+**Clean tree at `6f5bcb7`. 893 Python + 509 TypeScript, both linters clean, builds.**
+DECISIONS.md at 114 entries. Nothing half-finished; nothing owed from Claude.
+
+**Tomorrow, in order: T17 (CI) → T18 (Web Store prep) → Checkpoint E.** T17 is small and is
+the only thing between here and T18 — GitHub Actions running both suites, both linters and
+the build, **with the parity suite blocking**, which it has never been. No decision needed;
+just do it.
+
+**Research is closed.** T-A adopted (D97) and replicated (D100); T-B (D112) and T-C (D102)
+cleared their bars and both entries explain why that is worth less than it sounds; T-E and
+T-F measured and closed (D113); `return_24h` and `block_volume` retired. Only **T10b**
+remains available, and D89 already measured that its planned mechanism finds nothing — it
+needs a new idea, not an implementation.
+
+**Blocked on data, not on work:** T-G4 (live spans), T-D (unmeasurable offline, accumulates
+from live collection only), the import-vs-live offset check (~14 days of live collection).
+
+**Owed by Akash, and nothing else is:** install on a fresh profile (T15's own verification);
+a fresh export; the GESIS permission reply into `docs/gesis-permission-request.md`; and the
+four Web Store items (privacy URL, `privacy@holycowstudios.in`, developer account, icons at
+16/32/48/128px).
+
+---
+
 Full detail in [`plan.md`](plan.md). Spec in [`../SPEC.md`](../SPEC.md).
 
 Tick a task only when its verification commands pass. Each task leaves the repository
