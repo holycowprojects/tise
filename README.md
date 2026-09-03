@@ -1,14 +1,88 @@
 # Tise
 
-**Status: working, not yet released.** The extension builds, collects, trains and predicts
-on a real profile. It is not on the Chrome Web Store, and the prediction target changed in
-August 2026 — see [Where this is](#where-this-is).
+[![CI](https://github.com/holycowprojects/tise/actions/workflows/ci.yml/badge.svg)](https://github.com/holycowprojects/tise/actions/workflows/ci.yml)
 
-A privacy-first personal behavioural forecasting system. Tise learns patterns from your own
-browsing, predicts what you are likely to do next, shows you the evidence behind every
-prediction, and then measures whether it was right.
+**A Chrome extension that learns your browsing habits and tells you what it has noticed —
+entirely on your own computer.**
 
-Everything runs on your machine. Nothing is transmitted anywhere.
+There is no account, no server, and no company receiving your data. The learning happens
+inside your browser, on your laptop, and the answers stay there.
+
+**Status: working, not yet released.** Not on the Chrome Web Store yet.
+
+---
+
+## What it actually records
+
+Most software says "we respect your privacy". Here is exactly what that means, so you can
+check it rather than trust it.
+
+When you visit `youtube.com/watch?v=abc123`, Tise writes down **`youtube.com`** and the time.
+
+That is all. It never stores the page address, what you searched for, what you read, what
+you typed, your passwords or your cookies. Not "encrypted" — **not stored at all.** The rest
+of the address is discarded before Tise writes anything down.
+
+So what Tise knows about you is roughly *"video, 9:15pm on a Tuesday, arrived from a link"*.
+Repeated a few thousand times that is enough to see patterns, and not enough to know what
+you were actually doing.
+
+## What it shows you
+
+Your own habits, counted honestly:
+
+- **What tends to follow what** — *"after shopping you usually go to search"*, with the
+  number of times that has actually happened.
+- **Which topics you really spend time on**, with the real counts underneath.
+- **How much attention a page genuinely held** — not how long a tab sat open, but how long
+  you were actually looking at it.
+- **A scorecard of Tise's own accuracy**, including the times it was wrong.
+
+Every number comes with its denominator. "You do this 70% of the time" means something very
+different at 7 times out of 10 than at 700 out of 1,000, and Tise always says which.
+
+## How it helps you
+
+**Today, it mostly helps you see yourself clearly.** Most people are wrong about their own
+browsing — where the hours go, what they keep returning to, what they only think they read.
+Tise counts it instead of guessing, and it does not flatter you.
+
+The forecasting is real but deliberately slow to arrive. One prediction has genuinely earned
+its place — *will this page hold your attention, or will you leave in ten seconds?* It was
+tested against a standard written down **before** the answer was known, then checked again on
+**1,326 other people's browsing**, where it beat the obvious guess for 88.6% of them
+individually.
+
+**It is not switched on yet.** Tise will not use it on you until it has seen enough of your
+browsing to trust it — a threshold that was also fixed in advance, and that the extension
+shows you the progress towards. Anyone can show you a confident number on the first day. It
+would not mean anything.
+
+## How and when it works
+
+| When | What happens |
+|---|---|
+| **You install it** | A page explains what will and will not be recorded. **Nothing is stored until you agree** — the database is genuinely empty, not merely unused. |
+| **You agree** | It offers to read your existing Chrome history so it is not starting from nothing. Optional, and you can decline. |
+| **Every day, invisibly** | It notes the topic and time of pages you visit, and how long you actually looked. No pop-ups, no interruptions. |
+| **Every few hours** | It re-learns from what it now knows, in small pieces so your browser never slows down. |
+| **When you open it** | The counts, the patterns, and how far along the predictions are. |
+| **After 30 days** | Raw records are deleted automatically. Change that, keep everything forever, or delete the lot — all in the settings. |
+
+You can export everything at any time as a readable file. It is your data, in a form you can
+actually open and read.
+
+## Why this is unusual
+
+Most tools that claim to predict things show you a confident number and never tell you
+whether it was right.
+
+Tise **writes down what it expects before it measures**, keeps the score, and publishes the
+failures beside the successes. Four prediction ideas have been tested on real browsing and
+**two were thrown away** — because a simple counting rule beat the clever model. Both are
+written up in public, in detail, rather than quietly dropped.
+
+That honesty is the point of the project.
 
 ---
 
