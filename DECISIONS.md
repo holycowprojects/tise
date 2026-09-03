@@ -5596,3 +5596,107 @@ badge — deliberately not written yet, because a badge URL guessed at a reposit
 not exist is the hand-typed claim about a system that moved, which D114 is entirely about.
 
 908 Python tests, 509 TypeScript, both linters clean, builds.
+
+---
+
+### D116 — T-G4: the gate is measurable for the first time, and it does not pass
+
+The first export carrying real attention arrived. T-G's gate has been *"enough live spans to
+train on — not a date, a count"* since D96, and the count was never fixed. It is fixed now,
+and this entry is mostly about where it came from, because that is the part that could
+easily have gone wrong.
+
+#### The gate is D99's, and choosing it today would have been the failure
+
+D99 declared an eligibility rule before the D100 replication ran: **at least 1,000 visits, 20
+sessions and 200 labels** for one person to be worth fitting this model on. It was declared
+on 2,148 strangers, months before this profile recorded a single span, and **822 of those
+people were excluded by it**.
+
+Reusing it means the threshold this profile is measured against was chosen by someone who
+could not have seen this profile's numbers. Inventing a fresh one now, with the answer
+already on screen, is precisely what pre-registration exists to stop — and it would have been
+easy, because the honest-sounding version ("enough to train on") has no defence against being
+quietly set at whatever today happens to be.
+
+`analysis/engagement_gate.py` **fits nothing**. It counts and stops, which is D88's rule for a
+data-sufficiency gate: measured from quantities that carry no score information, so there is
+nothing available to bias it with. Every number it prints would be identical if the model did
+not exist.
+
+#### Two translations, both of which would have passed a criterion that should fail
+
+The rule was written for a corpus where **every** visit carries a duration. This profile is
+not that, and the two places the difference hides are named in both mirrors:
+
+* **Visits means dwell-carrying visits.** Imported history has no dwell and never will (D35,
+  the duration trap). Counting all 3,918 stored events would clear a 1,000-visit bar on data
+  that cannot answer the question. The honest count is **192**.
+* **Sessions means sessions holding a label.** The bootstrap clusters on sessions and a
+  cluster with no rows in it is not a cluster. All sessions is **107**; sessions holding a
+  label is **18**.
+
+Both looser readings pass. Both are wrong. Neither would have looked wrong in a report.
+
+#### Where the profile stands
+
+```
+  no    dwell-carrying visits         192 / 1,000   (19%)
+  no    sessions holding a label       18 / 20      (90%)
+  no    labels                        134 / 200     (67%)
+```
+
+**The gate does not pass on any of the three.** At 49 dwell-carrying visits a day over the
+3.9 days attention has been collected, the binding criterion is about **16 days** away.
+Labels are deliberately *not* projected: they arrive faster than linearly while categories
+are still crossing their ten-visit threshold, and a straight line through that is a forecast,
+not a count.
+
+The composition is the more interesting half. Of 134 labels, 53 are `unknown` — excluded from
+headlines by D27 — and of the 81 that remain, **75 are `search`**. **93% of the usable labels
+are one category.** A model trained on this would be a model about one topic wearing the name
+of a general one, and no count-based gate would have said so; only looking at the split does.
+
+#### A correction, because it changed the conclusion
+
+The first reading of this export reported "six categories clear ten dwelled visits" and
+treated the gate as met. That counted **spans**, not visits. There are 367 spans across 192
+visits — 1.9 each, because a revisited page opens a new span and D96 sums them deliberately.
+Per *visit*, only `search` (85) and `unknown` (63) exceed ten; `travel` has 15 and `learning`
+11, and everything else is under ten and produces nothing at all.
+
+The corrected count is what the labeller actually consumes, and it moves the answer from
+"ready" to "19% of the way there". Recorded because a gate that was reported as passing on a
+miscount is the same defect as one that was set after seeing the data.
+
+#### What was built, and the one thing deliberately not built
+
+`src/model/engagement.ts` computes the same gate **in the extension**, over the real store.
+Not for convenience. D101: attention collection shipped gated on a permission Chrome never
+grants at install, the span store stayed empty for two days, every note described collection
+as running, and the count that would have exposed it existed nowhere a person could see. **A
+gate whose progress is invisible is indistinguishable from a gate that is broken.**
+
+It also means the label path is *exercised*. `attachDwell` and `attentionExamples` now run
+every time the popup opens, weeks before anything is trained on their output. Both languages
+were run over the same real export and agree exactly — **192 / 18 / 134**, and the same
+per-category split — which is a stronger check than the fixture, because the fixture was
+built to be agreed on.
+
+**The popup was lying, in the same way the popup was lying at D114.** *"Predictions need
+roughly ten measured visits per topic before they begin"* shipped in D101. Ten per topic is
+when a **label** becomes possible; it says nothing about when a model may be trusted, and it
+was wrong by more than an order of magnitude. It is derived from the gate now, and
+`engagement.test.ts` reads the Python constants and fails if the two sides drift — verified
+by lowering `MIN_LABELS` on one side, which failed 2 of 10.
+
+**Training and prediction were not built.** They are the rest of T-G4 and they stay unbuilt
+on purpose. The gate is at 19% of its binding criterion, so a training path written today
+could not run against real data for a fortnight — and a path that cannot be exercised until
+the day it matters, while every record describes it as ready, is D101 exactly. The gate is
+the part that can be watched working today, so the gate is the part that shipped.
+
+**T-G4 is not done.** It is gated, by a rule fixed before the data existed, on a count that
+is now measured, visible on the device, and roughly two weeks out.
+
+917 Python tests, 519 TypeScript, both linters clean, builds.

@@ -27,6 +27,7 @@ import { currentCategory, nextCategoryCard } from "../../src/model/nextCategory"
 import { isCollecting, loadSettings, saveSettings } from "../../src/storage/settings";
 import { countLabels } from "../../src/storage/labels";
 import { allSpans } from "../../src/storage/spans";
+import { engagementGate, gateSentence } from "../../src/model/engagement";
 import {
   isStaleModel,
   readJob,
@@ -111,11 +112,22 @@ async function renderAttention(consented: boolean): Promise<void> {
         "look at, so browse for a minute and reopen this.";
     } else {
       const total = spans.reduce((sum, span) => sum + span.activeSeconds, 0);
+      // The gate is computed rather than described. The sentence this replaced —
+      // "Predictions need roughly ten measured visits per topic before they begin" — was
+      // written by hand in D101 and wrong by more than an order of magnitude: ten per topic
+      // is when a *label* becomes possible, not when a model may be trusted. D99's rule is
+      // 1,000 visits, 20 sittings and 200 labels, and now this line reads it.
+      const settings = await loadSettings();
+      const gate = engagementGate(
+        await allEvents(),
+        spans,
+        settings.sessionTimeoutSeconds,
+      );
       detail.textContent =
         `${spans.length.toLocaleString()} span${spans.length === 1 ? "" : "s"} over ` +
         `${pages.toLocaleString()} page${pages === 1 ? "" : "s"}, ` +
         `${Math.round(total / 60).toLocaleString()} minutes of attention. ` +
-        "Predictions need roughly ten measured visits per topic before they begin.";
+        gateSentence(gate);
     }
     button.hidden = true;
     return;

@@ -66,8 +66,10 @@ export const TARGET_STATUS: readonly TargetStatus[] = [
     note:
       "The one place machine learning has earned its place here. It cleared a bar set " +
       "before it was fitted (D97) and held on 1,326 other people's browsing (D100), " +
-      "beating a constant for 88.6% of them individually. It is not switched on yet: it " +
-      "needs a few weeks of measured attention on this device first.",
+      "beating a constant for 88.6% of them individually. It is not switched on yet, and " +
+      "the rule for when it will be was fixed before any of your attention was measured: " +
+      "1,000 visits Tise actually watched, across 20 sittings, producing 200 labelled " +
+      "visits. The popup shows how far along that is.",
   },
   {
     name: "return_24h",

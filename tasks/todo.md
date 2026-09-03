@@ -22,8 +22,11 @@ T-F measured and closed (D113); `return_24h` and `block_volume` retired. Only **
 remains available, and D89 already measured that its planned mechanism finds nothing — it
 needs a new idea, not an implementation.
 
-**Blocked on data, not on work:** T-G4 (live spans), T-D (unmeasurable offline, accumulates
-from live collection only), the import-vs-live offset check (~14 days of live collection).
+**Blocked on data, not on work:** T-G4 — the gate is now *measured* rather than vague and it
+does not pass (D116): **192/1,000 visits, 18/20 sessions, 134/200 labels**, roughly 16 days
+out at the current rate. Run `uv run python analysis/engagement_gate.py` on any fresh export.
+Also T-D (unmeasurable offline, accumulates from live collection only) and the import-vs-live
+offset check (~14 days of live collection).
 
 **Owed by Akash, and nothing else is:** the GitHub remote, then branch protection and the
 badge (T17); install on a fresh profile (T15's own verification); a fresh export; the GESIS
@@ -402,6 +405,29 @@ published as a failure.
   - **Gate: enough live spans to train on.** Not a date — a count, measured from the store.
     Until then the extension keeps training `return_24h` and keeps showing nothing
   - The import-vs-live offset check below becomes due in the same window
+  - **T-G4 · The gate, measured — D116.** The count is fixed and **it does not pass**:
+    `uv run python analysis/engagement_gate.py` → **192/1,000 visits, 18/20 sessions,
+    134/200 labels**. ~**16 days** at 49 dwell-carrying visits a day
+    - **The rule is D99's**, declared before the D100 replication on 2,148 strangers and
+      excluding 822 of them. Choosing one today, with the answer on screen, is the failure
+      pre-registration exists to stop. The script **fits nothing** — D88's rule
+    - **Two translations that would each have passed a criterion that should fail**: visits
+      means *dwell-carrying* visits (192, not 3,918 — imported history has no dwell, D35);
+      sessions means sessions *holding a label* (18, not 107)
+    - **93% of the usable labels are one category.** 53 of 134 are `unknown` (D27 excludes
+      them); 75 of the remaining 81 are `search`. No count-based gate would say this
+    - **A correction that changed the answer**: the first reading counted *spans* (367) as
+      visits (192) and reported the gate as met. 1.9 spans per visit, because D96 sums a
+      revisited page's spans deliberately
+    - **`src/model/engagement.ts` computes the same gate in the extension**, and both
+      languages agree exactly on the real export — 192/18/134 and the same split. Not for
+      convenience: D101 is what happens when a gate's progress is invisible. It also means
+      `attachDwell` + `attentionExamples` run on every popup open, weeks before training
+    - **The popup was lying again** (cf. D114): *"roughly ten measured visits per topic"*
+      shipped in D101 and is wrong by an order of magnitude. Derived now, and
+      `engagement.test.ts` reads the Python constants — broken deliberately, 2 of 10 failed
+    - **Training and prediction deliberately NOT built.** A path that cannot be exercised
+      until the day it matters, while the records call it ready, is D101 exactly
 
 - [x] **T-H · Does `visit_engaged` replicate on other people?** · L — **YES (D100).**
       **+0.0091 [+0.0086, +0.0097]** over **1,326 panelists**; the model beats a constant for
