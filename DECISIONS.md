@@ -5852,3 +5852,41 @@ that plants one to prove the scanner matches. *No screenshot* is now the same ki
 enforced by something that fails, not by remembering.
 
 932 Python tests, 524 TypeScript, both linters clean, builds with the icons in `dist/`.
+
+---
+
+### D119 — The published identity: one address, in all 81 commits, decided before the first push
+
+Akash, 2026-09-03: the repository goes public, private first to watch CI go green once, and
+the commits carry **`office@holycowstudios.in`**.
+
+Every commit permanently records an author and a committer. All 81 carried
+`Akash <akashnavet@outlook.com>`, which on a public repository is a personal address in
+machine-readable form — scraped for spam, and the project's default contact route forever.
+
+**Why it had to be settled before the first push and not after.** The address is an input to
+each commit's hash. Rewriting 81 commits costs seventy seconds today; after publication,
+clones and forks keep the old one regardless of what this repository later says. It is one
+of the few decisions here that is genuinely irreversible in one direction only.
+
+`office@holycowstudios.in` rather than a GitHub noreply address, because Tise is a showcase
+for Holy Cow Studios and the Web Store developer account goes under the company identity
+(D13). A company address makes the repository, the listing and the privacy policy agree, and
+it keeps the project contactable — a noreply address is more private and closes the only
+route a reader has to ask a question.
+
+The author name was set to **Akash Navet** in the same pass, matching the LICENSE (D47).
+`Akash` alone was what git happened to be configured with.
+
+**One step is owed on GitHub's side and it is not cosmetic**: `office@holycowstudios.in`
+has to be added and verified on the account. GitHub links a commit to a profile by matching
+its email against the account's verified addresses, so without it all 81 commits render as
+an unlinked name with no avatar and count toward nothing. *Keep my email addresses private*
+and *Block command line pushes that expose my email* belong in the same visit — the second
+is a hard stop against a future commit carrying the personal address again, which is exactly
+the kind of thing that comes back after being fixed once.
+
+Local git config in this repository now carries the same identity, so no future commit has
+to remember.
+
+932 Python tests, 524 TypeScript, both linters clean, builds.
