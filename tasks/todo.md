@@ -1171,9 +1171,16 @@ published as a failure.
       TypeScript-7 one closed as unmergeable — `typescript-eslint` caps TS at `<6.1.0` in
       its newest release, so `npm ci` cannot resolve, and majors are now ignored with the
       revisit condition written next to the rule
-- [ ] **Flip it public**, when ready — Settings → General → Danger Zone
+- [ ] **Flip it public — no later than Web Store submission** (D122). Akash: public once the
+      full product is ready. Private today makes nothing untrue, because nothing is listed.
+      **But `docs/privacy-policy.md` says "You can read the source. Tise is open source"**,
+      in the present tense, and that is the sentence turning "trust us" into "go and check".
+      Listing the extension while the repository is private makes it false to every reader,
+      about the claim they would most want to verify. **Submission is the deadline**
 - [ ] **Branch protection on `main`**, and secret scanning + push protection. Repository
-      settings, not workflow files. **Deferred by Akash 2026-09-03** ("wait for this").
+      settings, not workflow files. **Deferred by Akash 2026-09-03** ("wait for this"), and
+      on a private single-contributor repo the exposure is close to nil — it stops being
+      nil the moment someone else can fork or open a PR, which is the same moment as above.
       Worth knowing when it is revisited: required status checks end direct pushes to
       `main` even without "require pull requests", because a freshly pushed commit has no
       check results yet. The real choice is *everything via a PR* or *nothing enforced*

@@ -6069,3 +6069,44 @@ after. Nothing here is implemented and nothing should be until the bar above has
 being read again.
 
 939 Python tests, 524 TypeScript.
+
+---
+
+### D122 — The repository stays private until the product is ready, which ties it to submission
+
+Akash, 2026-09-03: *"We would make repo public once full product is ready."*
+
+Sound, and it costs nothing that has already been done. The work that had to happen before
+the **first push** — purging screenshots from all 81 commits (D118), settling the published
+identity (D119) — is unaffected: those were irreversible only once the repository left this
+machine, and it has left it, privately. Nothing was premature.
+
+**But repository visibility and Web Store submission are not independent, and the coupling
+runs through the privacy policy.** `docs/privacy-policy.md` says:
+
+> You can read the source. Tise is open source, and the code that would have to exist for
+> data to be transmitted does not exist — its absence is enforced by an automated test that
+> fails the build if anyone adds it.
+
+That sentence is the load-bearing one in the whole document. Everything else in the policy is
+a promise; this is the part that turns "trust us" into "go and check". **If the repository is
+private when the extension is listed, it is false to every person who reads the policy** —
+and false about precisely the claim they would most want to verify.
+
+`SPEC.md` carries the same assumption in its success criteria ("a public repository someone
+can read and believe") and in its opening description. Those are goals rather than statements
+of current fact, so they are not yet wrong; the privacy policy is written in the present tense
+and would be.
+
+**So the constraint is: public no later than Web Store submission.** Not before, if the
+product is not ready — the repository being private today makes nothing untrue, because
+nothing is listed and nobody has been told to go and read anything.
+
+The alternative is to ship with a private repository and rewrite that paragraph. It is
+available and it is worse: the privacy argument would rest entirely on assertion, in a product
+whose entire pitch is that its claims can be checked. Recorded so that the choice is made
+deliberately if it is ever made at all, rather than discovered during a listing review.
+
+**Branch protection moves with it.** Deferred by Akash today, and on a private
+single-contributor repository the exposure is close to nil. The moment it stops being close
+to nil is the moment someone else can fork or open a pull request, which is the same moment.
