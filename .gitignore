@@ -77,6 +77,11 @@ node_modules/
 extension/dist/
 *.zip
 
+# CI scratch — the parity-count steps in .github/workflows/ci.yml write these, and they
+# are as reproducible as the suite that produces them.
+extension/parity.json
+parity-collected.txt
+
 # Editors and OS
 .vscode/
 .idea/

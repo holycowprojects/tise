@@ -1,0 +1,38 @@
+# Dependency advisories, without adding a dependency to check for dependencies.
+#
+# `pip-audit` and friends would each be a new package in a project whose shipped
+# dependency list is one entry long. Dependabot runs on GitHub's side, sees the same
+# advisory database, and opens a pull request that CI then has to pass — which is the
+# behaviour actually wanted: an advisory should arrive as a reviewable change, not as a
+# red build on work that has nothing to do with it.
+#
+# Weekly, not daily. This is a solo project with bursty sessions (D4); a daily cadence
+# produces a queue nobody reads, and an unread queue is worse than none because it looks
+# like coverage.
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /extension
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # One pull request for the toolchain rather than six. vite, vitest, esbuild and the
+      # typescript-eslint packages move together and are worth reviewing together.
+      dev-tooling:
+        dependency-type: development
+
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # The actions in ci.yml are third-party code that runs with a checkout of this
+    # repository. They are pinned to major versions, which is a compromise: a tag can be
+    # moved, a commit SHA cannot. Worth revisiting if this repository ever holds a secret.

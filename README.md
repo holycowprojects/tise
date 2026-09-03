@@ -118,6 +118,7 @@ research/    Python research tier — features mirrored, backtests, calibration,
 analysis/    One-off measurement scripts that write the benchmark reports
 docs/        Benchmarks, design history, privacy policy draft
 tasks/       Plan and task list
+.github/     Continuous integration and dependency updates
 data/        Local data — never committed
 ```
 
@@ -128,6 +129,26 @@ the same mechanism. There is no service to run.
 Features are implemented **twice** — TypeScript for the product, Python for research — and a
 parity suite asserts the two agree to 1e-9 against a committed oracle. Without it, every
 published benchmark could describe a model that was never shipped.
+
+## Checks
+
+```
+uv run pytest             Research suite
+uv run pytest -m parity   The parity suite — TypeScript and Python must agree
+uv run ruff check .
+npm test                  Extension suite, from extension/
+npm run lint
+npm run build             Typechecks and produces the loadable unpacked extension
+```
+
+All of it runs on every push and pull request, and the parity suite runs a second time on
+its own **against a committed floor on how many tests it contains**. A green suite proves
+the tests that ran passed; it does not prove the parity tests were among them, and deleting
+one is the quietest way to make a parity failure stop happening.
+
+The same job asserts that nothing under `data/`, no history database, no export and no
+credential-shaped string is tracked by git — `git ls-files` being the truth about what would
+be published, where `.gitignore` is only a prediction about it.
 
 ## Documents
 

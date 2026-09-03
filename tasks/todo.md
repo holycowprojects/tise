@@ -1,14 +1,20 @@
 # Tise V1 — Task List
 
-## ▶ RESUME HERE — 2026-09-02, end of day
+## ▶ RESUME HERE — 2026-09-03
 
-**Clean tree at `6f5bcb7`. 893 Python + 509 TypeScript, both linters clean, builds.**
-DECISIONS.md at 114 entries. Nothing half-finished; nothing owed from Claude.
+**908 Python + 509 TypeScript, both linters clean, builds.** DECISIONS.md at 115 entries.
+Nothing half-finished; nothing owed from Claude.
 
-**Tomorrow, in order: T17 (CI) → T18 (Web Store prep) → Checkpoint E.** T17 is small and is
-the only thing between here and T18 — GitHub Actions running both suites, both linters and
-the build, **with the parity suite blocking**, which it has never been. No decision needed;
-just do it.
+**Next: T18 (Web Store prep) → Checkpoint E.** T17 is done (D115) — both suites, both
+linters and the build on push and pull request, with the parity suite blocking and counted
+against a floor, plus a `git ls-files` guard on everything invariant 5 forbids.
+
+**T17's last mile needs the repository to exist.** There is no git remote. Every command in
+the workflow was run locally in the order the workflow runs them, and the deliberate breaks
+were confirmed; what is unproven is that GitHub runs them. Push, then: branch protection on
+`main` requiring both jobs, secret scanning and push protection on, and the README badge —
+left unwritten on purpose, because a badge URL guessed at a repository that does not exist
+is exactly the hand-typed claim D114 is about. **Give me the owner/repo and it is one line.**
 
 **Research is closed.** T-A adopted (D97) and replicated (D100); T-B (D112) and T-C (D102)
 cleared their bars and both entries explain why that is worth less than it sounds; T-E and
@@ -19,10 +25,10 @@ needs a new idea, not an implementation.
 **Blocked on data, not on work:** T-G4 (live spans), T-D (unmeasurable offline, accumulates
 from live collection only), the import-vs-live offset check (~14 days of live collection).
 
-**Owed by Akash, and nothing else is:** install on a fresh profile (T15's own verification);
-a fresh export; the GESIS permission reply into `docs/gesis-permission-request.md`; and the
-four Web Store items (privacy URL, `privacy@holycowstudios.in`, developer account, icons at
-16/32/48/128px).
+**Owed by Akash, and nothing else is:** the GitHub remote, then branch protection and the
+badge (T17); install on a fresh profile (T15's own verification); a fresh export; the GESIS
+permission reply into `docs/gesis-permission-request.md`; and the four Web Store items
+(privacy URL, `privacy@holycowstudios.in`, developer account, icons at 16/32/48/128px).
 
 ---
 
@@ -1068,9 +1074,43 @@ published as a failure.
     bug still could not fail, because its extra hop was itself visible. Both closed;
     counting break failures caught both
 
-- [ ] **T17 · CI** · S · deps: T10
-  - Both suites on push/PR; parity failure blocks; secret scanning + dependency audit
-  - Verify: a PR with a deliberate parity break is blocked
+- [x] **T17 · CI** · S · deps: T10 — **done** (D115)
+  - Verify: every workflow command run locally in order — `uv lock --check` ✓,
+    `uv run ruff check .` ✓, `uv run pytest -q` ✓ 908, parity floor ✓ 18, `npm run lint` ✓,
+    `npm test` ✓ 509, parity floor ✓ 57 / 0 skipped, `npm run build` ✓,
+    `npm audit --omit=dev --audit-level=high` ✓ 0 vulnerabilities
+  - **`.github/workflows/ci.yml`** — two jobs, ubuntu-latest, `permissions: contents: read`,
+    `TZ: UTC` stated rather than inherited. Ubuntu only on purpose: Windows is where this is
+    developed and the suites run there daily; Linux is what nothing has ever checked
+  - **The parity suite runs a second time on its own, against a committed floor** on how
+    many tests it contains. A green suite proves the tests that ran passed, not that the
+    parity tests were among them — and deleting one is the quietest way to make a parity
+    failure stop happening. **Measured**: marking one TypeScript parity test `.skip` leaves
+    `npm test` at `508 passed | 1 skipped (509)`, **exit 0**, while the parity step fails
+  - **Broken deliberately** (the parity contract requires it): `>=` → `>` in
+    `features/recency.ts`'s leakage guard fails 12 of the 57
+  - **`research/tests/test_repository.py`** — the scan this repository actually needs. Not
+    *is it ignored* but **is it tracked**: `git ls-files` is the truth about what would be
+    published, `.gitignore` only a prediction about it (D97's near-miss). Credential shapes
+    too, with a test that plants one to prove the scanner matches. **Both broken
+    deliberately** — a staged `.pem`, and a token planted in README.md
+  - The first draft of that guard flagged the seven loaders under
+    `research/tise_research/data/` — the exact trap `.gitignore`'s own comment warns about.
+    The anchoring now has its own test
+  - **Audits what ships, not what builds.** `npm audit --omit=dev` blocks; the full audit
+    reports and does not block. The five open advisories are all esbuild's dev server via
+    vite, which never ships and which `npm run dev` never starts — clearing them means
+    vite 8. A gate red for a reason nobody can act on teaches people to pass `--force`
+  - **`.github/dependabot.yml`** — npm, pip and github-actions, weekly, dev tooling grouped.
+    Checking for vulnerable dependencies without adding a dependency to do it
+  - **905 in CI, 908 locally.** `TestCoverageAgainstRealBrowsing` is parametrised over
+    `data/history-*.copy` and collects nothing there. T2's criterion is measurable only on
+    Akash's machine, by design
+  - **No formatter.** Prettier would rewrite 67 files, `ruff format` 76. Worth doing, worth
+    its own commit; not one that both adds CI and rewrites the repository
+  - **OWED BY AKASH: there is no remote.** T17's stated verification — a PR with a
+    deliberate parity break is blocked — needs one. Then branch protection on `main`
+    requiring both jobs, secret scanning + push protection on, and the README badge
 
 - [ ] **T18 · Web Store preparation** · M · deps: T15, T16, T17
   - Privacy policy URL, permission justifications, disclosures, company developer account
@@ -1093,3 +1133,8 @@ published as a failure.
 - [ ] Chrome Web Store developer account registered under the company identity (D13) —
       one-time fee, you register and pay it
 - [ ] Icons: 16/32/48/128px. HCS artwork, or a plain mark I generate and you replace
+- [ ] **Create the GitHub repository and push.** There is no remote, so nothing in
+      `.github/workflows/ci.yml` has ever been run by GitHub — only, command for command,
+      locally. Tell me the owner/repo and the README badge is one line
+- [ ] After the first run: branch protection on `main` requiring both CI jobs, and secret
+      scanning + push protection enabled. Both are repository settings, not workflow files

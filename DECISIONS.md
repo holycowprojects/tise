@@ -5477,3 +5477,122 @@ class as the two above, in the smallest possible form. It is derived from state 
 automated half proves the store is empty; only a browser can show the welcome tab opening.
 
 509 TypeScript tests, 893 Python, both linters clean, builds.
+
+---
+
+### D115 — T17: a green suite is not evidence the parity suite ran
+
+CI. Both suites, both linters and the build, on every push and pull request. That part is
+unremarkable and is not what this entry is about.
+
+#### The parity suite has been CI-blocking since T3, in a repository with no CI
+
+`pyproject.toml` has said so in writing since T3: *"parity: TypeScript/Python feature parity.
+CI-blocking from T17."* For fourteen tasks the enforcement was **someone remembering to run
+it**, and it held — the suite has been green every time it was checked. Habit is not a
+control, though. It is a control that happens to be working.
+
+So the obvious workflow would be `npm test` and `uv run pytest`, and the parity tests are
+inside both. That is enough for the failure everyone pictures — a feature drifts, assertions
+fail, the build goes red — and it is not enough for the failure that actually threatens this
+project.
+
+**A green suite proves the tests that ran passed. It does not prove the parity tests were
+among them.** Deselected, skipped or deleted, they leave a build that is green and a claim
+that is unsupported, and the pressure points that way: when a parity test fails, the cheapest
+route to green is to stop asking the question. That is not hypothetical laziness, it is what
+`.skip` is *for*.
+
+Measured, not asserted. Marking one TypeScript parity test `.skip`:
+
+* `npm test` — **`508 passed | 1 skipped (509)`, exit 0.** Green. The count is even printed,
+  in yellow, and it is the sort of thing a person scrolls past on a passing build.
+* The parity step — **fails**, because it reads the run's own report and refuses a non-zero
+  skip count.
+
+So parity runs a second time as its own step in each language, against a committed floor on
+how many tests it contains: **18 in Python, 57 in TypeScript**. A floor, not a fixture —
+growth is free, and shrinkage has to survive a diff someone reads. The TypeScript step also
+refuses any skipped test outright, which is the standing rule (*never mark a parity test
+`skip` or `xfail`*) enforced for the first time by something other than the rule.
+
+**Broken deliberately**, as the parity contract requires. Relaxing the leakage guard in
+`features/recency.ts` from `>=` to `>` — one character, the difference between filtering
+strictly before `windowEnd` and including it — fails 12 of the 57.
+
+#### "Secret scanning" is the wrong name for what this repository can leak
+
+T17's acceptance criteria say secret scanning, and the generic kind is here because it costs
+nothing: AWS ids, GitHub tokens, private-key headers, and a test that plants one to prove the
+scanner can match. Tise has no credentials, and a repository that never holds a secret is
+exactly the one where a stray token would sit unnoticed, because nobody is looking.
+
+But that is not the exposure. What this repository can leak is **a copy of one person's
+browsing**, and invariant 5 has been enforced by `.gitignore` and by care.
+
+`.gitignore` is a list of patterns someone thought of in advance, and D97 recorded the time
+nobody had: running `analysis/history_shape.py` from `research/` wrote a fresh copy of the
+live Chrome history to `research/data/`, which the anchored `/data/` rule did not cover. It
+was never committed. Nothing except noticing stood in the way.
+
+`test_repository.py` asks the other question. Not *is it ignored* but **is it tracked** —
+because `git ls-files` is the truth about what would be published, where an ignore rule is
+only a prediction about it. Every forbidden shape carries the reason it is forbidden, and it
+runs on every local `uv run pytest`, not only at push, so it bites while the mistake is still
+a working-tree file.
+
+**The first draft of that guard was wrong in the exact way the file it protects warns about.**
+An unanchored `data/` pattern flagged seven source files under `research/tise_research/data/`
+— the Chrome, Firefox and corpus loaders — and the cheapest way to silence that noise is to
+weaken the rule guarding the real directory. `.gitignore` carries a comment about this trap
+because it fell into it once already. The anchoring now has its own test, so the lesson does
+not have to be learnt a third time.
+
+#### Audit what ships, not what builds
+
+`npm audit` reports five advisories, all reaching back to one root: esbuild's development
+server, through vite, through vitest. None of it ships — the extension's `dependencies` is
+one package — and Tise never runs that server: `npm run dev` is `vite build --watch`.
+Clearing them means vite 8, a breaking change to the build.
+
+A gate that is red for a reason nobody can act on is a gate people learn to pass with
+`--force`. So the blocking audit is `--omit=dev`, which is the code that would actually reach
+a browser, and the full audit runs beside it reporting and not blocking. Dependabot handles
+the rest weekly — on GitHub's side, so checking for vulnerable dependencies does not itself
+add a dependency, and an advisory arrives as a pull request that has to pass CI rather than
+as a red build on unrelated work.
+
+#### What CI does not check, stated rather than implied
+
+* **T2's coverage criterion does not run.** `TestCoverageAgainstRealBrowsing` is parametrised
+  over `data/history-*.copy`, which invariant 5 forbids committing, so it collects zero tests
+  there. **908 locally, 905 in CI**, and the gap is exactly that. It is the shape of this
+  project: the strongest evidence is the least publishable.
+* **"Never transmits" is still a source scan**, not a property of the manifest (D114). No
+  permission is needed to call `fetch`. CI runs that scan; it does not upgrade it.
+* **A real install is still owed.** CI can prove the store is empty on a fresh database. Only
+  a browser shows the welcome tab opening.
+
+#### Two things deliberately not done
+
+**No formatter.** Prettier would rewrite 67 files and `ruff format` 76. Adopting one is a
+reasonable decision and it is not this one; folding it in would make a single commit that
+both adds CI and rewrites the repository, and neither half would be reviewable.
+
+**Ubuntu only.** Windows is where this is developed and where the suites run many times a
+day. Linux is the platform nothing has ever checked, and it is where anyone cloning this
+will run it.
+
+#### Owed by Akash
+
+**There is no remote.** T17's stated verification — *a pull request with a deliberate parity
+break is blocked* — needs one, and every command in the workflow has been run locally in the
+order the workflow runs them, with the break confirmed. What remains unproven is that GitHub
+runs them, which is a push away.
+
+With the remote: turn on branch protection for `main` requiring both jobs, turn on secret
+scanning and push protection (repository settings, not a workflow), and the README gets its
+badge — deliberately not written yet, because a badge URL guessed at a repository that does
+not exist is the hand-typed claim about a system that moved, which D114 is entirely about.
+
+908 Python tests, 509 TypeScript, both linters clean, builds.

@@ -1,0 +1,155 @@
+# T17. What has to be true before anything reaches `main`.
+#
+# The suites have been green for eighteen tasks, and nothing except habit made that so.
+# The parity suite in particular — the one this repository calls its most important test —
+# has never been enforced by anything but someone remembering to run it. That is the gap
+# this closes.
+#
+# Two things it does that a default "run the tests" workflow would not:
+#
+#   1. **It counts the parity tests.** A green suite proves the tests that ran passed; it
+#      does not prove the parity tests were among them. Deselected, skipped or deleted,
+#      they leave a build that is green and a claim that is unsupported — and deletion is
+#      the shape the pressure takes, because the way to make a parity failure go away is
+#      to stop asking. So parity runs as its own step against a committed floor.
+#
+#   2. **It audits what ships, not what builds.** `npm audit` flags esbuild through vite,
+#      a development-server advisory in a toolchain that never reaches a user's browser.
+#      Blocking on that trains people to pass `--force`. The blocking audit is
+#      `--omit=dev`; the full one runs alongside it and reports.
+#
+# Ubuntu only, on purpose. Windows is where this is developed and the suites run there
+# many times a day; Linux is the platform nothing has ever checked.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Nothing here writes to the repository, opens an issue, or publishes anything.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Said out loud rather than inherited. Runners are UTC and the development machine is
+  # not; several features bucket by *local* day and take a `tzinfo` explicitly for that
+  # reason (`features/blocks.py`, `data/shape.py`). If a test ever starts depending on the
+  # machine's zone, it should fail here rather than disagree quietly.
+  TZ: UTC
+
+jobs:
+  research:
+    name: Research — Python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      # No `python-version` here: `.python-version` already says 3.12 and uv reads it.
+      # Two places to state one fact is how they come to disagree.
+
+      - name: The lockfile still matches pyproject.toml
+        run: uv lock --check
+
+      - name: Ruff
+        run: uv run ruff check .
+
+      - name: Tests
+        # Three fewer than a local run, and that is correct: `TestCoverageAgainstRealBrowsing`
+        # is parametrised over `data/history-*.copy`, which invariant 5 forbids committing.
+        # T2's acceptance criterion is measurable only on this machine, by design.
+        run: uv run pytest -q
+
+      - name: The parity suite ran, and all of it
+        env:
+          # Raise this when parity tests are added. It is a floor, not a fixture: growth is
+          # free, and shrinkage has to be argued for in a diff someone reads.
+          PARITY_FLOOR: 18
+        run: |
+          uv run pytest -m parity --collect-only -q > parity-collected.txt || true
+          collected=$(grep -c '::' parity-collected.txt || true)
+          echo "parity tests collected: $collected (floor $PARITY_FLOOR)"
+          if [ "$collected" -lt "$PARITY_FLOOR" ]; then
+            echo "::error::Parity tests went missing: $collected collected, floor is $PARITY_FLOOR."
+            echo "::error::Deleting or deselecting a parity test is not a way to make it pass."
+            exit 1
+          fi
+          uv run pytest -m parity -q
+
+  extension:
+    name: Extension — TypeScript
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extension
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Tests
+        run: npm test
+
+      - name: The parity suite ran, and none of it is skipped
+        env:
+          PARITY_FLOOR: 57
+        run: |
+          npx vitest run tests/parity.test.ts --reporter=json --outputFile=parity.json
+          node -e "
+            const fs = require('node:fs');
+            const report = JSON.parse(fs.readFileSync('parity.json', 'utf8'));
+            const floor = Number(process.env.PARITY_FLOOR);
+            console.log(
+              'parity tests: ' + report.numTotalTests + ' total, ' +
+              report.numPassedTests + ' passed, ' + report.numPendingTests + ' skipped ' +
+              '(floor ' + floor + ')'
+            );
+            if (report.numPendingTests > 0) {
+              console.error('::error::A parity test is skipped. Never mark one skip or xfail.');
+              process.exit(1);
+            }
+            if (report.numTotalTests < floor) {
+              console.error(
+                '::error::Parity tests went missing: ' + report.numTotalTests +
+                ' collected, floor is ' + floor + '.'
+              );
+              process.exit(1);
+            }
+          "
+
+      - name: Build
+        # Typechecks both tsconfigs and produces the loadable unpacked extension. A repo
+        # whose tests pass and whose build is broken is not in a shippable state.
+        run: npm run build
+
+      - name: Audit what ships
+        # `dependencies` is one package. This is the audit that would actually reach a
+        # user's browser, so this is the one allowed to block.
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Audit the toolchain, for the record
+        # Reports and does not block. As of T17: five advisories, all reachable only
+        # through esbuild's development server, which this project never runs — `npm run
+        # dev` is `vite build --watch`. Upgrading past them means vite 8, a breaking
+        # change to the build, and that is a decision with a name on it, not a CI reflex.
+        continue-on-error: true
+        run: npm audit
