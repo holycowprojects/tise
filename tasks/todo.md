@@ -1165,8 +1165,15 @@ published as a failure.
       `test_icons.py` asserts regenerating reproduces the committed bytes. **Still owed:
       HCS artwork.** A placeholder that ships is a placeholder forever; swapping it in
       changes no code, since the manifest names the files
-- [ ] **Create the GitHub repository and push.** There is no remote, so nothing in
-      `.github/workflows/ci.yml` has ever been run by GitHub — only, command for command,
-      locally. Tell me the owner/repo and the README badge is one line
-- [ ] After the first run: branch protection on `main` requiring both CI jobs, and secret
-      scanning + push protection enabled. Both are repository settings, not workflow files
+- [x] **GitHub repository created and pushed** — `holycowprojects/tise`, **private**,
+      2026-09-03. Badge in the README. **CI's first run found two real Linux-only bugs,
+      one of them in the parity suite** (D120). Three Dependabot action bumps merged; the
+      TypeScript-7 one closed as unmergeable — `typescript-eslint` caps TS at `<6.1.0` in
+      its newest release, so `npm ci` cannot resolve, and majors are now ignored with the
+      revisit condition written next to the rule
+- [ ] **Flip it public**, when ready — Settings → General → Danger Zone
+- [ ] **Branch protection on `main`**, and secret scanning + push protection. Repository
+      settings, not workflow files. **Deferred by Akash 2026-09-03** ("wait for this").
+      Worth knowing when it is revisited: required status checks end direct pushes to
+      `main` even without "require pull requests", because a freshly pushed commit has no
+      check results yet. The real choice is *everything via a PR* or *nothing enforced*
