@@ -40,7 +40,7 @@ FORBIDDEN_PATHS = (
     (r"\.copy(-wal|-shm)?$", "a copy of a live history database, wherever it landed"),
     (r"tise-export-.*\.json$", "an export is a profile of a person"),
     (r"history-shape-domains-", "a ranked domain list is a profile of a person"),
-    (r"/ss_t[ta]", "verification screenshots taken on a real profile"),
+    (r"(^|/)Screenshots?/", "no screenshot is published, without exception (D118)"),
     (r"\.local\.md$", "local working notes, never published"),
     (r"^\.env|\.key$|\.pem$", "credentials"),
 )
@@ -113,6 +113,44 @@ class TestNothingForbiddenIsTracked:
 
         expression = re.compile(r"^data/")
         assert not [n for n in package if expression.search(n)]
+
+
+#: The only images this repository publishes. Anything else is a screenshot until proven
+#: otherwise, and D118 is what "proven otherwise" cost last time.
+PUBLISHABLE_IMAGES = ("extension/icons/icon16.png", "extension/icons/icon32.png",
+                      "extension/icons/icon48.png", "extension/icons/icon128.png")
+
+IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".heic")
+
+
+class TestTheOnlyPublishedImagesAreTheProductsOwn:
+    """An allow-list of four files, not a pattern.
+
+    `.gitignore` deliberately does **not** ignore `*.png`: the icons are product assets and
+    must ship, and a blanket rule with an exception carved out for them is the same shape
+    that let two screenshots of a live hotel booking into this repository for a fortnight.
+    So the rule lives here instead, where breaking it fails a suite and prints why, rather
+    than in a file whose failure mode is a silently missing icon.
+    """
+
+    def test_every_tracked_image_is_an_icon(self):
+        images = [
+            name
+            for name in _tracked_files()
+            if name.lower().endswith(IMAGE_SUFFIXES)
+        ]
+        unexpected = [name for name in images if name not in PUBLISHABLE_IMAGES]
+        assert not unexpected, (
+            "only Tise's own icons may be published. If this is a screenshot, it belongs "
+            f"outside the repository: {unexpected}"
+        )
+
+    def test_the_icons_themselves_are_still_tracked(self):
+        """The mirror. A guard against publishing images is one bad rule away from an
+        extension that ships with no icon, and `manifest.json` names all four."""
+        tracked = set(_tracked_files())
+        for name in PUBLISHABLE_IMAGES:
+            assert name in tracked, f"{name} is named by the manifest and is not committed"
 
 
 class TestNoCredentialShapedStringIsCommitted:

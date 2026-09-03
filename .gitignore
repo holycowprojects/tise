@@ -14,20 +14,27 @@ CLAUDE.local.md
 *.local.md
 .claude/settings.local.json
 
-# Verification screenshots and exports from real profiles. Kept local by decision: they
-# show browsing domains, and DECISIONS.md cites them by name, so the claims stay traceable
-# without publishing the evidence. The T5 spike screenshots ran on a throwaway profile and
-# are published; those are listed explicitly below.
+# Screenshots. **No screenshot is published, without exception** (Akash, 2026-09-03).
 #
-# The default is DENY. Everything under Screenshots/ is ignored and the published files
-# are re-admitted one by one — the earlier rules named files to exclude, which meant every
-# new screenshot was published unless someone remembered to add a pattern. A T11 export of
-# 5,105 real domains sat untracked-but-publishable under that scheme.
-/Screenshots/**
-!/Screenshots/chrome screenshots/
-!/Screenshots/chrome screenshots/ss_chrome*.png
-!/Screenshots/chrome screenshots/ss_again*.png
-!/Screenshots/chrome screenshots/ss_check*.png
+# The previous scheme ignored the directory and re-admitted eleven "safe" T5 spike files
+# one pattern at a time. Two of them showed a live Booking.com hotel search, one with a
+# full tracking URL in the address bar — in the repository whose headline claim is that no
+# full URL is ever stored. They were judged safe once, by someone looking at them, and the
+# judgement did not survive being looked at again. A rule that needs a person to classify
+# each image correctly fails on the image nobody looked at twice, so there is no
+# allow-list any more.
+#
+# The folder has also been moved out of the repository to `../Tise-evidence/`: a file that
+# is not in the working tree cannot be committed by a mistake in this file (D118).
+#
+# **This deliberately does not ignore `*.png`.** Tise's own icons are product assets and
+# must ship. A blanket rule with an exception for them is the same allow-list shape that
+# failed above, one typo away from an extension with no icon. Screenshots are excluded by
+# *where they are*, and `test_repository.py` fails on any tracked image outside
+# `extension/icons/` — a guard that says so out loud rather than one that silently drops
+# a file.
+Screenshots/
+**/Screenshots/
 
 # Belt and braces, path-independent: an export is a profile of a person wherever it lands.
 # The `/data/` rule above is anchored on purpose — a bare `data/` would swallow the source

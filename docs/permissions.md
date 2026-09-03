@@ -311,21 +311,35 @@ able to re-run them in fifteen minutes rather than take them on trust.
 
 ## Evidence
 
-Screenshots taken during the run, kept so a reader can check the findings rather than
-take them on trust. Every "observed" verdict above traces to one of these.
+Screenshots were taken during the run, and **they are not published** (D118). They are held
+outside this repository. Every "observed" verdict above traces to one of them, and the list
+below says which, so the record stays checkable by anyone with access to the originals even
+though the images are not here.
 
-| File | Shows |
+| Held as | Shows |
 |---|---|
-| `Screenshots/chrome screenshots/ss_chrome1.png` | All five variants loaded, Developer mode |
+| `ss_chrome1.png` | All five variants loaded, Developer mode |
 | `ss_chrome2.png` | **Variant A** — `history` alone yields URLs, 36 events, no hosts |
 | `ss_chrome3.png` | **Variant B** — `webNavigation` alone yields URLs, 26 events. Disproves the host-permission claim |
 | `ss_chrome4.png` | **Variant C** — `webNavigation` + `<all_urls>`, identical 26 events |
 | `ss_chrome5.png` | **Variant D** — proposed set; `alarms` and `offscreen` present and silent |
 | `ss_chrome6.png` | **Variant E before grant** — `chrome.history` absent, 0 events |
 | `ss_chrome7.png` | **Variant E after grant** — `onAdded` fired, listeners re-attached, no reload |
-| `Screenshots/ss_againcheck2.png` | The runtime consent dialog verbatim, with **Deny** focused |
-| `Screenshots/ss_checkgain3.png` | The four `history.search` variations, all 20 rows |
-| `Screenshots/ss_checkagain3.2.png` | Backfill fan-out: 0.7 ms per page, ~0.014 s projected |
+| `ss_againcheck2.png` | The runtime consent dialog verbatim, with **Deny** focused |
+| `ss_checkgain3.png` | The four `history.search` variations, all 20 rows |
+| `ss_checkagain3.2.png` | Backfill fan-out: 0.7 ms per page, ~0.014 s projected |
 
-`VisitItem` appears in three separate screenshots as `id, isLocal, referringVisitId,
-transition, visitId, visitTime` — the duration trap, visible rather than asserted.
+**Why they are not here.** These eleven were classified as safe to publish, because the
+spike ran in a throwaway profile. The *profile* was throwaway; the *browsing* was not.
+`ss_checkgain3.png` and `ss_checkagain3.2.png` are the panel photographed over a live
+Booking.com hotel search, and the first carries a full URL with tracking parameters in the
+address bar — in the repository whose headline claim is that no full URL is ever stored.
+
+Nothing was leaked: there is no remote yet. The finding is about the rule, not the damage.
+A publish-list that depends on someone correctly classifying each image is a rule that
+fails on the image nobody looked at twice, and it had already passed review once.
+
+**The verdicts above do not depend on the images.** Each is reproducible in about fifteen
+minutes from `spike/permissions/`, which is committed, and that is the stronger evidence
+anyway — a screenshot shows what happened once on one machine, and the spike shows it
+happening on yours.

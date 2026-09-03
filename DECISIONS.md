@@ -5770,3 +5770,85 @@ Replacing them changes no code: the manifest names the files, and `generate.py` 
 deleted the day real artwork exists.
 
 930 Python tests, 524 TypeScript, both linters clean, builds with the icons in `dist/`.
+
+---
+
+### D118 — No screenshot is published, and the rule that allowed eleven is the finding
+
+Akash, 2026-09-03: *"no screenshot gets on github. no credential or secret goes on github.
+delete the screenshot folder in tise."*
+
+Eleven screenshots were tracked. They are gone from the working tree, gone from every
+commit, and the folder has been moved out of the repository entirely.
+
+#### The old rule was an allow-list, and it had already passed review
+
+`.gitignore` ignored `Screenshots/**` and re-admitted the eleven T5 spike files one pattern
+at a time. That scheme was itself a fix: an earlier version named files to *exclude*, which
+meant every new screenshot was publishable unless someone remembered to add a pattern, and
+a T11 export of 5,105 real domains once sat untracked-but-publishable under it.
+
+The replacement was better and still wrong, because it kept the same dependency: **a person
+correctly classifying each image.** The eleven were classified as safe on the reasoning that
+the spike ran in a throwaway profile. The *profile* was throwaway. The *browsing* was not.
+
+`ss_checkgain3.png` and `ss_checkagain3.2.png` are the spike panel photographed over a live
+Booking.com hotel search — a named hotel, a destination, a map — and the first carries a
+**full URL with tracking parameters in the address bar**, in the repository whose headline
+claim is that no full URL is ever stored. Nine of the eleven were genuinely fine, which is
+the problem: the rule worked nine times out of eleven and that is not a rule.
+
+**Nothing leaked.** There is no remote yet. The finding is about the rule, not the damage,
+and it was caught by looking rather than by anything failing — the same way D101 and T18b
+surfaced.
+
+#### Moved out of the repository, not merely ignored
+
+The folder now lives at `../Tise-evidence/`. A `.gitignore` entry is a promise that every
+future rule in that file will stay correct; a file that is not in the working tree cannot
+be committed by any mistake in it. The images are kept rather than destroyed because
+`docs/permissions.md` and `DECISIONS.md` cite them by name, and deleting the evidence for a
+published claim to protect it is the wrong trade.
+
+`docs/permissions.md` now says they are held outside the repository, lists what each showed,
+and says why they are not here. It also records the thing that makes their absence cheap:
+**every verdict in that document is reproducible from `spike/permissions/` in about fifteen
+minutes**, which was always the stronger evidence. A screenshot shows what happened once on
+one machine; the spike shows it happening on yours.
+
+#### The rule that replaced it, and the shape it deliberately avoids
+
+`.gitignore` ignores `Screenshots/` and **does not ignore `*.png`.** Tise's own icons (D117)
+are product assets and must ship. A blanket image rule with an exception carved out for them
+would be the identical allow-list shape that just failed — and its failure mode is worse in
+one way: a silently missing icon, where nothing says anything went wrong.
+
+So the rule lives in `test_repository.py` instead, and it is an allow-list of four exact
+paths rather than a pattern:
+
+* **no tracked image except the four icons** — anything else is a screenshot until proven
+  otherwise, and this entry is what "proven otherwise" cost last time;
+* **those four are still tracked** — the mirror, because a guard against publishing images
+  is one bad rule away from an extension that ships with no icon, and `manifest.json` names
+  all four.
+
+A test fails loudly and prints the offending paths. An ignore rule fails by quietly dropping
+a file, which is how the icons would have gone missing.
+
+#### History, purged
+
+The eleven were in all 78 commits, so removing them from `HEAD` would have published them
+anyway on the first push. `git filter-branch` over every ref removes the blobs from history.
+
+Cheap, and checked before doing it rather than after: **no committed file cites a commit
+SHA**, so rewriting every hash costs nothing that this project relies on. A backup tag was
+taken first.
+
+#### The other two instructions were already enforced
+
+*No credential or secret* — `test_repository.py` has scanned every tracked text file for
+AWS ids, GitHub tokens, private-key headers, Slack and Google keys since D115, with a test
+that plants one to prove the scanner matches. *No screenshot* is now the same kind of rule:
+enforced by something that fails, not by remembering.
+
+932 Python tests, 524 TypeScript, both linters clean, builds with the icons in `dist/`.
