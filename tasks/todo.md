@@ -1,40 +1,73 @@
 # Tise V1 — Task List
 
-## ▶ RESUME HERE — 2026-09-03
+## ▶ RESUME HERE — paused 2026-09-03, resuming in a few days
 
-**908 Python + 509 TypeScript, both linters clean, builds.** DECISIONS.md at 115 entries.
-Nothing half-finished; nothing owed from Claude.
+**`holycowprojects/tise`, private. Clean tree, CI green, local and remote in sync.**
+948 Python + 524 TypeScript, both linters clean, builds. DECISIONS.md at **122 entries**.
+Nothing is half-finished and nothing is owed from Claude.
 
-**Next: T18 (Web Store prep) → Checkpoint E.** T17 is done (D115) — both suites, both
-linters and the build on push and pull request, with the parity suite blocking and counted
-against a floor, plus a `git ls-files` guard on everything invariant 5 forbids.
+### First thing on return — one command
 
-**T17's last mile needs the repository to exist.** There is no git remote. Every command in
-the workflow was run locally in the order the workflow runs them, and the deliberate breaks
-were confirmed; what is unproven is that GitHub runs them. Push, then: branch protection on
-`main` requiring both jobs, secret scanning and push protection on, and the README badge —
-left unwritten on purpose, because a badge URL guessed at a repository that does not exist
-is exactly the hand-typed claim D114 is about. **Give me the owner/repo and it is one line.**
+```
+uv run python analysis/engagement_gate.py
+```
 
-**Research is closed.** T-A adopted (D97) and replicated (D100); T-B (D112) and T-C (D102)
-cleared their bars and both entries explain why that is worth less than it sounds; T-E and
-T-F measured and closed (D113); `return_24h` and `block_volume` retired. Only **T10b**
-remains available, and D89 already measured that its planned mechanism finds nothing — it
-needs a new idea, not an implementation.
+It reads the newest export in `data/`. **Ask Akash for a fresh one first** — the current
+export is from 2026-09-03 and the whole point of the pause is that it goes stale. On
+2026-09-03 the gate stood at **192/1,000 visits, 18/20 sittings, 134/200 labels**, about
+**16 days out** at 49 dwell-carrying visits a day. If it passes, T-G4 is unblocked and
+that is the next task. If it does not, the script says by how much.
 
-**Blocked on data, not on work:** T-G4 — the gate is now *measured* rather than vague and it
-does not pass (D116): **192/1,000 visits, 18/20 sessions, 134/200 labels**, roughly 16 days
-out at the current rate. Run `uv run python analysis/engagement_gate.py` on any fresh export.
-Also T-D (unmeasurable offline, accumulates from live collection only) and the import-vs-live
-offset check (~14 days of live collection).
+### The sequence is fully determined — nothing to decide
 
-**Owed by Akash, and nothing else is:** the GitHub remote, then branch protection and the
-badge (T17); install on a fresh profile (T15's own verification); a fresh export; the GESIS
-permission reply into `docs/gesis-permission-request.md`; and three Web Store items
-(privacy URL, `privacy@holycowstudios.in`, developer account). Icons are placeholders now
-(D117) — real HCS artwork drops in without a code change.
+1. **Akash browses** — that is T-G4's gate filling. Fresh export re-checks it
+2. **Ship `visit_engaged`** (T-G4) — attention labels, training, prediction, the UI. The
+   path is deliberately unbuilt until the gate passes (D116, D101)
+3. **Checkpoint E** — the twelve `SPEC.md` criteria. Only #7 is outstanding, and #7 *is*
+   step 2. That is also the definition of "product ready" (D122)
+4. **T18** — packaging, listing copy, permission justifications. Needs Akash's three items
+5. **Repo public** — before listing, never after (D122)
+6. **Submit**
+
+Steps 1–4 are not blocked by visibility; 5–6 cannot start before 3.
+
+### Do not build these yet
+
+- **T10b** — re-registered in **D121** as a prompting problem, not a clustering one. The
+  bar, the ranking rule and the pessimistic counterfactual are all written down and
+  **nothing is implemented on purpose**. Read D121 before touching it; two of its five
+  predictions are marked as already-observed rather than dressed up as predictions
+- **T-G4's training path** — same reason: a path that cannot be exercised until the day it
+  matters, while the records call it ready, is D101 exactly
+
+### Cold-start facts that are not in the code
+
+- **No screenshot is ever committed.** They live outside the repo at
+  `../Tise-evidence/Screenshots/`. Eleven were purged from all 81 commits on 2026-09-03
+  (D118); two showed a live hotel booking with a full tracking URL. `test_repository.py`
+  fails on any tracked image except `extension/icons/icon*.png`
+- **`.gitignore` deliberately does not ignore `*.png`** — the icons must ship, and a
+  blanket rule with an exception is the allow-list shape that failed
+- **Commit identity is set repo-locally**: `Akash Navet <office@holycowstudios.in>` (D119)
+- **CI is Ubuntu-only and it earns that.** Its first run found two Linux-only bugs, one in
+  the parity suite (D120). Windows is covered by daily habit; Linux was not covered at all
+- **Dependabot ignores TypeScript majors** until `typescript-eslint` accepts one — remove
+  the two lines in `.github/dependabot.yml` when `npm view typescript-eslint
+  peerDependencies` admits 7
+- Icons are **placeholders** (D117), generated by a committed script. Real HCS artwork
+  drops in with no code change
+
+### Owed by Akash, and nothing else is
+
+1. **A fresh export**, on return — the one thing that unblocks step 1
+2. **Install on a fresh Chrome profile** — T15's own verification. Use a *second* profile:
+   removing the extension deletes its IndexedDB and restarts T-G4's clock at zero
+3. **Three Web Store items** — publish the privacy-policy section and send the URL; confirm
+   the contact address; register the developer account under the company identity
+4. **The GESIS permission reply** into `docs/gesis-permission-request.md`. Blocks nothing
 
 ---
+
 
 Full detail in [`plan.md`](plan.md). Spec in [`../SPEC.md`](../SPEC.md).
 
