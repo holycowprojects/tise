@@ -50,6 +50,7 @@ Screenshots/
 **/*.copy-wal
 **/*.copy-shm
 **/history-shape-domains-*.md
+**/unknown-domains.md
 **/ss_tt*.png
 **/ss_ta*.png
 

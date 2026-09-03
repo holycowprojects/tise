@@ -5947,3 +5947,125 @@ D115 chose Ubuntu-only on the reasoning that Windows is covered by daily habit a
 what nothing had ever checked. That reasoning is now measured rather than argued.
 
 939 Python tests, 524 TypeScript, both linters clean, builds.
+
+---
+
+### D121 — `unknown` is a head, not a tail: T10b re-registered as asking rather than discovering
+
+T10b has said since D42: *cluster domains by session co-occurrence and time-of-day, name each
+cluster by its most frequent member.* D89 measured that and found **zero clusters at every
+threshold from 0.3 to 0.7**, and concluded the bucket "is a long tail of domains visited once
+or twice".
+
+`analysis/unknown_shape.py` measures the same question on every corpus this project has. It
+**fits nothing** — it counts, and every number would be identical if no model existed, which
+is what lets a bar be set from it (D88).
+
+#### D89's first half holds. Its second half read the wrong column.
+
+The clustering verdict is right and load-bearing: **77 of 121 unknown domains are seen exactly
+once**, and only **8** appear in three or more sessions. A domain seen once has no co-visit
+signal at any threshold, so no amount of tuning reaches it. That is settled, twice now, and
+T10b's stated mechanism is dead.
+
+But "a long tail of domains visited once or twice" describes the **domain count** and not the
+**event mass**, and the two say opposite things about the same data:
+
+```
+  top  1 domains    76.6% of unknown events
+  top  3 domains    80.4%
+  top 10 domains    85.8%
+  seen exactly once   77 of 121 domains (64%)
+```
+
+**One domain is three quarters of `unknown`.** Both facts were in the corpus D89 examined; it
+looked at the tail, found it hopeless, and generalised to the bucket. Recorded as a
+misreading rather than a superseded result, because the measurement was correct and only the
+sentence drawn from it was wrong.
+
+#### It mostly generalises, and the exception is stated rather than buried
+
+| corpus | top-1 | top-10 | seen once |
+|---|---|---|---|
+| live export | **76.6%** | 85.8% | 64% |
+| Chrome (imported) | **58.1%** | 71.5% | 62% |
+| Edge (imported) | **58.4%** | 78.6% | 53% |
+| Firefox (imported) | **13.9%** | 55.7% | 47% |
+
+Three of four corpora have a dominant head. **Firefox does not** — 13.9%, and no domain
+carries the bucket. It is also by far the smallest at 115 unknown events, so it is weak
+evidence either way, and it is here because a table showing only the three that agree would
+be a different claim.
+
+#### The head is institutional, and the privacy design is what put it there
+
+The largest unknown domain on the live profile is the author's own employer. D26 and D88 keep
+employer, school, council and neighbourhood domains **out of the shipped map on purpose**,
+because a published list of workplaces is a profile of the people who work at them.
+
+So the head of `unknown` is not a gap in the map. It is the map behaving as designed, and
+adding those domains would be the privacy violation rather than the fix. **The head can only
+ever be resolved on the device, by the person.** The clustering plan was, in retrospect, an
+attempt to avoid admitting that.
+
+`overrides` and the editor for it shipped in D114. The storage exists, the interface exists,
+the export carries it (D45). What does not exist is anything that tells a person *which*
+domain is costing them — the editor is a blank form, and nobody fills in a blank form.
+
+**So T10b is not a discovery problem. It is a prompting problem.**
+
+---
+
+#### Pre-registration — written before any of the mechanism exists
+
+**The mechanism.** A panel that ranks unknown domains and asks the person to assign the top
+ones to a category. Ranked **by event count**, declared here rather than chosen later: events
+are what the dashboard's "unknown share" means and what a person recognises about their own
+browsing. Dwelled visits are the quantity that produces labels and they rank the head
+differently on this profile, which is exactly why the choice has to be fixed in advance.
+
+**The bar**, all three, measured after the top **3** are answered:
+
+1. `unknown` share of events falls **below 10%**, from 29.9%.
+2. D27-eligible labels rise by **at least 20%**.
+3. The number of categories grows by **no more than the number of prompts answered** — D88's
+   "the goal is shrinking `unknown`, never multiplying categories", as a check rather than an
+   intention.
+
+**Measured at the pessimistic end.** The script brackets the counterfactual rather than
+guessing which category a person would pick: `merged` puts the named domains into an
+established category, where they clear the ten-prior-visit rule at once; `separate` gives each
+its own, starting from zero. **The bar must be met at `separate`.**
+
+**Predicted outcomes, and which of them are honest predictions.**
+
+| # | Prediction | Status |
+|---|---|---|
+| 1 | Unknown event share falls below 10% | **arithmetic, not a prediction** — top-3 is 80.4% |
+| 2 | Named labels rise ≥20% at `separate` | **already observed at +20%**, not independent |
+| 3 | Largest-category share falls below 80% | **already observed at 77%**, not independent |
+| 4 | Categories grow by ≤3 | genuine |
+| 5 | The head is institutional on every corpus that has one | genuine, and the one worth being wrong about |
+
+**Two and three are marked because I ran the counterfactual before writing this bar, and a
+bar drawn at a number already seen is not a bar.** The thresholds are set below the observed
+values on purpose — 20% against 20%, 80% against 77% — so they are slack rather than
+hindsight, and the entry says so instead of presenting five clean predictions.
+
+Prediction 5 is the interesting one. If the head is institutional for everyone, the design
+follows: the public map should never learn these domains, and the prompt is the only correct
+mechanism. If some people's heads are ordinary public sites the map simply missed, then part
+of this is a map-coverage problem and should be fixed there instead.
+
+**A design finding already, worth testing rather than assuming**: routing an answer into an
+*established* category produced more labels than creating a new one, because a new category
+produces nothing until its eleventh dwelled visit. But merging into the *largest* category
+made concentration worse, not better — 95% against today's 93%. Where an answer routes
+changes which half of the bar it helps, and the panel should not quietly default to either.
+
+**Not blocking, and not next.** T-G is two weeks of data away and this changes what those
+labels look like, so the order matters: measure first, prompt second, and re-run the gate
+after. Nothing here is implemented and nothing should be until the bar above has survived
+being read again.
+
+939 Python tests, 524 TypeScript.
