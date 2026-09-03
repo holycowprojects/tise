@@ -5700,3 +5700,73 @@ the part that can be watched working today, so the gate is the part that shipped
 is now measured, visible on the device, and roughly two weeks out.
 
 917 Python tests, 519 TypeScript, both linters clean, builds.
+
+---
+
+### D117 — Icons, generated rather than drawn, and honest about being placeholders
+
+Tise had no icons at all. `extension/icons/` held a `.gitkeep` and the manifest had no
+`icons` key, so Chrome fell back to what it always does — a grey tile with the first letter
+of the name. That is what has been in every screenshot of this project since T5.
+
+Four PNGs is a small thing. Two decisions inside it are not.
+
+#### They are produced by a committed script, not drawn once
+
+Four binaries nobody can regenerate are four binaries nobody can change: the day the accent
+colour moves or a fifth size is wanted, the only options are to redraw by hand or to live
+with the drift. `extension/icons/generate.py` writes them, and `test_icons.py` asserts that
+**regenerating reproduces the committed bytes**.
+
+That is the same guard as `test_parity_fixture.py` and it is here for the same reason.
+Without it the generator becomes a comment: someone opens a PNG in an editor, nudges it,
+and the file on disk and the script that supposedly produces it describe different marks
+with nothing to say so. **Broken deliberately** — one byte flipped in `icon48.png` failed
+the 48 case and nothing else, which is the resolution wanted.
+
+**No new dependency.** Neither toolchain has an image library and this is not a good enough
+reason to add one, so the PNGs are written with `zlib` and `struct` from the standard
+library. Flat shapes, six-by-six supersampling for the edges, deterministic compression
+level so the bytes are stable across runs.
+
+#### The palette is the product's, and a test says so
+
+`#1f6feb` is `--accent` from `ui/popup/popup.html` and the mark is `--bg`. An icon in
+colours nothing else uses is a second brand.
+
+The generator's docstring *claims* that. A claim about a value in another file is exactly
+the kind that stops being true silently, so `test_icons.py` reads `popup.html` and compares.
+**Broken deliberately**: changing the accent by one hex digit failed 5 of 13 — the palette
+pin, and all four regeneration cases, because the rendered bytes moved too.
+
+#### The mark says what Tise actually is
+
+Three ascending bars, the third at 42% opacity. It is a chart, which is what Tise is, and
+the faded bar is the part Tise does not claim to know.
+
+That is not decoration. It is the honest description of where this project stands: what it
+shows a person today is descriptive — counts with their denominators — and the one target
+that earned adoption is not switched on, because D116 measured its gate at 19%. If that
+changes, the last bar can fill in.
+
+#### Checked in both directions, like the disclosure
+
+`manifest.test.ts` asserts every icon the manifest names exists, carries the PNG magic, and
+declares the size it is named for — read out of the IHDR, so a 32px file renamed to
+`icon128.png` fails. It also asserts the reverse: **no PNG on disk that the manifest does
+not name**, which is how a half-wired fifth size would announce itself.
+
+And one more, because the manifest can name a path that only exists in the repository:
+Chrome loads `dist/`, so the test reads `vite.config.ts` and requires every icon to be in
+the copy list. An icon the build forgets is missing exactly where it matters and nowhere
+that would fail.
+
+#### They are placeholders and the record should keep saying so
+
+Tise is a showcase for Holy Cow Studios, and what represents the company in the Chrome Web
+Store is a branding decision rather than a rendering one. **A placeholder that ships is a
+placeholder forever**, and the only defence against that is writing down that it is one.
+Replacing them changes no code: the manifest names the files, and `generate.py` can be
+deleted the day real artwork exists.
+
+930 Python tests, 524 TypeScript, both linters clean, builds with the icons in `dist/`.

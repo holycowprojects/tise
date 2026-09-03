@@ -18,6 +18,13 @@ const VERBATIM: ReadonlyArray<readonly [string, string]> = [
   ["ui/popup/popup.html", "popup.html"],
   ["ui/dashboard/dashboard.html", "dashboard.html"],
   ["ui/welcome/welcome.html", "welcome.html"],
+  // Listed one by one rather than copied as a directory, so a file the manifest names and
+  // the build forgets fails here instead of on someone's install. `manifest.test.ts`
+  // checks the other direction: an icon on disk the manifest never references.
+  ["icons/icon16.png", "icons/icon16.png"],
+  ["icons/icon32.png", "icons/icon32.png"],
+  ["icons/icon48.png", "icons/icon48.png"],
+  ["icons/icon128.png", "icons/icon128.png"],
 ];
 
 function copyStaticFiles(): Plugin {

@@ -6,7 +6,7 @@
  * These assertions exist so that permission creep has to be deliberate. Adding a
  * permission is on the "ask first" list; this test makes doing it by accident fail.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -110,5 +110,69 @@ describe("manifest", () => {
 
   it("has a description short enough for the Web Store listing", () => {
     expect(String(manifest["description"]).length).toBeLessThanOrEqual(132);
+  });
+});
+
+/**
+ * Icons, checked in both directions, because either direction failing ships something
+ * broken and neither would fail anything else.
+ *
+ * A file the manifest names and the build forgets is a missing icon in the store listing.
+ * A file on disk the manifest never names is dead weight in the package and, more to the
+ * point, the sign that a size was added and half-wired. Same shape as `disclosure.test.ts`
+ * against the permission list.
+ */
+describe("icons", () => {
+  const REQUIRED = [16, 32, 48, 128];
+  const icons = manifest["icons"] as Record<string, string>;
+  const action = manifest["action"] as Record<string, unknown>;
+
+  function read(relative: string): Buffer {
+    return readFileSync(fileURLToPath(new URL(`../${relative}`, import.meta.url)));
+  }
+
+  it("declares the four sizes Chrome and the Web Store ask for", () => {
+    expect(Object.keys(icons).map(Number).sort((a, b) => a - b)).toEqual(REQUIRED);
+  });
+
+  it("gives the toolbar button an icon, so it is not a generated letter", () => {
+    // What Chrome falls back to without one, and what Tise showed until T18: a grey tile
+    // with the first letter of the name.
+    expect(action["default_icon"]).toEqual({
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+    });
+  });
+
+  it("names files that exist and are PNGs of the size claimed", () => {
+    for (const [size, path] of Object.entries(icons)) {
+      const bytes = read(path);
+      expect(bytes.subarray(0, 8)).toEqual(
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      );
+      // IHDR width and height, big-endian, at a fixed offset in every PNG.
+      expect(bytes.readUInt32BE(16)).toBe(Number(size));
+      expect(bytes.readUInt32BE(20)).toBe(Number(size));
+    }
+  });
+
+  it("has no icon on disk that the manifest does not name", () => {
+    const named = new Set(Object.values(icons).map((path) => path.split("/").pop()));
+    const onDisk = readdirSync(
+      fileURLToPath(new URL("../icons", import.meta.url)),
+    ).filter((name) => name.endsWith(".png"));
+
+    expect(onDisk.length).toBeGreaterThan(0);
+    for (const name of onDisk) expect(named).toContain(name);
+  });
+
+  it("is copied by the build, not left behind in source", () => {
+    // The manifest can name a path that only exists in the repository. Chrome loads
+    // `dist/`, so an icon the build does not copy is missing where it matters.
+    const config = readFileSync(
+      fileURLToPath(new URL("../vite.config.ts", import.meta.url)),
+      "utf8",
+    );
+    for (const path of Object.values(icons)) expect(config).toContain(path);
   });
 });

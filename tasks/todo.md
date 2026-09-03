@@ -30,8 +30,9 @@ offset check (~14 days of live collection).
 
 **Owed by Akash, and nothing else is:** the GitHub remote, then branch protection and the
 badge (T17); install on a fresh profile (T15's own verification); a fresh export; the GESIS
-permission reply into `docs/gesis-permission-request.md`; and the four Web Store items
-(privacy URL, `privacy@holycowstudios.in`, developer account, icons at 16/32/48/128px).
+permission reply into `docs/gesis-permission-request.md`; and three Web Store items
+(privacy URL, `privacy@holycowstudios.in`, developer account). Icons are placeholders now
+(D117) — real HCS artwork drops in without a code change.
 
 ---
 
@@ -1158,7 +1159,12 @@ published as a failure.
       suggestion in the draft, not a fact
 - [ ] Chrome Web Store developer account registered under the company identity (D13) —
       one-time fee, you register and pay it
-- [ ] Icons: 16/32/48/128px. HCS artwork, or a plain mark I generate and you replace
+- [x] Icons: 16/32/48/128px — **placeholders generated (D117)**, `extension/icons/`.
+      Three ascending bars, the third faded, in the popup's own `--accent`. Produced by
+      `uv run python extension/icons/generate.py` with no new dependency, and
+      `test_icons.py` asserts regenerating reproduces the committed bytes. **Still owed:
+      HCS artwork.** A placeholder that ships is a placeholder forever; swapping it in
+      changes no code, since the manifest names the files
 - [ ] **Create the GitHub repository and push.** There is no remote, so nothing in
       `.github/workflows/ci.yml` has ever been run by GitHub — only, command for command,
       locally. Tell me the owner/repo and the README badge is one line
