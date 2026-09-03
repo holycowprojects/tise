@@ -22,6 +22,22 @@ updates:
       # typescript-eslint packages move together and are worth reviewing together.
       dev-tooling:
         dependency-type: development
+    ignore:
+      # **TypeScript majors, until `typescript-eslint` can accept one.**
+      #
+      # The first grouped bump raised TypeScript 5 -> 7 and could not install at all:
+      # `typescript-eslint` declares `typescript@">=4.8.4 <6.1.0"`, and its newest release
+      # (8.69.0) still does. So npm cannot resolve the tree, `npm ci` exits 1, and no
+      # amount of rebasing helps — the constraint is upstream, not here.
+      #
+      # Left un-ignored, Dependabot re-raises that pull request every week and it fails
+      # every week, which is how a red check becomes background noise. The rest of the
+      # group is fine and should keep flowing; only this one member poisons it.
+      #
+      # **Revisit when `npm view typescript-eslint peerDependencies` admits 7.** Removing
+      # these two lines is the whole change, and CI then judges the upgrade on its merits.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: pip
     directory: /
