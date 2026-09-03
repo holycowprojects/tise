@@ -5890,3 +5890,60 @@ Local git config in this repository now carries the same identity, so no future 
 to remember.
 
 932 Python tests, 524 TypeScript, both linters clean, builds.
+
+---
+
+### D120 — CI's first run found two bugs, and one was in the parity suite
+
+The repository was pushed to `holycowprojects/tise`, private. CI ran for the first time and
+**the research job failed**. That is T17 paying for itself on the first attempt: both
+failures are real, both are Linux-only, and both had been passing on Windows for months.
+
+#### The parity oracle was not reproducible across platforms
+
+`test_regenerating_the_expected_output_reproduces_the_committed_file` compared the
+regenerated oracle to the committed one with `==`. On Ubuntu it produced
+`-0.3226722826296328` where Windows produced `-0.32267228262963277` — the same number to
+sixteen significant figures, differing in the seventeenth.
+
+**The cause is `libm`.** `logreg.py` is hand-written gradient descent over `math.exp`, and
+`exp` comes from the platform's C library — glibc on Linux, the CRT on Windows — which are
+each permitted to be out by a unit in the last place. Gradient descent carries that through
+every iteration. Nothing about the model, the features or the fixture is wrong.
+
+**The parity contract itself was never in danger.** Its tolerance is 1e-9 and this noise is
+~1e-16. What could not survive a platform change was the *freeze* test's exact equality —
+a check written on a machine where exactness happened to be free.
+
+So the freeze comparison is now **exact on structure and 1e-12 on floats**: keys, lengths,
+ordering, strings and `null`-versus-zero all still fail on any difference at all, and only
+float magnitude gets a tolerance. 1e-12 is four orders above the libm noise and **three
+orders below the 1e-9 the parity contract allows**, so the freeze check remains strictly the
+tighter of the two — a drift small enough to pass it could not reach TypeScript comparison
+either.
+
+**That is a weakening and it is treated as one.** `TestTheFreezeComparisonStillBites` is
+seven tests that a renamed key, a dropped element, a reordered list, a changed string,
+`null` where zero was expected, and **a 1e-9 float change** all still fail. Verified against
+the real artefact too: nudging `model.predictions[0]` by 1e-9 fails and names the path.
+
+The path reporting is a side benefit worth keeping. The old `==` printed two truncated
+dictionaries; this prints `.model.predictions[0]`.
+
+#### A SQL literal that only one SQLite would parse
+
+`test_corpus.py` wrote `visit_duration = 4_000_000` inside a SQL string. The underscore is
+**Python's** digit separator; SQLite only accepts separators from 3.46, so the library
+bundled with Windows Python parsed it and Ubuntu's did not. A Python habit that reads
+correctly and is not Python.
+
+#### What this says about the eighteen tasks before it
+
+Both bugs were latent for months in a suite run many times a day, and neither could ever
+have been found on the machine it was written on. The value of CI here was not "run the
+tests" — the tests were already being run — it was **running them somewhere else**.
+
+D115 chose Ubuntu-only on the reasoning that Windows is covered by daily habit and Linux is
+what nothing had ever checked. That reasoning is now measured rather than argued.
+
+939 Python tests, 524 TypeScript, both linters clean, builds.

@@ -98,7 +98,10 @@ class TestEventsAreWellFormed:
         path = tmp_path / "History"
         write_chrome_history(path, CHROME_REDIRECT_CHAIN)
         connection = sqlite3.connect(path)
-        connection.execute("UPDATE visits SET visit_duration = 4_000_000 WHERE id = 5")
+        # 4000000, not 4_000_000: the underscore is Python's digit separator and this is a
+        # SQL string. SQLite only accepts separators from 3.46, so the bundled library on
+        # Windows parsed it and the one on Ubuntu did not — found by CI on its first run.
+        connection.execute("UPDATE visits SET visit_duration = 4000000 WHERE id = 5")
         connection.commit()
         connection.close()
 

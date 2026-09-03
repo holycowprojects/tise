@@ -38,15 +38,96 @@ class TestFixtureIsCommitted:
         assert EXPECTED_PATH.exists(), "run python -m tise_research.parity_fixture"
 
 
+#: How far two runs of the *same* pipeline may differ and still count as frozen.
+#:
+#: Not a convenience. `logreg.py` is hand-written gradient descent over `math.exp`, and
+#: `exp` is supplied by the platform's C library — glibc on Linux, the CRT on Windows —
+#: which are permitted to differ by a unit in the last place. Gradient descent carries that
+#: through every iteration. CI's first run on Ubuntu produced `-0.3226722826296328` where
+#: Windows produced `-0.32267228262963277`: the same number to sixteen significant figures.
+#:
+#: 1e-12 sits four orders of magnitude above that noise and **three orders below the 1e-9
+#: the parity contract itself allows**, so this stays the tighter of the two checks. Any
+#: real change to the pipeline — a feature, a constant, an iteration count — moves values
+#: by vastly more. Structure is still compared exactly; only floats get the tolerance.
+FREEZE_TOLERANCE = 1e-12
+
+
+def _assert_frozen(produced: object, committed: object, path: str = "") -> None:
+    """Exact on everything except float magnitude, where it is 1e-12.
+
+    Written out rather than reached for from a library because the *exactness* is the point:
+    a renamed key, a dropped row, a reordered list or a changed string is drift and must
+    fail, and a blanket `approx` on a nested structure would let some of those through.
+    """
+    where = path or "<root>"
+    if isinstance(produced, dict):
+        assert isinstance(committed, dict), where
+        assert produced.keys() == committed.keys(), f"{where}: keys differ"
+        for key in produced:
+            _assert_frozen(produced[key], committed[key], f"{path}.{key}")
+    elif isinstance(produced, list):
+        assert isinstance(committed, list), where
+        assert len(produced) == len(committed), f"{where}: length differs"
+        for index, (a, b) in enumerate(zip(produced, committed, strict=True)):
+            _assert_frozen(a, b, f"{path}[{index}]")
+    elif isinstance(produced, float) or isinstance(committed, float):
+        assert isinstance(produced, int | float) and isinstance(committed, int | float), where
+        near = pytest.approx(committed, rel=FREEZE_TOLERANCE, abs=FREEZE_TOLERANCE)
+        assert produced == near, f"{where}: {produced!r} != {committed!r}"
+    else:
+        assert produced == committed, where
+
+
+class TestTheFreezeComparisonStillBites:
+    """The tolerance above is a weakening, so it gets its own tests.
+
+    A guard that was exact and is now approximate has to prove what it still catches. The
+    one that matters most is the last: **1e-9 fails here**, which is the tolerance the
+    parity contract itself allows — so this check stays strictly the tighter of the two, and
+    a drift small enough to slip past it could not reach TypeScript comparison either.
+    """
+
+    def test_libm_noise_passes(self):
+        # The actual pair from CI's first Ubuntu run.
+        _assert_frozen(-0.3226722826296328, -0.32267228262963277)
+
+    def test_a_difference_the_parity_contract_would_tolerate_still_fails(self):
+        with pytest.raises(AssertionError):
+            _assert_frozen(1.0, 1.0 + 1e-9)
+
+    def test_a_renamed_key_fails(self):
+        with pytest.raises(AssertionError):
+            _assert_frozen({"a": 1}, {"b": 1})
+
+    def test_a_dropped_element_fails(self):
+        with pytest.raises(AssertionError):
+            _assert_frozen([1.0, 2.0], [1.0, 2.0, 3.0])
+
+    def test_a_reordered_list_fails(self):
+        with pytest.raises(AssertionError):
+            _assert_frozen([1.0, 2.0], [2.0, 1.0])
+
+    def test_a_changed_string_fails(self):
+        with pytest.raises(AssertionError):
+            _assert_frozen({"featureSet": "fs_3"}, {"featureSet": "as_2"})
+
+    def test_null_is_not_zero(self):
+        # D51's rule, which a numeric tolerance could quietly erase.
+        with pytest.raises(AssertionError):
+            _assert_frozen({"v": None}, {"v": 0.0})
+
+
 @pytest.mark.parity
 class TestFixtureIsFrozen:
     def test_regenerating_the_input_reproduces_the_committed_file(self):
+        """Exact. The input carries no fitted value, so nothing here depends on libm."""
         assert build_input_document() == _load(EVENTS_PATH)
 
     def test_regenerating_the_expected_output_reproduces_the_committed_file(self):
         """If this fails, the pipeline changed. Decide whether that was intended, then
         regenerate deliberately — never as a reflex to make the suite green."""
-        assert build_expected_document() == _load(EXPECTED_PATH)
+        _assert_frozen(build_expected_document(), _load(EXPECTED_PATH))
 
 
 class TestFixtureCoversWhatItClaimsTo:
