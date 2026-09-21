@@ -532,9 +532,14 @@ a number that is technically correct and practically meaningless.
 
 ### Map gaps that the measurement caught
 
-The first draft missed several genuinely generic services — `deepseek.com` alone was 11.8%
-of the Firefox corpus, and `insighttimer.com` 15.7%, which is why `wellness` exists as a
-category at all. Coverage there went from 53.5% to 87.8% once they were added.
+The first draft missed several genuinely generic services — one alone was **11.8%** of the
+Firefox corpus and another **15.7%**, which is why `wellness` exists as a category at all.
+Coverage there went from 53.5% to 87.8% once they were added.
+
+*(The two were named here until D128. They are ordinary public services and both remain in
+the shipped category map, where they say nothing about anyone; naming them **beside their
+share of one person's browsing** is what made this sentence a profile rather than a method
+note. The percentages are the evidence and they are untouched.)*
 
 Worth noting as method: the taxonomy was not designed and then validated. It was drafted,
 measured, found wanting, and corrected — which is the only reason `wellness` exists.
@@ -6582,8 +6587,9 @@ observation rather than an assertion.
 #### Two more, which Akash had not been shown when he decided
 
 D126 surfaced five domains. A full sweep of the log found **seven**, and the two extra are a
-different shape: `deepseek.com` at **11.8%** of the Firefox corpus and `insighttimer.com` at
-**15.7%**, in D26, as the reason the `wellness` category exists.
+different shape: two named services at **11.8%** and **15.7%** of the Firefox corpus, in
+D26, as the reason the `wellness` category exists. *(Akash removed that pair in D128; the
+names are gone and the percentages stand.)*
 
 A bare domain says a site was visited. A domain with a share of a corpus says **how much of
 someone's browsing it was**, which is closer to a profile than anything else published here.
@@ -6627,3 +6633,78 @@ every export remain forbidden paths, gitignored and tested for.
 the one file whose job is to be checkable.
 
 955 Python tests plus 3, 527 TypeScript. Both linters clean.
+
+---
+
+### D128 — Two of the seven are withdrawn, and a revoked name needs saying so
+
+Akash, one turn after D127: **remove the two, keep the other five.**
+
+#### The pair that was different, and why the distinction held up
+
+D127 permitted seven real domains and flagged that two were not like the rest. The five are
+*citations*: a domain appears because an entry makes a claim about it — a redirect chain the
+heuristic is judged against, four domains observed stored bare. Anyone rereading the entry
+needs the name to check the claim.
+
+The other two were printed **beside their share of one person's browsing** — 11.8% and 15.7%
+of the Firefox corpus. That is not a citation, it is a measurement *about the person*, and
+one of them was a meditation service. The name adds nothing a reader can check that the
+percentage does not already carry, and it carries something no reader needs.
+
+D127 said that pair could be reversed without disturbing the rest, and it was, one turn
+later. **That is the separation earning its keep** — had the seven been recorded as a single
+undifferentiated set, reversing two would have meant reopening all of it.
+
+#### The percentages stay, so D26 stays checkable
+
+Only the names are gone. *"One alone was 11.8% of the Firefox corpus and another 15.7%,
+which is why `wellness` exists as a category at all"* keeps every number, and the coverage
+figures (53.5% → 87.8%) are untouched. A reader can still see that two generic services
+drove a whole category into existence, and that the taxonomy was drafted, measured, found
+wanting and corrected.
+
+What is lost is real and worth naming: a reader can no longer verify **which** services those
+were. That is a genuine reduction in checkability, chosen deliberately, and it is the first
+time in this project that privacy has been traded against verifiability rather than the two
+pointing the same way. Recorded as a trade, not as a tidy-up.
+
+#### Both remain in the shipped category map, on purpose
+
+Both are still classified in `domains.json`, under `ai` and `wellness`. **A category map is
+a public vocabulary and records no visits** — it says these services exist and what kind of
+thing they are, which is true of them for everybody and true of nobody in particular.
+Removing them would degrade coverage for every user and protect no one.
+
+*(They are not named here either. This entry withdrew the names, and an entry that spells
+them out while explaining their withdrawal is D119's mistake repeated — which the new guard
+caught on this paragraph before it was committed. `WITHDRAWN_DOMAINS` in
+`test_repository.py` holds them, which is the one place naming them does work.)*
+
+The thing withdrawn is the *pairing* of a name with a percentage, which only ever existed in
+the decision log. A test asserts both are still in the map, so a later reader cannot mistake
+this entry for a reason to strip them.
+
+#### Deleting an allow-list entry does not keep a name out
+
+The part worth carrying elsewhere. `EVIDENCE_DOMAINS` **grants** permission, so removing an
+entry only revokes it — and D127's undeclared-domain guard would then report these two with
+the message *"if one is a real visit kept as evidence, add it to EVIDENCE_DOMAINS"*.
+
+**The guard's own remedy would have reversed the decision**, helpfully, at the hands of
+whoever next hit the failure. An allow-list can express "permitted" and "not yet considered";
+it cannot express "considered and refused", and those need different answers.
+
+So `WITHDRAWN_DOMAINS` states the revocation, with a failure message that says the opposite
+of the other one: *"Do not add them to EVIDENCE_DOMAINS."* A third test asserts the two sets
+are disjoint, because a name in both would be permitted or forbidden depending on which test
+ran first.
+
+Verified by appending one of them to `DECISIONS.md`: two guards fired, and the withdrawal
+one named it and said not to re-permit it.
+
+**This is the screenshot lesson from the other end.** D118 was about an allow-list that grew
+too easily; this is about one that cannot say no. Both failures come from a list that only
+has an "in" column.
+
+958 Python tests plus 3, 527 TypeScript. Both linters clean.

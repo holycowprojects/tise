@@ -95,8 +95,22 @@ EVIDENCE_DOMAINS = {
     "dominos.co.in": "D34/D36 — observed, and the three-label multi-part suffix case",
     "nike.in": "D36 — observed, stored bare",
     "zomato.com": "D36 — observed; also a category-map entry",
-    "deepseek.com": "D26 — 11.8% of the Firefox corpus; why `wellness` exists",
-    "insighttimer.com": "D26 — 15.7% of the Firefox corpus; why `wellness` exists",
+}
+
+#: Domains that were published as evidence and have been **withdrawn** (D128).
+#:
+#: Removed from `EVIDENCE_DOMAINS` is not enough on its own. That set is an allow-list, so
+#: dropping an entry only stops it being *permitted* — and the guard would then report it as
+#: an undeclared domain, whose documented remedy is "add it to EVIDENCE_DOMAINS". The next
+#: person to hit that failure would helpfully put it back.
+#:
+#: These two are different from the other five: each was printed beside **its share of one
+#: person's browsing**, which is a profile rather than a citation. Both remain in the shipped
+#: category map on purpose — there they are ordinary public services and say nothing about
+#: anyone. It is the pairing with a percentage that was withdrawn, not the classification.
+WITHDRAWN_DOMAINS = {
+    "deepseek.com": "D128 — withdrawn from DECISIONS.md; still a category-map entry",
+    "insighttimer.com": "D128 — withdrawn from DECISIONS.md; still a category-map entry",
 }
 
 #: Domains that are not evidence about anybody: illustrative, infrastructural, or generic
@@ -309,3 +323,44 @@ class TestTheEvidenceDomainsAreAClosedSet:
         found = set(DOMAIN_SHAPE.findall(planted))
         assert found == {"someones-real-employer.com"}
         assert not found & (set(EVIDENCE_DOMAINS) | NEUTRAL_DOMAINS)
+
+
+class TestAWithdrawnDomainStaysWithdrawn:
+    """Removing a name from an allow-list does not keep it out (D128).
+
+    `EVIDENCE_DOMAINS` grants permission, so deleting an entry only revokes it. The domain
+    would then trip the undeclared-domain guard, whose failure message says to add it to
+    `EVIDENCE_DOMAINS` — which is precisely the wrong remedy for a name that was taken out
+    deliberately. A revocation needs to be stated, or the next failure quietly reverses it.
+    """
+
+    def test_no_withdrawn_domain_reappears_in_the_decision_log(self):
+        text = (REPO_ROOT / "DECISIONS.md").read_text(encoding="utf-8")
+        back = [domain for domain in WITHDRAWN_DOMAINS if domain in text]
+        assert not back, (
+            f"withdrawn and published again: {back}. These were removed on purpose — each "
+            "had been printed beside its share of one person's browsing. Do not add them "
+            "to EVIDENCE_DOMAINS."
+        )
+
+    def test_withdrawn_and_permitted_are_disjoint(self):
+        # The two sets contradict each other if they ever overlap, and the guard would then
+        # both permit and forbid the same name depending on which test ran.
+        assert not set(WITHDRAWN_DOMAINS) & set(EVIDENCE_DOMAINS)
+        assert not set(WITHDRAWN_DOMAINS) & NEUTRAL_DOMAINS
+
+    def test_the_shipped_category_map_still_classifies_them(self):
+        """Withdrawing the citation is not withdrawing the classification.
+
+        These are ordinary public services. In `domains.json` they are a public vocabulary
+        shipped to everyone and describe nobody; removing them would degrade the map for
+        every user and protect no one, because the map records no visits.
+        """
+        import json
+
+        mapping = json.loads(
+            (REPO_ROOT / "extension/src/categories/domains.json").read_text(encoding="utf-8")
+        )
+        flat = mapping.get("domains", mapping)
+        for domain in WITHDRAWN_DOMAINS:
+            assert domain in flat, f"{domain} should stay in the shipped map"
