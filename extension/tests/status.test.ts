@@ -11,7 +11,7 @@
  * `research/tise_research/reports.py` anchors to the same file from the other language, so
  * a change to the shipped target has to break something in both.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { TARGET } from "../src/model/predict";
@@ -48,6 +48,26 @@ describe("what the page says Tise ships", () => {
     expect(withheld.map((entry) => entry.name)).toEqual(["visit_engaged"]);
     expect(withheld[0]?.name).not.toBe(SHIPPED_TARGET);
     expect(TARGET_STATUS.some((entry) => entry.state === "adopted")).toBe(false);
+  });
+
+  it("never calls a target unfitted when a benchmark report for it exists", () => {
+    // **This caught a real one.** `browsing_next_hour` sat at `registered` — "nothing
+    // fitted" — from D94 until D125, while `docs/benchmarks/browsing-next-hour.md` had
+    // existed since D112, which fitted it and cleared its bar. The panel told every reader
+    // the opposite of the record, in the file written to prevent that.
+    //
+    // A report on disk is the artefact of a run, so its existence is checkable in a way
+    // that "is this still true?" is not. The states themselves cannot be derived, but this
+    // one contradiction can be, so it is.
+    const benchmarks = fileURLToPath(new URL("../../docs/benchmarks/", import.meta.url));
+    for (const entry of TARGET_STATUS) {
+      if (entry.state !== "registered") continue;
+      const report = `${benchmarks}${entry.name.replaceAll("_", "-")}.md`;
+      expect(
+        existsSync(report),
+        `${entry.name} is "registered" (nothing fitted) but ${report} exists`,
+      ).toBe(false);
+    }
   });
 
   it("says why a withheld target is withheld, not merely that it is", () => {

@@ -5,10 +5,44 @@
 **A Chrome extension that learns your browsing habits and tells you what it has noticed —
 entirely on your own computer.**
 
-There is no account, no server, and no company receiving your data. The learning happens
-inside your browser, on your laptop, and the answers stay there.
+There is no account, no server, and no company receiving your data. There is no network code
+to switch off: the learning happens inside your browser, on your laptop, and the answers stay
+there.
 
-**Status: working, not yet released.** Not on the Chrome Web Store yet.
+---
+
+### The part worth knowing first
+
+Tise has one prediction that genuinely works. It was tested against a standard written down
+**before** the answer was known, then checked again on **1,326 other people's browsing**,
+where it beat the obvious guess for 88.6% of them individually.
+
+**It is switched off.** How much data it needed was also fixed in advance — and the author's
+own browsing does not reach the threshold. It could have been quietly lowered. The
+measurement is in this repository, nobody was watching, and nobody would ever have known. It
+was not lowered.
+
+So Tise shows you **what it measured** rather than what a model guesses. Six prediction ideas
+have been taken seriously here and **not one of them is shown to you as a prediction** — each
+was either retired, beaten by a rule simple enough to write in two lines, impossible to
+measure honestly, or, in this one case, better than its baseline and still withheld. All six
+are written up with their numbers.
+
+That is the project. The extension is how it is demonstrated.
+
+**Status: working, deliberately not listed.** Not on the Chrome Web Store.
+
+### If you are here for the method, not the product
+
+- [`DECISIONS.md`](DECISIONS.md) — 124 entries. Bars, definitions and adoption rules written
+  down before the things they judge, with git holding the order so the claim is checkable
+  rather than asserted. Start at **D123** and **D124**: a data gate firing against the person
+  who wrote it.
+- [`docs/benchmarks/`](docs/benchmarks) — 22 reports, every number produced by a committed
+  script. The negative results are the interesting ones.
+- **The parity suite** — every feature implemented twice, TypeScript and Python, agreeing to
+  1e-9 against a committed oracle. Without it a published benchmark can describe a model
+  that was never shipped. `uv run pytest -m parity`.
 
 ---
 
@@ -47,23 +81,12 @@ different at 7 times out of 10 than at 700 out of 1,000, and Tise always says wh
 browsing — where the hours go, what they keep returning to, what they only think they read.
 Tise counts it instead of guessing, and it does not flatter you.
 
-The forecasting is real but deliberately slow to arrive. One prediction has genuinely earned
-its place — *will this page hold your attention, or will you leave in ten seconds?* It was
-tested against a standard written down **before** the answer was known, then checked again on
-**1,326 other people's browsing**, where it beat the obvious guess for 88.6% of them
-individually.
+The prediction that works — *will this page hold your attention, or will you leave in ten
+seconds?* — is switched off, for reasons set out in full under
+[**Where this is**](#where-this-is), with the numbers and the command to reproduce them.
 
-**And it is switched off.** Tise would only use it on you once it had seen enough of your
-browsing to trust it — a threshold fixed in advance, before any of this author's attention
-was measured, and one that excluded 822 of those 1,326 people as too light to model.
-
-His own browsing does not reach it either. Tise keeps 30 days at a time, so the count settles
-around 650 against a bar of 1,000 and stays there; waiting does not fix it. The bar could
-have been quietly lowered — the measurement is in this repository and nobody would have
-known. It was not.
-
-**So Tise shows you what it measured instead of what a model guesses.** That is the honest
-version of this product, and it is the one you get.
+The short version: it needs more browsing than this author does, judged by a rule written
+before any of that browsing was measured.
 
 ## How and when it works
 
@@ -85,9 +108,23 @@ Most tools that claim to predict things show you a confident number and never te
 whether it was right.
 
 Tise **writes down what it expects before it measures**, keeps the score, and publishes the
-failures beside the successes. Four prediction ideas have been tested on real browsing and
-**two were thrown away** — because a simple counting rule beat the clever model. Both are
-written up in public, in detail, rather than quietly dropped.
+failures beside the successes. Six prediction ideas have been taken seriously:
+
+| | |
+|---|---|
+| `return_24h` | Retired — measurable, and not a question anyone cares about |
+| `block_volume` | Retired — the model lost to a single constant |
+| `next_category` | Cleared its bar, then lost to a two-line rule on every browser |
+| `browsing_next_hour` | Cleared its bar, then came apart on the 79% of rows where the question was real |
+| `visit_engaged` | Beat its baseline for 88.6% of 1,326 people — and is withheld |
+| `tab_return` | Cannot be measured honestly on any browser history. Registered anyway |
+
+**None of them is shown to you as a prediction.** Each is written up in full, with the
+numbers that decided it, rather than quietly dropped.
+
+Two further ideas — grouping sittings by intent, and mining domain associations — were
+investigated and **found nothing**. That is written up too, including how the first null
+result was too weak to trust and had to be replaced.
 
 That honesty is the point of the project.
 
@@ -146,7 +183,9 @@ Written down here rather than discovered later:
 
 ## Where this is
 
-**Two prediction targets were built, benchmarked and retired before the third one worked.**
+**Two targets were built, benchmarked and retired before one finally worked** — and two more
+were measured in between, cleared their bars, and still did not earn a place on screen (the
+table above has all six). The three that shaped the project:
 
 `return_24h` — "will you return to this topic within 24 hours?" — was retired because it
 turned out to be measurable and uninteresting: a ~70% base rate meant a constant answer was
@@ -162,7 +201,7 @@ That work is kept, not deleted. Those reports in [`docs/benchmarks/`](docs/bench
 as superseded results and carry banners saying so — they are the evidence that justified the
 changes, and removing them would remove the reason.
 
-**The current target is `visit_engaged`.** It is the first one to clear a bar that was
+**The one that worked is `visit_engaged`.** It is the first target to clear a bar that was
 written down before it was measured — and the first result in this project that does not rest
 on a single person:
 

@@ -105,11 +105,13 @@ export const TARGET_STATUS: readonly TargetStatus[] = [
   {
     name: "browsing_next_hour",
     question: "Will you be browsing in the next hour?",
-    state: "registered",
+    state: "measured",
     note:
-      "Bar and rule fixed in advance, nothing fitted. The bar is your own daily rhythm " +
-      "rather than a flat rate, because beating a flat rate would be trivial — and the " +
-      "pre-registered prediction is that this one fails.",
+      "It cleared the bar written before it was fitted (D112) — and then the result came " +
+      "apart when the rows were split. Almost all of the margin was earned on the hours " +
+      "that follow an hour you were already browsing in, where the answer is obvious. On " +
+      "the other 79% of hours, where the question is a real question, it does no better " +
+      "than knowing your daily rhythm. So it is not shown to you.",
   },
   {
     name: "tab_return",

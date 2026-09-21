@@ -6383,3 +6383,79 @@ changes, the gate passes and the entry above becomes wrong in the good direction
 
 953 Python tests, **526 TypeScript** (two added: the popup must not phrase the gap as a wait,
 and a withheld target must carry its reason). Both linters clean, builds.
+
+---
+
+### D125 — The claims panel was wrong about a target, and the README buried the only thing worth reading
+
+Two findings from reading the repository as a stranger would, before making it public.
+
+#### `browsing_next_hour` said "nothing fitted" for thirteen entries
+
+`status.ts` carried it as **`registered`** — *"Bar and rule fixed in advance, nothing fitted
+… the pre-registered prediction is that this one fails."*
+
+**D112 fitted it.** It cleared D94's bar on the adoption corpus: **+0.0546 [+0.0383,
++0.0724]**, day-clustered, 5 of 5 folds. So the dashboard told every reader that nothing had
+been fitted, and that the expectation was failure, about a target that had been measured and
+had passed — for thirteen decision entries.
+
+**This is the defect that file exists to prevent, inside that file.** Its own docstring opens
+with D88–D97: `reports.py` said the project predicted `block_volume` after D92 retired it,
+and eight generated reports told readers so. The lesson recorded there was that a constant
+asked to mean two things will be wrong about one of them. `registered` was asked to mean
+"declared in advance" — which stayed true — and "not yet measured", which stopped being true
+at D112. Nothing updated it, because nothing had to.
+
+It is **`measured`** now, and the note says the thing worth saying: it cleared its bar, and
+then the result came apart on the 79% of rows where the question is a real question.
+
+#### The guard: a state that claims nothing was fitted, beside a report of the fitting
+
+The states are judgements and cannot be derived. **One contradiction can be**, and it is the
+one that actually happened: `docs/benchmarks/browsing-next-hour.md` has existed since D112.
+A report on disk is the artefact of a run, so its presence is checkable in a way that "is
+this description still true?" is not.
+
+`status.test.ts` now fails if any `registered` target has a benchmark report named after it.
+Broken deliberately by restoring the old state: it fails with the diagnostic naming the
+target and the file. **This is D110's seam-audit shape** — the existing tests pinned
+`status.ts` against `predict.ts`, which is one build checked against itself, and could never
+see a claim that had gone stale against a *document*.
+
+It would have caught this on the day D112 landed.
+
+#### The README opened with a product pitch and buried the argument
+
+A stranger decides in about fifteen seconds, and the first line offered *"a Chrome extension
+that learns your browsing habits"* — which is what every browsing extension says, including
+the ones that exfiltrate everything. The thing no other repository can say sat at **line 188
+of 283**.
+
+Restructured rather than rewritten; the plain-language explanation Akash asked for is intact
+and still first in the body. What changed:
+
+* **The opening states the claim**: a prediction validated on 1,326 people, switched off
+  because its author's own data did not clear a threshold fixed in advance, which nobody was
+  watching and nobody would have known was lowered.
+* **Six targets, in a table, none of them shown to the user.** The old text said *"four
+  prediction ideas have been tested and two were thrown away"* — stale since D102 and D112,
+  and it undercounted the work. The honest line is that six were taken seriously and **not
+  one is shown as a prediction**.
+* **A path for the reader who came for the method**, at the top: `DECISIONS.md` pointed at
+  D123–D124, the benchmark directory, and the parity suite.
+* **The withholding is told once, properly.** It had been told twice, 130 lines apart, and
+  the first telling arrived before the reader knew what `visit_engaged` was — so "switched
+  off" read as a missing feature rather than a decision.
+
+Every number in it was verified against the repository rather than carried over: 124
+decision entries, 22 benchmark reports, and every link resolves.
+
+#### The pattern this session
+
+Four stale records found in one day, none by a failing test: three copies of a Checkpoint E
+criterion count that never existed (D124), and this one. **The planning documents and the
+honesty panel were the least verified artefacts in a project whose entire discipline is
+verification**, because nothing renders them and, until now, nothing read them.
+
+953 Python tests, **527 TypeScript** (+1). Both linters clean, builds.
