@@ -6156,17 +6156,20 @@ sentence assumes the count is cumulative. **It is not.** Events expire at 30 day
 gate counts dwell-carrying visits — events joined to spans — so it counts what fits in the
 window, not what has ever happened.
 
-Measured over the 24 days of live collection: **20.7 dwelled visits a day**, 22.6 per active
-day, 17.3 over the last seven active days. Against a 30-day window:
+Measured over the 22.7 days attention has been collected: **21.9 dwelled visits a day**.
+Against a 30-day window:
 
 ```
-  20.7/day x 30 days  ~=  621 at saturation        the criterion is 1,000
+  21.9/day x 30-day window  ->  about 656 at saturation, against 1,000
 ```
 
-So the count rises to roughly 620 by the end of September and **then stops**. Nothing has
+So the count rises to roughly 650 by the end of September and **then stops**. Nothing has
 expired yet — the union of dwelled visits across all four exports is 497, exactly today's
 count, because the oldest is 2026-08-29 and expiry begins around 2026-09-28. After that the
-number is flat. **It is a ceiling, not a countdown, and the script says "23 days" anyway.**
+number is flat. **It is a ceiling, not a countdown, and the script said "23 days" anyway.**
+
+Reaching 1,000 needs about **33 dwelled visits a day, sustained** — half again the observed
+rate, forever, and not a thing to plan a product on.
 
 #### The proposal that was wrong, recorded because it was nearly acted on
 
@@ -6191,28 +6194,36 @@ excellent reason to skip checking one.
 
 #### The verdict is robust to the translation, which is what makes it a finding
 
-If the unit were loosened to all stored events, the profile still fails:
+If the unit were loosened to **every stored event** — imported history included, though it
+carries no dwell and can never produce a label — the profile still fails. The script prints
+both, because a verdict that survives the loose reading is a finding about the profile rather
+than about the translation:
 
 ```
-  all stored events                     871 over 29 days  ->  901 / 30 days
-  live-collected events only            497 over 24 days  ->  621 / 30 days
-  dwell-carrying visits (D116's unit)   497 over 24 days  ->  621 / 30 days
+  dwell-carrying visits (D116's unit)   21.9/day x 30  ->  about 656
+  every stored event                    31.0/day x 30  ->  about 931
 ```
 
-**Every live event carries a span** — the two counts are identical at 497 — so the 374-event
-gap is entirely imported history, which is mid-expiry and will be gone within days. The
-loosest available reading is 901 and falls short of 1,000 on its own, *before* accounting for
-the fact that it is inflated by data about to vanish.
+**Every live event carries a span** — dwell-carrying visits and live events are both 497 — so
+the gap between the two rows is entirely imported history, which is mid-expiry and gone
+within days. The loosest available reading is 931 and falls short of 1,000 on its own,
+*before* accounting for the fact that it is inflated by data about to vanish.
 
 No reading of the rule passes. That is a much stronger statement than the strict reading
 failing alone.
+
+**That line was wrong on its first run and the error is worth keeping.** It divided every
+stored event by the *dwell* collection window rather than the stored one, mixing a 29-day
+span with a 22.7-day span, and printed **1,150 — a pass** — in the one line whose purpose is
+to show the verdict survives a generous reading. Two spans are now measured separately and a
+test pins the arithmetic in both directions.
 
 #### What this actually means: the gate is working
 
 **D99 excluded 822 of 2,148 panelists on this criterion.** 38% of real people did not browse
 enough, in a month, for this model to be worth fitting for them.
 
-**Akash is one of them.** At roughly 620 dwell-carrying visits a month against a bar of
+**Akash is one of them.** At roughly 656 dwell-carrying visits a month against a bar of
 1,000, this profile is not a marginal case; it is inside the excluded group by a wide margin,
 and it would have been excluded from the D100 replication had it been in that panel.
 
@@ -6238,7 +6249,7 @@ returned an unwelcome answer. Nothing is changed on the strength of it today.
 Three options exist and none is taken in this entry:
 
 1. **Wait.** Does not work — the count saturates below the bar. Only a sustained change in
-   browsing volume (33/day against 20.7) reaches 1,000, and that is not a thing to plan on.
+   browsing volume (33/day against 21.9) reaches 1,000, and that is not a thing to plan on.
 2. **Ship descriptive.** D94's stopping rule in a different costume: Tise shows what it has
    measured, `visit_engaged` stays adopted and unshipped, and the honest headline is that a
    model was validated on 1,326 people and withheld from the one person it could not be
@@ -6249,5 +6260,8 @@ Three options exist and none is taken in this entry:
 **T-G4 remains gated, and the gate has now returned a real answer rather than a wait.**
 `SPEC.md` criterion #7 is not met and, on the current reading, will not be met by patience.
 
-Measurement only. Nothing was fitted, nothing was changed, no threshold moved. 948 Python
-tests, 524 TypeScript, both linters clean.
+**No threshold moved and nothing was fitted.** The only code change is that
+`engagement_gate.py` now checks the ceiling before dividing a shortfall by a rate, and says
+so when the window cannot hold the bar — a projection corrected, not a bar rewritten. It was
+broken deliberately once and 4 of 13 tests failed. 953 Python tests, 524 TypeScript, both
+linters clean.

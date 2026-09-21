@@ -59,14 +59,14 @@ def _span(index: int, seconds: float) -> AttentionSpan:
     )
 
 
-def _export(events, spans) -> TiseExport:
+def _export(events, spans, retention_days: int = 30) -> TiseExport:
     return TiseExport(
         exported_at=START,
         extension_version="0.1.0",
         category_map_version=1,
         suffix_list_version=1,
         session_timeout_seconds=1800.0,
-        raw_retention_days=30,
+        raw_retention_days=retention_days,
         overrides={},
         events=tuple(events),
         attention=tuple(spans),
@@ -151,7 +151,101 @@ class TestTheVerdict:
 
         assert "does not pass" in text
         # A failing gate has to say how far off it is, or it is a wall rather than a gate.
+        # These fourteen visits arrive minutes apart, so the implied rate is enormous and
+        # the window holds far more than the criterion: the reachable branch.
+        assert "days to go" in text
+
+
+class TestTheCeilingRatherThanACountdown:
+    """D123: raw events expire, so the visit count is a window and not a running total.
+
+    Dividing a shortfall by a rate assumes a total. Doing that on a profile whose window
+    saturates below the bar prints a date that will never arrive, which is what this script
+    did for eighteen days. Both branches are asserted because a ceiling check that cannot
+    come back "reachable" has not been tested, it has been run.
+    """
+
+    def _profile(self, visits: int, over_days: float):
+        """`visits` dwelled visits spread evenly across `over_days`."""
+        events: list[Event] = []
+        spans: list[AttentionSpan] = []
+        step = over_days * 24 * 60 / max(1, visits - 1)
+        for index in range(visits):
+            events.append(_event(index, category="news", minutes=index * step))
+            spans.append(_span(index, 40.0))
+        return events, spans
+
+    def test_a_rate_that_cannot_fill_the_window_refuses_to_print_a_date(self) -> None:
+        # 20 visits/day against a 30-day window holds 600 — short of 1,000, forever.
+        events, spans = self._profile(400, over_days=20.0)
+        text = report(measure(_export(events, spans, retention_days=30)))
+
+        assert "cannot hold" in text
+        assert "at saturation" in text
+        assert "days to go" not in text
+        assert "short of the visit criterion" not in text
+
+    def test_a_rate_that_does_fill_the_window_still_gets_its_countdown(self) -> None:
+        # 100 visits/day against the same window holds 3,000, so a date is meaningful.
+        events, spans = self._profile(400, over_days=4.0)
+        text = report(measure(_export(events, spans, retention_days=30)))
+
+        assert "days to go" in text
+        assert "cannot hold" not in text
+
+    def test_keeping_events_forever_makes_the_count_genuinely_cumulative(self) -> None:
+        # Retention 0 is "keep forever" in settings, and only there is a shortfall over a
+        # rate a real date rather than an assumption.
+        events, spans = self._profile(400, over_days=20.0)
+        text = report(measure(_export(events, spans, retention_days=0)))
+
         assert "short of the visit criterion" in text
+        assert "cumulative" in text
+        assert "cannot hold" not in text
+
+    def test_the_loosest_reading_divides_by_its_own_span_and_not_the_dwell_span(self) -> None:
+        """Imported history is wider than the dwell window, and mixing them inflates it.
+
+        Written because the first version of this comparison did exactly that and printed a
+        looser reading of 1,150 against a 1,000 bar — a pass, from an arithmetic mismatch,
+        in the one line whose job is to show the verdict survives the loose reading.
+        """
+        # 400 dwelled visits over 20 days, plus imported history stretching 40 days back.
+        events, spans = self._profile(400, over_days=20.0)
+        imported = [
+            Event(
+                event_id=f"imp{i}",
+                occurred_at=START - timedelta(days=40) + timedelta(hours=i),
+                source="import",
+                domain="a.example",
+                category="news",
+                transition="link",
+                dwell_seconds=None,
+            )
+            for i in range(400)
+        ]
+        measured = measure(_export(imported + events, spans, retention_days=30))
+
+        # The two spans are genuinely different, which is what makes the mistake possible.
+        assert float(measured["stored_days"]) > float(measured["collection_days"])
+
+        text = report(measured)
+        loose = next(line for line in text.splitlines() if "every stored event" in line)
+        # 800 events over ~60 stored days is ~13/day. Dividing by the 20-day dwell window
+        # instead gives ~40/day, and the ceiling it implies clears the bar it is meant to
+        # be tested against.
+        assert "13.3/day" in loose
+        assert "40.0/day" not in loose
+
+    def test_the_ceiling_is_computed_from_retention_and_not_hardcoded(self) -> None:
+        events, spans = self._profile(400, over_days=20.0)
+        tight = report(measure(_export(events, spans, retention_days=30)))
+        roomy = report(measure(_export(events, spans, retention_days=180)))
+
+        assert "cannot hold" in tight
+        # Same browsing, longer window: the same rate now reaches the bar.
+        assert "cannot hold" not in roomy
+        assert "180-day window" in roomy
 
     def test_a_profile_meeting_all_three_passes(self) -> None:
         # Enough visits, enough sittings, enough labels: sessions are split by putting a
