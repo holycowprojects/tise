@@ -74,7 +74,7 @@ should not sit alongside your real browsing.
 
 4. Click **Load unpacked**
 5. Navigate to
-   `C:\Users\akash\Documents\Work-Projects\Tise\spike\permissions\build\` and select the
+   `spike/permissions/build/` inside your clone of this repository, and select the
    variant folder — start with `A-history-only`. Click **Select Folder**.
 6. **Screenshot whatever Chrome shows you**, including the card that appears on the
    extensions page. Note whether it warned you about anything at all. The exact wording

@@ -232,7 +232,7 @@ class TestRegistrableDomain:
         [
             "chrome://settings/privacy",
             "chrome-extension://abcdefg/popup.html",
-            "file:///C:/Users/akash/secret.txt",
+            "file:///C:/Users/someone/secret.txt",
             "about:blank",
             "http://localhost:3000/admin",
             "http://127.0.0.1:8000/",

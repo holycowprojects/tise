@@ -58,6 +58,22 @@ SECRET_SHAPES = (
     (r"\bsk-[A-Za-z0-9]{32,}", "OpenAI-style API key"),
 )
 
+#: Personal identifiers that must never be published, named rather than shaped.
+#:
+#: The shapes above catch *credentials*. They cannot catch a personal email address, which
+#: looks exactly like the intended contact address and is a perfectly ordinary string. D119
+#: chose `office@holycowstudios.in` as the published identity precisely so the personal one
+#: would not be scraped off a public repository forever — and then D119's own entry spelled
+#: the personal address out, in the paragraph explaining why it must not appear, where it
+#: survived six further entries (D126).
+#:
+#: A rule that depends on remembering is the rule that failed. This one is named, so the
+#: build fails rather than a reader noticing.
+PERSONAL_STRINGS = (
+    ("akashnavet@outlook.com", "the author's personal email; D119 publishes office@ instead"),
+    ("C:\\Users\\akash", "a local filesystem path carrying the author's username"),
+)
+
 #: This file names every shape it looks for, so it cannot scan itself — the same reason
 #: `privacy.test.ts` strips comments before its own source scan. Nothing else is exempt.
 SCAN_EXEMPT = {"research/tests/test_repository.py"}
@@ -175,3 +191,32 @@ class TestNoCredentialShapedStringIsCommitted:
         """A scanner that has never matched anything has never been shown to work."""
         planted = "AKIA" + "ABCDEFGHIJKLMNOP"
         assert any(re.search(pattern, planted) for pattern, _ in SECRET_SHAPES)
+
+    def test_no_tracked_file_carries_a_personal_identifier(self):
+        """The half a credential scanner cannot see.
+
+        An email address is not credential-shaped; it is an ordinary string that looks
+        exactly like the address the project *does* publish. Found by reading the repository
+        before making it public, in two places — including the decision entry that exists to
+        argue the address must not be published (D126).
+        """
+        offenders: list[str] = []
+        for name in _tracked_files():
+            path = REPO_ROOT / name
+            if name in SCAN_EXEMPT or path.suffix.lower() not in TEXT_SUFFIXES:
+                continue
+            if not path.is_file():
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError):
+                continue
+            for needle, why in PERSONAL_STRINGS:
+                if needle in text:
+                    offenders.append(f"{name}: {why}")
+        assert not offenders, offenders
+
+    def test_the_personal_scan_would_actually_find_one(self):
+        """Same reason as above: a guard that cannot fire is decoration."""
+        for needle, _ in PERSONAL_STRINGS:
+            assert needle in f"prefix {needle} suffix"

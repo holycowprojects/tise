@@ -78,7 +78,7 @@ With thanks,
 
 Akash Naveth
 Holy Cow Studios
-akashnavet@outlook.com
+office@holycowstudios.in
 
 ---
 

@@ -5860,9 +5860,12 @@ enforced by something that fails, not by remembering.
 Akash, 2026-09-03: the repository goes public, private first to watch CI go green once, and
 the commits carry **`office@holycowstudios.in`**.
 
-Every commit permanently records an author and a committer. All 81 carried
-`Akash <akashnavet@outlook.com>`, which on a public repository is a personal address in
-machine-readable form — scraped for spam, and the project's default contact route forever.
+Every commit permanently records an author and a committer. All 81 carried Akash's personal
+Outlook address, which on a public repository is a personal address in machine-readable form
+— scraped for spam, and the project's default contact route forever.
+
+*(The address itself was spelled out here until D126, which is the same leak this entry
+argues against, written into the entry making the argument.)*
 
 **Why it had to be settled before the first push and not after.** The address is an input to
 each commit's hash. Rewriting 81 commits costs seventy seconds today; after publication,
@@ -6459,3 +6462,95 @@ honesty panel were the least verified artefacts in a project whose entire discip
 verification**, because nothing renders them and, until now, nothing read them.
 
 953 Python tests, **527 TypeScript** (+1). Both linters clean, builds.
+
+---
+
+### D126 — The pre-publication audit: no credential, and the leak was a personal email
+
+Akash, before making the repository public: *"check no credential or secret is published."*
+Done as an audit rather than a test run, because `test_repository.py` is the thing being
+checked and a guard cannot audit itself.
+
+#### Nothing credential-shaped exists, in the tree or in the history
+
+* **271 tracked files** scanned for AWS keys, GitHub tokens, Slack tokens, Google API keys,
+  OpenAI keys, private-key headers and JWTs. **Nothing.**
+* **All 99 commits** scanned the same way, with `git log --all -p`. **Nothing.** This matters
+  separately from the tree: a public clone carries the history, and a secret deleted in a
+  later commit is still published by the earlier one.
+* **Every path ever added** in history checked against `.env`, `*.key`, `*.pem`, exports,
+  history databases, domain rankings and screenshots. **None has ever been committed.**
+* **Every image ever committed** is one of the four icons. D118's `filter-branch` purge holds
+  — no screenshot survives anywhere in history.
+* CI references no secret and holds `contents: read`. The lockfile resolves only to
+  `registry.npmjs.org`. The remote is HTTPS with no embedded token.
+* **All 99 commits are authored `Akash Navet <office@holycowstudios.in>`.** D119's rewrite
+  held, including everything committed since.
+
+#### What it did find, and the shape of it is the lesson
+
+**The author's personal email address, in two tracked files.** One of them is D119 — the
+entry that exists to argue the address must never appear on a public repository, which
+spelled the address out while making the argument. It survived six further entries and today
+would have been published with everything else.
+
+The other was the signature block of `docs/gesis-permission-request.md`.
+
+**A credential scanner could never have caught either.** Every shape in `SECRET_SHAPES` is a
+high-entropy string with a distinctive prefix. An email address has neither property: it is
+an ordinary string, and it looks exactly like `office@holycowstudios.in`, the address the
+project deliberately *does* publish. The scanner was solving a problem this repository does
+not have, which D118 already said in different words — **what this repository can leak is not
+credentials, it is a person.**
+
+Two smaller ones, both hygiene rather than exposure: a hardcoded Windows build path carrying
+the author's username in `spike/permissions/README.md`, and the same username inside a
+synthetic `file:///` URL in a test that asserts such URLs are *rejected*.
+
+*(This paragraph originally quoted that path in full, and the new guard failed on this entry
+before it was committed — which is the guard working, on its first real input, against the
+entry describing it.)*
+
+#### The guard now names what it cannot shape
+
+`PERSONAL_STRINGS` sits beside `SECRET_SHAPES` and holds literals rather than patterns: the
+personal address, and the local path prefix. Both scans run over every tracked text file, and
+both have a companion test asserting they can still fire.
+
+**Verified by planting the address in `README.md`**, which failed with *"README.md: the
+author's personal email; D119 publishes office@ instead"*, then reverting.
+
+This is the fourth guard this project has added after the thing it guards already happened,
+and the ratio is the point: `.gitignore` was a prediction until D97 nearly wrote a history
+copy outside it; the screenshot allow-list held until it did not; parity floors exist because
+a green suite proves nothing about which tests ran. **A rule that depends on remembering is
+the rule that fails**, and remembering is exactly what D119 was relying on.
+
+#### Left for Akash: two real domains from his own browsing
+
+Not redacted, because they are his to decide and the argument cuts both ways.
+
+* **`zivasuites.com`** — a hotel, appearing in D40/D78's worked example of the redirect
+  heuristic and in the test fixtures built from it. It is a real visit, with its real
+  redirect chain.
+* **`darkreading.com`, `dominos.co.in`, `nike.in`, `zomato.com`** — recorded in D36's
+  verification table as *observed*, evidence that stored domains are bare.
+
+**For:** they are load-bearing evidence. D78's finding — that the research tier kept the
+redirect plumbing and binned the landing page — is only checkable because the chain is
+printed. Replacing them with `example.com` would make the entries unfalsifiable, and
+unfalsifiable evidence in a decision log is the thing this project is against.
+
+**Against:** the stated standard is absolute, and D118 purged screenshots for showing a hotel
+search. A hotel domain from the same browsing surviving in the decision log is the same
+class of thing at lower resolution, and a reader who spots the inconsistency has a reason to
+doubt the rest.
+
+Five domains do not identify anybody, and the author is already named — the cost is
+consistency, not exposure. Recorded undecided rather than quietly resolved, because deciding
+it silently is how the screenshots got through the first time.
+
+**Verdict: no credential or secret is published.** The two email occurrences are redacted and
+the repository is clean for publication on that question.
+
+955 Python tests (+2), 527 TypeScript. Both linters clean.
