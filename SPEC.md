@@ -257,7 +257,14 @@ the contradiction recorded in the audit.
 **Two targets have been retired. One is adopted; three remain pre-registered and unfitted.**
 The authoritative list is D94 in `DECISIONS.md`, and D97 records the adoption.
 
-### T-A — `visit_engaged` (primary, **adopted D97, replicated D100**, not yet shipped)
+### T-A — `visit_engaged` (primary, **adopted D97, replicated D100, withheld D124**)
+
+> **Not shipped, and no longer waiting to be.** D99's data gate — 1,000 watched visits, 20
+> sittings, 200 labels, declared on 2,148 strangers and failed by 822 of them — is not met
+> on this profile and does not close: raw events expire at 30 days, so the visit count is a
+> window that saturates near 656 against a bar of 1,000 (D123). The model is good; this
+> person's browsing is below the volume it was validated for. Tise ships descriptive
+> instead (D124).
 
 > At the moment a page opens: will dwell exceed the median dwell for this category over its
 > trailing 20 visits?

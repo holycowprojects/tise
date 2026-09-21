@@ -39,10 +39,23 @@ describe("what the page says Tise ships", () => {
     expect(shipped?.state).toBe("retired");
   });
 
-  it("claims exactly one adopted target, and it is not the shipped one", () => {
-    const adopted = TARGET_STATUS.filter((entry) => entry.state === "adopted");
-    expect(adopted.map((entry) => entry.name)).toEqual(["visit_engaged"]);
-    expect(adopted[0]?.name).not.toBe(SHIPPED_TARGET);
+  it("claims exactly one withheld target, and it is not the shipped one", () => {
+    // D124 moved `visit_engaged` from `adopted` to `withheld`. `adopted` describes a wait
+    // and this is a decision: the model cleared its bar, the person's data does not clear
+    // the data gate, and that gate is not closing (D123). Nothing is `adopted` any more,
+    // because nothing is queued to ship.
+    const withheld = TARGET_STATUS.filter((entry) => entry.state === "withheld");
+    expect(withheld.map((entry) => entry.name)).toEqual(["visit_engaged"]);
+    expect(withheld[0]?.name).not.toBe(SHIPPED_TARGET);
+    expect(TARGET_STATUS.some((entry) => entry.state === "adopted")).toBe(false);
+  });
+
+  it("says why a withheld target is withheld, not merely that it is", () => {
+    // A state with no reason beside it is the shape that lets a page claim something the
+    // records have retired (D88-D97). The note has to carry the argument.
+    const withheld = TARGET_STATUS.find((entry) => entry.state === "withheld");
+    expect(withheld?.note).toMatch(/switched off|not reach|stays there/);
+    expect(withheld?.note).toContain("D123");
   });
 
   it("claims nothing is both adopted and shipped yet", () => {

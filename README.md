@@ -53,10 +53,17 @@ tested against a standard written down **before** the answer was known, then che
 **1,326 other people's browsing**, where it beat the obvious guess for 88.6% of them
 individually.
 
-**It is not switched on yet.** Tise will not use it on you until it has seen enough of your
-browsing to trust it — a threshold that was also fixed in advance, and that the extension
-shows you the progress towards. Anyone can show you a confident number on the first day. It
-would not mean anything.
+**And it is switched off.** Tise would only use it on you once it had seen enough of your
+browsing to trust it — a threshold fixed in advance, before any of this author's attention
+was measured, and one that excluded 822 of those 1,326 people as too light to model.
+
+His own browsing does not reach it either. Tise keeps 30 days at a time, so the count settles
+around 650 against a bar of 1,000 and stays there; waiting does not fix it. The bar could
+have been quietly lowered — the measurement is in this repository and nobody would have
+known. It was not.
+
+**So Tise shows you what it measured instead of what a model guesses.** That is the honest
+version of this product, and it is the one you get.
 
 ## How and when it works
 
@@ -66,7 +73,7 @@ would not mean anything.
 | **You agree** | It offers to read your existing Chrome history so it is not starting from nothing. Optional, and you can decline. |
 | **Every day, invisibly** | It notes the topic and time of pages you visit, and how long you actually looked. No pop-ups, no interruptions. |
 | **Every few hours** | It re-learns from what it now knows, in small pieces so your browser never slows down. |
-| **When you open it** | The counts, the patterns, and how far along the predictions are. |
+| **When you open it** | The counts, the patterns, and what Tise does and does not claim — including which predictions are switched off and why. |
 | **After 30 days** | Raw records are deleted automatically. Change that, keep everything forever, or delete the lot — all in the settings. |
 
 You can export everything at any time as a readable file. It is your data, in a form you can
@@ -178,11 +185,21 @@ That panel measures attention with idle time excluded, which is a *better* measu
 the author's own data could provide — so the largest known caveat on the original result is
 now closed rather than outstanding.
 
-**Adopted is not shipped.** It needs how long you actually looked at a page, which the
-`chrome.history` API cannot supply — so the extension collects that itself, from the day the
-permission was granted, and there is not yet enough of it to train on. Until there is, the
-extension keeps training the old target and the UI keeps showing nothing. Nothing gets wired
-in before it is built end to end.
+**Adopted is not shipped, and this one will not be.** It needs how long you actually looked
+at a page, which the `chrome.history` API cannot supply — so the extension collects that
+itself, from the day the permission was granted. The rule for how much it needed was fixed
+before any of it arrived: 1,000 visits Tise actually watched, across 20 sittings, producing
+200 labelled visits.
+
+Measured on 2026-09-21: **497 of 1,000**, with the other two criteria passed. And the visit
+count does not climb forever — raw events expire after 30 days, so it is a window rather than
+a running total, and at this rate the window holds about **656**. The gap does not close by
+waiting; it needs roughly 33 attention-carrying visits a day against the 22 observed.
+
+**That is the whole argument for withholding it** (`DECISIONS.md`, D123 and D124). The model
+is good and this person's browsing is below the volume it was validated for, which is exactly
+what the threshold was written to detect. Reproduce it with
+`uv run python analysis/engagement_gate.py`.
 
 ## Repository layout
 

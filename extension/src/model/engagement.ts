@@ -111,6 +111,18 @@ export function engagementGate(
  * possible — `DEFAULT_MIN_PRIOR_VISITS` — and it says nothing about when a model may be
  * trusted. Same defect as D114's popup subtitle: a number typed next to a system that keeps
  * the real one somewhere else.
+ *
+ * **It stopped being a countdown in D124.** The unmet sentence used to end *"so 503 to
+ * go"*, which reads as a wait. It is not one: raw events expire, so the visit count is a
+ * window rather than a running total, and at this profile's rate the window saturates
+ * around 656 against a bar of 1,000 (D123). A number that only ever approaches its target
+ * described as a shortfall is the same defect as D116's popup line — a sentence that sounds
+ * like a measurement and is actually a forecast nobody made.
+ *
+ * **The counts stay on screen**, because D101's reason for putting them there has not
+ * changed: a store whose progress is invisible is indistinguishable from one that is
+ * broken, and these numbers are the only thing that would expose collection silently
+ * stopping. What changed is the promise attached to them, not the measurement.
  */
 export function gateSentence(gate: EngagementGate): string {
   if (gate.met) {
@@ -123,9 +135,10 @@ export function gateSentence(gate: EngagementGate): string {
     .filter((criterion) => !criterion.met)
     .sort((a, b) => a.observed / a.required - b.observed / b.required)[0];
   if (furthest === undefined) return "Ready.";
-  const short = (furthest.required - furthest.observed).toLocaleString();
   return (
-    `Not yet — ${furthest.observed.toLocaleString()} of ${furthest.required.toLocaleString()} ` +
-    `${furthest.name}, so ${short} to go.`
+    `${gate.dwelledVisits.toLocaleString()} visits with measured attention, ` +
+    `${gate.labels.toLocaleString()} of them labelled. Prediction stays off — ` +
+    `${furthest.observed.toLocaleString()} of ${furthest.required.toLocaleString()} ` +
+    `${furthest.name}, and that gap is not closing on its own.`
   );
 }

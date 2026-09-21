@@ -134,7 +134,23 @@ describe("the sentence a person reads", () => {
 
     expect(gate.met).toBe(false);
     expect(gateSentence(gate)).toContain("visits with measured attention");
-    expect(gateSentence(gate)).toContain("986 to go");
+    expect(gateSentence(gate)).toContain("14 of 1,000");
+  });
+
+  it("does not describe the shortfall as a wait", () => {
+    // D124. The sentence used to end "so 986 to go", which reads as a countdown. The visit
+    // count is a window and not a running total — raw events expire — so at a rate that
+    // cannot fill the window it approaches a ceiling below the bar and stays there (D123).
+    // Language that implies arrival is a forecast nobody made, and the popup has shipped
+    // that mistake twice already (D101, D114).
+    const events = Array.from({ length: 14 }, (_, i) => event(i));
+    const gate = engagementGate(events, events.map((_, i) => span(i)), TIMEOUT);
+    const sentence = gateSentence(gate);
+
+    expect(sentence).not.toContain("to go");
+    expect(sentence).not.toContain("Not yet");
+    // And it still says where the model stands, rather than going quiet about it.
+    expect(sentence).toContain("Prediction stays off");
   });
 
   it("does not repeat the claim it replaced", () => {

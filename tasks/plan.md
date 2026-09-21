@@ -548,7 +548,28 @@ benchmark documents the README links to. Quantify what the in-browser constraint
 
 ### Checkpoint E — complete
 
-- [ ] All twelve spec success criteria met.
+**There are five criteria, not twelve.** This line read *"All twelve spec success criteria
+met"* from the scaffold commit until D124, and `SPEC.md` has listed **five** since that same
+commit — the twelve never existed. `tasks/todo.md` compounded it with *"only #7 is
+outstanding, and #7 is T-G4"*, a claim about an item that was never there, and that sentence
+was the stated definition of "product ready" (D122). Checked against `git log`, not memory.
+
+They are spelled out here rather than counted, because a count is what allowed a number
+nobody could check to stand in for a list anybody could.
+
+- [ ] **1. A public repository someone can read and believe.** Blocked on D122's visibility
+      decision, not on work.
+- [ ] **2. A Web Store listing that truthfully declares zero data transmission.** T18.
+- [x] **3. A reliability curve from real browsing, showing stated probabilities are
+      approximately correct.** `docs/benchmarks/calibration.md`, computed on real browsing
+      (D110). It scores `return_24h`, which D88 retired — so it is a research result, and
+      **the shipped surface states frequencies with their denominators rather than model
+      probabilities**, which is D103's design and is why nothing on screen needs this curve
+      to be trusted. Read D124 before treating this tick as unqualified.
+- [x] **4. A benchmark table where every number was actually measured (D3).**
+      `docs/benchmarks/`, every figure produced by a committed script.
+- [x] **5. A documented case where the model failed and why.** Six of them: D80, D92, D102,
+      D109, D112, D123.
 - [ ] Every README number traces to a committed script.
 - [ ] `DECISIONS.md` current, including superseded entries.
 - [ ] Repository is genuinely readable by a stranger.

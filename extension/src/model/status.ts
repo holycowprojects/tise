@@ -24,6 +24,17 @@ export type TargetState =
   | "shipped"
   /** Cleared a bar written before it was fitted, and is not wired in yet. */
   | "adopted"
+  /**
+   * Cleared its bar, and deliberately not shipped because a *data* gate fixed in advance
+   * is not met and will not be (D124).
+   *
+   * Distinct from `adopted`, which describes a wait. This one is a decision: the model is
+   * good and the person's data is insufficient, which is a real and common answer rather
+   * than a stage on the way to shipping. Keeping them apart is the whole point of this
+   * file — D88 to D97 had one constant meaning both a goal and a shipped fact, and one of
+   * the two was always wrong.
+   */
+  | "withheld"
   /** Scored against a pre-registered bar; the result did not adopt it. */
   | "measured"
   /** Definition, bar and adoption rule fixed in advance. Nothing fitted. */
@@ -62,14 +73,16 @@ export const TARGET_STATUS: readonly TargetStatus[] = [
   {
     name: "visit_engaged",
     question: "Will this page hold your attention?",
-    state: "adopted",
+    state: "withheld",
     note:
-      "The one place machine learning has earned its place here. It cleared a bar set " +
-      "before it was fitted (D97) and held on 1,326 other people's browsing (D100), " +
-      "beating a constant for 88.6% of them individually. It is not switched on yet, and " +
-      "the rule for when it will be was fixed before any of your attention was measured: " +
-      "1,000 visits Tise actually watched, across 20 sittings, producing 200 labelled " +
-      "visits. The popup shows how far along that is.",
+      "The one place machine learning has earned its place here, and it is switched off. " +
+      "It cleared a bar set before it was fitted (D97) and held on 1,326 other people's " +
+      "browsing (D100), beating a constant for 88.6% of them individually. Switching it " +
+      "on needed 1,000 visits Tise actually watched — a rule fixed before any of your " +
+      "attention was measured, and one that excluded 822 of those 1,326 people. Your " +
+      "browsing does not reach it: Tise only keeps 30 days at a time, so the count " +
+      "settles near 650 and stays there. Waiting does not fix that, so rather than " +
+      "quietly lower the bar, Tise shows you what it measured instead (D123, D124).",
   },
   {
     name: "return_24h",

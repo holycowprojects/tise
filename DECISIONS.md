@@ -6265,3 +6265,121 @@ Three options exist and none is taken in this entry:
 so when the window cannot hold the bar — a projection corrected, not a bar rewritten. It was
 broken deliberately once and 4 of 13 tests failed. 953 Python tests, 524 TypeScript, both
 linters clean.
+
+---
+
+### D124 — Ship descriptive: the model is good, the data is not, and the product says so
+
+Akash's call, given D123's three options: **ship descriptive.** `visit_engaged` stays
+adopted, stays replicated, and does not switch on. Tise ships what it has measured.
+
+This is D94's stopping rule arriving by a route nobody planned for. That rule said: if no
+target separates from its declared bar, the finding is that this data does not support a
+model and Tise ships descriptive. **T-A did separate** — it is the one target that cleared a
+pre-registered bar (D97) and held on 1,326 other people (D100). The stopping rule still
+fires, one layer down: the model earned its place and the *person* does not clear the data
+gate that was declared for it.
+
+#### What changes, and it is less than it sounds
+
+Nothing about the engine. Collection, sessions, features, attention, training, calibration,
+retention, export, parity, the card, the dashboard, resolution — all of it stays, all of it
+works, and the research is unretracted. What changes is that three surfaces stop describing
+a switch-on that is not coming.
+
+**`status.ts` gains a state.** `visit_engaged` moves from `adopted` to **`withheld`**, and
+the distinction is the point: `adopted` describes a *wait*, and this is a *decision*. A state
+that means "queued to ship" applied to something that will not ship is the exact defect this
+file was written to prevent — D88 to D97 had one constant meaning both a goal and a shipped
+fact, and one of the two was always wrong. The note now carries the argument rather than a
+pointer to a progress bar.
+
+**The popup stops counting down.** `gateSentence` ended *"so 503 to go"*. A shortfall phrased
+as a remainder is a promise of arrival, and D123 established there is none at this rate. It
+now reports what was measured and says prediction stays off, with the gap and the reason.
+**The counts stay on screen**, because D101's argument for putting them there is untouched: a
+store whose progress is invisible is indistinguishable from one that is broken, and these
+numbers remain the only thing that would expose collection silently stopping. What was
+withdrawn is the promise attached to them, not the measurement. Third time the popup has
+shipped a hand-written claim that outlived its system (D101, D114, now).
+
+**`SPEC.md`'s T-A heading** said "not yet shipped". "Not yet" is the same promise in two
+words.
+
+#### The headline is the withholding, not an apology for it
+
+The honest framing, and the one worth putting in front of a reader: **a model was validated
+on 1,326 people, and withheld from the one person it could not be validated for.** A
+capability showcase that demonstrates a team will not ship an unvalidated model against its
+own interest is showing something harder to fake than a working model — every ML project
+claims a gate and very few can point at the run where it fired against them.
+
+D123's numbers are what make it checkable rather than a posture: 497 of 1,000, a ceiling near
+656, and 822 of 2,148 strangers excluded by the same rule years earlier.
+
+#### Checkpoint E: there are five criteria, not twelve, and there never were
+
+Acting on this decision meant reading Checkpoint E, which says *"All twelve spec success
+criteria met"*, and `tasks/todo.md`, which says *"the twelve `SPEC.md` criteria. Only #7 is
+outstanding, and #7 **is** T-G4."*
+
+**`SPEC.md` has listed five since the scaffold commit.** Checked against `git log`, not
+memory: the five items in "What success looks like" are byte-identical to `1e0c26d`, the
+first commit in the repository. There has never been a seventh criterion, so "only #7 is
+outstanding" was a claim about an item that did not exist — and D122 made that sentence the
+definition of "product ready". The planning documents have been carrying it since the
+scaffold, and this session repeated it in conversation before checking.
+
+**This is the project's own recurring defect, in its own planning documents.** D98:
+`reports.py` labelled twelve benchmarks with a retired target. D105, D106, D108, D114, D116:
+a surface asserting something the system had moved past. Every one was caught by looking at a
+real artefact rather than a record of it. The records were never audited the same way,
+because nothing renders them and nothing tests them.
+
+Checkpoint E now **spells the criteria out instead of counting them**, because a count is
+precisely what let an unverifiable number stand in for a checkable list.
+
+Where they stand: **4 and 5 are met** (`docs/benchmarks/`; six documented failures — D80,
+D92, D102, D109, D112, D123). **1 and 2 are visibility and T18**, neither blocked by this
+decision. **3 needs reading carefully**, below.
+
+#### Criterion 3 is ticked with its qualification attached, not quietly
+
+*"A reliability curve, computed from real browsing, showing that stated probabilities are
+approximately correct."*
+
+The curve exists at `docs/benchmarks/calibration.md`, computed on real browsing (D110). It
+scores `return_24h` — retired by D88 — so it is a research result about a target nothing
+shows.
+
+The shipped surface does not state model probabilities at all. D103 chose counts with their
+denominators (*"after `news`, you usually go to `video` 41% — 9 of 22"*) precisely so that
+what is displayed is either true of the person's own data or it is not, and **smoothing was
+deliberately left out so the percentage equals the fraction**. There is nothing on screen
+whose calibration could be wrong.
+
+So the criterion is met in the sense it was written, and **the qualification travels with the
+tick wherever it appears** rather than being argued once and forgotten. Recorded plainly
+because reinterpreting a success criterion in the same session that abandoned the feature it
+was written for is exactly the shape D123 refused a day earlier, and the defence is not that
+this reading is convenient — it is that D103 chose the non-probabilistic surface in August,
+for stated reasons, long before anything failed.
+
+#### What is explicitly not decided
+
+**The extension still trains `return_24h`.** It is retired, its predictions are kept and
+scored and shown to nobody as advice, and it is what keeps the prediction and resolution loop
+exercised end to end. Ripping it out is a separate change with its own risk and no user
+visible in it either way. `SHIPPED_TARGET` still names it, truthfully.
+
+**D99's rule is not re-opened.** D123's third option — asking whether shipping deserves a
+different bar from replication — remains available, untaken, and still carries its timing
+problem. Choosing to ship descriptive is not an argument that the gate was wrong; it is
+accepting the gate's answer.
+
+**`visit_engaged` switches on by itself if the gate is ever met.** Nothing about the rule was
+weakened, and `engagementGate` still runs on every popup open. If Akash's browsing volume
+changes, the gate passes and the entry above becomes wrong in the good direction.
+
+953 Python tests, **526 TypeScript** (two added: the popup must not phrase the gap as a wait,
+and a withheld target must carry its reason). Both linters clean, builds.
