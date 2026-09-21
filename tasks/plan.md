@@ -557,8 +557,12 @@ was the stated definition of "product ready" (D122). Checked against `git log`, 
 They are spelled out here rather than counted, because a count is what allowed a number
 nobody could check to stand in for a list anybody could.
 
-- [ ] **1. A public repository someone can read and believe.** Blocked on D122's visibility
-      decision, not on work.
+- [x] **1. A public repository someone can read and believe.** Public 2026-09-21 (D129),
+      after an audit of 271 tracked files and all 99 commits (D126) and the domain question
+      settled and guarded (D127, D128). *Read* is verified — unauthenticated fetch returns
+      200, `data/` returns 404. **Believe is not a checkbox**: it rests on the decision log
+      being checkable, which is why D127 kept the evidence domains and why D128's removal of
+      two is recorded as a trade rather than a tidy-up.
 - [ ] **2. A Web Store listing that truthfully declares zero data transmission.** T18.
 - [x] **3. A reliability curve from real browsing, showing stated probabilities are
       approximately correct.** `docs/benchmarks/calibration.md`, computed on real browsing

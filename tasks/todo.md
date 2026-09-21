@@ -1,9 +1,15 @@
 # Tise V1 — Task List
 
-## ▶ START HERE — shipping descriptive (D124), 2026-09-21
+## ▶ START HERE — public, shipping descriptive, 2026-09-21
 
-**`holycowprojects/tise`, private. Clean tree, CI green, local and remote in sync.**
-953 Python + 526 TypeScript, both linters clean, builds. DECISIONS.md at **124 entries**.
+**[`holycowprojects/tise`](https://github.com/holycowprojects/tise) — PUBLIC since
+2026-09-21** (D129). Clean tree, CI green, local and remote in sync.
+961 Python + 527 TypeScript, both linters clean, builds. DECISIONS.md at **129 entries**.
+
+**Anything committed from here is world-readable the moment it is pushed.** The guards in
+`research/tests/test_repository.py` run locally and in CI, and push protection refuses a
+credential at the push — but none of that reads a decision entry for judgement. D126 and
+D128 both caught their own text naming what they argued should not be named.
 
 ### The decision that reshaped this list
 
@@ -1224,14 +1230,19 @@ published as a failure.
       TypeScript-7 one closed as unmergeable — `typescript-eslint` caps TS at `<6.1.0` in
       its newest release, so `npm ci` cannot resolve, and majors are now ignored with the
       revisit condition written next to the rule
-- [ ] **Flip it public — no later than Web Store submission** (D122). Akash: public once the
-      full product is ready. Private today makes nothing untrue, because nothing is listed.
-      **But `docs/privacy-policy.md` says "You can read the source. Tise is open source"**,
-      in the present tense, and that is the sentence turning "trust us" into "go and check".
-      Listing the extension while the repository is private makes it false to every reader,
-      about the claim they would most want to verify. **Submission is the deadline**
-- [ ] **Branch protection on `main`**, and secret scanning + push protection. Repository
-      settings, not workflow files. **Deferred by Akash 2026-09-03** ("wait for this"), and
+- [x] **PUBLIC since 2026-09-21** (D129), ahead of the D122 deadline rather than against it.
+      `docs/privacy-policy.md` says *"You can read the source. Tise is open source"* in the
+      present tense — the sentence turning "trust us" into "go and check" — and it is now
+      true. **Verified unauthenticated**: the README returns 200 and `data/` paths return
+      404, checked against the real URL rather than against `.gitignore`
+- [x] **Secret scanning, push protection, Dependabot alerts and security updates — all on**
+      (D129). Push protection is the load-bearing one: it refuses a credential at the push
+      rather than alerting once it is already in a public history. **One toggle left, web UI
+      only** — Code security → Secret scanning → *non-provider patterns*, the catch-all for
+      generic keys and connection strings. The API accepts that PATCH and ignores it
+- [ ] **Branch protection on `main`**. Repository settings, not workflow files.
+      **Deferred by Akash 2026-09-03** ("wait for this"), and still deferred deliberately:
+      with no other contributor, PR-only merges are friction with nothing behind them. And
       on a private single-contributor repo the exposure is close to nil — it stops being
       nil the moment someone else can fork or open a PR, which is the same moment as above.
       Worth knowing when it is revisited: required status checks end direct pushes to

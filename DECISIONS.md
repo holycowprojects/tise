@@ -6708,3 +6708,94 @@ too easily; this is about one that cannot say no. Both failures come from a list
 has an "in" column.
 
 958 Python tests plus 3, 527 TypeScript. Both linters clean.
+
+---
+
+### D129 — Public, and two settings that reported success while doing nothing
+
+`holycowprojects/tise` is **public as of 2026-09-21**, eighteen days after D122 fixed the
+deadline as "no later than Web Store submission". It went early rather than late, and the
+order it went in is the part worth recording.
+
+#### The sequence, which was not an accident
+
+D122 said public no later than submission. D124 chose to ship descriptive, which made the
+repository the deliverable rather than the accompaniment. Then, before flipping anything:
+
+* **D126** — audited 271 tracked files and all 99 commits for credentials. Found none, and
+  found a personal email address in two files, one of them the entry arguing that address
+  must never be published.
+* **D127** — resolved what to do about real browsing domains: keep them, because evidence
+  that cannot be checked is not evidence, and close the set so "evidence" cannot expand.
+* **D128** — withdrew the two that carried a share of one person's browsing, and learnt that
+  deleting an allow-list entry does not keep a name out.
+
+**Publishing was the last step, not the first.** The alternative — flip it, then audit —
+differs in one respect that matters: a public repository cannot be un-published. Clones and
+forks keep whatever was there, the same asymmetry D119 recorded about commit authorship, and
+the same reason that decision was made before the first push rather than after.
+
+#### Verified against the live URL, not against `.gitignore`
+
+The claim in `docs/privacy-policy.md` — *"You can read the source. Tise is open source"* — is
+present tense and is now true. Checked unauthenticated:
+
+```
+README.md                        HTTP 200
+data/tise-export-2026-09-21.json HTTP 404
+```
+
+The second is the one worth running. `.gitignore` is a prediction, `git ls-files` is the
+truth about what would be published, and **the live URL is the truth about what was**. Three
+different questions, and only the last one is about the thing that actually happened.
+
+All 22 repository guards passed immediately before the change, at a clean tree.
+
+#### What is enabled
+
+Secret scanning, **push protection**, Dependabot alerts, Dependabot security updates.
+
+Push protection is the load-bearing one and the only one that is preventive: it refuses a
+credential at the push, rather than alerting after it is already in a public history where
+alerting is too late. The rest are detection.
+
+This does not replace `test_repository.py`. GitHub scans for credential *shapes*; what this
+repository can leak is a person, and D126 established that no shape-based scanner can see an
+email address or a domain beside a percentage. The two run at different layers on purpose.
+
+#### Both silent failures reported success
+
+`dependabot_security_updates` returned **200** to a PATCH and stayed `disabled` — the
+endpoint is a no-op unless `vulnerability-alerts` is enabled first, which nothing in the
+response said. Enabling alerts, then fixes, returned **204** twice and took.
+
+`secret_scanning_non_provider_patterns` also returns 200 and remains `disabled`. It appears
+to need the web UI. **Left off and recorded as off**, rather than reported as done.
+
+**The generalisable half:** both settings answered with a success code while changing
+nothing, and the only thing that caught it was reading the state back. A success code
+describes a request that was accepted, never an outcome that occurred.
+
+That is the same distinction D115 drew about CI — a green suite proves the tests that ran
+passed, not that the ones that mattered were among them — and the same one D101 drew about a
+store whose progress was invisible. Third appearance, third mechanism: **confirm the state,
+never the call.**
+
+#### What this closes, and what it does not
+
+`SPEC.md`'s first success criterion is met on its *readable* half, verified. **"Believe" is
+not a checkbox** and is not claimed as one: it rests on the decision log being checkable,
+which is exactly why D127 kept the evidence domains and why D128's removal of two is
+recorded as a trade against verifiability rather than as a cleanup.
+
+Criterion 2 — the Web Store listing — is the only one outstanding, and it is T18, blocked on
+three items only Akash can supply.
+
+**Branch protection stays off**, deliberately, and is now a live choice rather than a
+deferral: forks and pull requests are possible from today. With no second contributor,
+PR-only merges are friction with nothing behind them, and required status checks would end
+direct pushes to `main` even without requiring pull requests, because a freshly pushed commit
+has no check results yet. Revisit when somebody else contributes, which is the moment the
+calculation changes.
+
+961 Python tests, 527 TypeScript, both linters clean, builds. CI green on `a2d2b07`.
