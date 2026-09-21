@@ -27,6 +27,14 @@ bootstrap clusters on sessions and a cluster with no rows in it is not a cluster
 analogue is **sessions containing at least one label**. Both readings are printed, because
 the looser one passes and saying so is the point.
 
+**The visit count is a window, not a running total** (D123). Raw events expire after
+`rawRetentionDays` (D11) and a dwell-carrying visit needs its event, so the criterion is met
+only if the arrival rate *fills* the window — `rate x retention` is a ceiling the count
+approaches and then stops at. This is not a defect in the translation: D99's corpus is 1-31
+October 2018, one month, so a 30-day window is the comparison rather than a distortion of it.
+It does mean a shortfall must never be divided by a rate to produce a date without first
+checking the ceiling, which is what this script did until D123.
+
 Aggregates only. Categories, never domains. No path outside `data/` is written.
 """
 
@@ -71,9 +79,21 @@ def measure(export: TiseExport) -> dict[str, object]:
     moments = sorted(event.occurred_at for event in dwelled)
     span_days = (moments[-1] - moments[0]).total_seconds() / 86_400 if len(moments) > 1 else 0.0
 
+    # The *stored* window, which is wider: it includes imported history, which carries no
+    # dwell. Kept separate because dividing every event by the dwell window mixes two spans
+    # and inflates the looser reading — it read 1,150 against a 1,000 bar before this split.
+    all_moments = sorted(event.occurred_at for event in events)
+    all_days = (
+        (all_moments[-1] - all_moments[0]).total_seconds() / 86_400
+        if len(all_moments) > 1
+        else 0.0
+    )
+
     return {
         "events": len(events),
         "collection_days": span_days,
+        "stored_days": all_days,
+        "retention_days": export.raw_retention_days,
         "visits_per_day": (len(dwelled) / span_days) if span_days > 0 else 0.0,
         "spans": len(export.attention),
         "dwelled_visits": len(dwelled),
@@ -166,16 +186,63 @@ def report(measured: dict[str, object]) -> str:
     rate = float(measured["visits_per_day"])
     if not passed and rate > 0:
         short = MIN_VISITS - int(measured["dwelled_visits"])
+        retention = int(measured["retention_days"])
+        # D123: the count is a *window*, not a running total. Raw events expire (D11) and a
+        # dwell-carrying visit needs its event, so the criterion is met only if the rate
+        # fills the window. Projecting a shortfall over a rate assumes a total, and printed
+        # "about 23 days" for a profile whose count saturates ~380 short. Retention of 0 is
+        # "keep forever" (settings), and only there is the count genuinely cumulative.
+        ceiling = rate * retention if retention > 0 else None
         lines.append("")
-        lines.append("How far off, at the rate attention is currently arriving")
+        lines.append("Is the visit criterion reachable at this rate?")
         lines.append("")
         lines.append(
-            f"  {rate:.0f} dwell-carrying visits/day over "
+            f"  {rate:.1f} dwell-carrying visits/day over "
             f"{float(measured['collection_days']):.1f} days of collection"
         )
-        lines.append(
-            f"  {short:,} short of the visit criterion -> about {short / rate:.0f} days"
-        )
+        if ceiling is None:
+            lines.append(
+                f"  {short:,} short of the visit criterion -> about {short / rate:.0f} days"
+            )
+            lines.append("  Raw events are kept forever here, so the count is cumulative.")
+        else:
+            lines.append(
+                f"  raw events expire after {retention} days, so this count is a window "
+                "and not a total"
+            )
+            lines.append("")
+            lines.append(
+                f"  {rate:.1f}/day x {retention}-day window -> about {ceiling:,.0f} "
+                f"at saturation, against {MIN_VISITS:,}"
+            )
+            if ceiling >= MIN_VISITS:
+                lines.append(
+                    f"  the window holds enough -> about {short / rate:.0f} days to go"
+                )
+            else:
+                needed = MIN_VISITS / retention
+                lines.append(
+                    f"  NO — the window cannot hold {MIN_VISITS:,} at this rate. Waiting "
+                    "does not close the"
+                )
+                lines.append(
+                    f"  gap; it needs about {needed:.0f} visits a day sustained. (D123)"
+                )
+                # The loosest reading of "visits" there is, printed because a verdict that
+                # survives it is a finding about the profile rather than about the
+                # translation. It is generous twice over: imported history carries no dwell
+                # and can never produce a label, and it is mid-expiry besides.
+                days = float(measured["stored_days"])
+                loose_rate = (int(measured["events"]) / days) if days > 0 else 0.0
+                lines.append("")
+                lines.append(
+                    f"  Even counting every stored event — {loose_rate:.1f}/day, including "
+                    "imported"
+                )
+                lines.append(
+                    f"  history that cannot be labelled — the window holds about "
+                    f"{loose_rate * retention:,.0f}."
+                )
         lines.append("")
         lines.append("  Labels are NOT projected here, and the omission is deliberate: they")
         lines.append("  arrive faster than linearly while categories are still crossing their")

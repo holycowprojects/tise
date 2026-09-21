@@ -6110,3 +6110,158 @@ deliberately if it is ever made at all, rather than discovered during a listing 
 **Branch protection moves with it.** Deferred by Akash today, and on a private
 single-contributor repository the exposure is close to nil. The moment it stops being close
 to nil is the moment someone else can fork or open a pull request, which is the same moment.
+
+---
+
+### D123 — The gate is re-measured, does not pass, and is not going to
+
+Eighteen days of browsing later, a fresh export (`2026-09-21`). D116 left T-G4 gated on
+D99's eligibility rule at 19% of its binding criterion, about sixteen days out. This is the
+re-read, and it does three things: it reports the number, it withdraws a projection, and it
+records a proposal that was made and should not have been.
+
+#### Where the profile stands
+
+```
+  no    dwell-carrying visits         497 / 1,000   (50%)
+  PASS  sessions holding a label       62 / 20      (310%)
+  PASS  labels                        413 / 200     (206%)
+```
+
+**Two of the three criteria now pass, and neither is the one that binds.** On 2026-09-03 all
+three failed; sessions and labels have since cleared by 3x and 2x. The visit criterion has
+moved 192 -> 497.
+
+Composition has improved and is still lopsided. Of 413 labels, 126 are `unknown` (D27), and
+of the 287 that remain **205 are `search` — 71%, against 93% at D116**. Four categories now
+carry labels where two did. The base rate is **49.2%**, which is what a median split is
+supposed to produce and the first time this project has measured one that close to its own
+premise.
+
+#### The export shrank by 40%, and the reason is not a fault
+
+3,918 events -> 871. **Imported Chrome history aged out of the 30-day retention window
+(D11).** The oldest surviving event is 2026-08-24. Nothing was reset and nothing was lost
+that was not meant to expire: attention spans went **367 -> 860** over the same period, which
+is live collection working exactly as D96 intended.
+
+Worth recording because the innocent explanation and the alarming one look identical in a
+file size, and the alarming one — a store wiped by a reinstall — was live until the window
+was actually checked.
+
+#### The projection was wrong, and withdrawing it is the point of this entry
+
+`engagement_gate.py` printed *"503 short of the visit criterion -> about 23 days"*. That
+sentence assumes the count is cumulative. **It is not.** Events expire at 30 days, and the
+gate counts dwell-carrying visits — events joined to spans — so it counts what fits in the
+window, not what has ever happened.
+
+Measured over the 22.7 days attention has been collected: **21.9 dwelled visits a day**.
+Against a 30-day window:
+
+```
+  21.9/day x 30-day window  ->  about 656 at saturation, against 1,000
+```
+
+So the count rises to roughly 650 by the end of September and **then stops**. Nothing has
+expired yet — the union of dwelled visits across all four exports is 497, exactly today's
+count, because the oldest is 2026-08-29 and expiry begins around 2026-09-28. After that the
+number is flat. **It is a ceiling, not a countdown, and the script said "23 days" anyway.**
+
+Reaching 1,000 needs about **33 dwelled visits a day, sustained** — half again the observed
+rate, forever, and not a thing to plan a product on.
+
+#### The proposal that was wrong, recorded because it was nearly acted on
+
+The first reading of that ceiling was that **the unit was defective**: D99 counted visits
+over unbounded history, T-G4 counts them inside a retention window, so the bar could not
+transfer and the honest repair was a cumulative counter surviving raw-event expiry — which
+D11 permits, since derived features do not expire. It came with a deadline, because the true
+cumulative count is only recoverable while nothing has expired.
+
+**It was wrong, and checking rather than asserting is the only reason it did not ship.**
+`analysis/replication.py` computes `visits = len(events)` over a corpus that is **1-31
+October 2018 — one month** (D99, D100). D99's rule is *1,000 visits in a month*. A 30-day
+window is not a distortion of that comparison; it **is** that comparison. D116's translation
+was right.
+
+So the repair would have replaced a faithful unit with an unfaithful one, and it would have
+done so immediately after watching the faithful one fail. **That is the exact move
+pre-registration exists to stop** — D81's lesson, D102's, D112's — and it arrived dressed as
+a fidelity argument, which is the only form in which it would ever be persuasive. The
+deadline attached to it made it worse: urgency is a poor reason to change a bar and an
+excellent reason to skip checking one.
+
+#### The verdict is robust to the translation, which is what makes it a finding
+
+If the unit were loosened to **every stored event** — imported history included, though it
+carries no dwell and can never produce a label — the profile still fails. The script prints
+both, because a verdict that survives the loose reading is a finding about the profile rather
+than about the translation:
+
+```
+  dwell-carrying visits (D116's unit)   21.9/day x 30  ->  about 656
+  every stored event                    31.0/day x 30  ->  about 931
+```
+
+**Every live event carries a span** — dwell-carrying visits and live events are both 497 — so
+the gap between the two rows is entirely imported history, which is mid-expiry and gone
+within days. The loosest available reading is 931 and falls short of 1,000 on its own,
+*before* accounting for the fact that it is inflated by data about to vanish.
+
+No reading of the rule passes. That is a much stronger statement than the strict reading
+failing alone.
+
+**That line was wrong on its first run and the error is worth keeping.** It divided every
+stored event by the *dwell* collection window rather than the stored one, mixing a 29-day
+span with a 22.7-day span, and printed **1,150 — a pass** — in the one line whose purpose is
+to show the verdict survives a generous reading. Two spans are now measured separately and a
+test pins the arithmetic in both directions.
+
+#### What this actually means: the gate is working
+
+**D99 excluded 822 of 2,148 panelists on this criterion.** 38% of real people did not browse
+enough, in a month, for this model to be worth fitting for them.
+
+**Akash is one of them.** At roughly 656 dwell-carrying visits a month against a bar of
+1,000, this profile is not a marginal case; it is inside the excluded group by a wide margin,
+and it would have been excluded from the D100 replication had it been in that panel.
+
+That is not a failure of the gate. It is the gate doing the one thing it was built to do, to
+the person who built it. The uncomfortable part is that a rule declared on strangers, chosen
+specifically because nobody could tune it after seeing this profile, has now returned a
+verdict about this profile that its author does not want — which is the only circumstance in
+which such a rule is worth anything at all.
+
+#### What is not decided here
+
+Whether D99's rule is the right rule for **shipping** is a separate question from whether it
+was the right rule for **replication**, and it has never been asked. D99 answered *"is this
+person worth including in a measurement of a population effect?"*. Shipping asks *"should
+this person be shown a prediction?"*. Those are not obviously the same question, and a rule
+built for the first was reused for the second in D116 without the distinction being raised.
+
+**The distinction may be real. The timing is not innocent**, and it is recorded that way: it
+was noticed after the gate failed, by the person the gate excluded. It is a hypothesis
+needing its own pre-registered argument, not a licence to reinterpret a bar that has just
+returned an unwelcome answer. Nothing is changed on the strength of it today.
+
+Three options exist and none is taken in this entry:
+
+1. **Wait.** Does not work — the count saturates below the bar. Only a sustained change in
+   browsing volume (33/day against 21.9) reaches 1,000, and that is not a thing to plan on.
+2. **Ship descriptive.** D94's stopping rule in a different costume: Tise shows what it has
+   measured, `visit_engaged` stays adopted and unshipped, and the honest headline is that a
+   model was validated on 1,326 people and withheld from the one person it could not be
+   validated for.
+3. **Ask whether shipping needs its own bar.** Legitimate, tainted by timing, and requires
+   the argument to be written before any number is looked at again.
+
+**T-G4 remains gated, and the gate has now returned a real answer rather than a wait.**
+`SPEC.md` criterion #7 is not met and, on the current reading, will not be met by patience.
+
+**No threshold moved and nothing was fitted.** The only code change is that
+`engagement_gate.py` now checks the ceiling before dividing a shortfall by a rate, and says
+so when the window cannot hold the bar — a projection corrected, not a bar rewritten. It was
+broken deliberately once and 4 of 13 tests failed. 953 Python tests, 524 TypeScript, both
+linters clean.
