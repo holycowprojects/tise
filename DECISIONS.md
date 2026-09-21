@@ -6554,3 +6554,76 @@ it silently is how the screenshots got through the first time.
 the repository is clean for publication on that question.
 
 955 Python tests (+2), 527 TypeScript. Both linters clean.
+
+---
+
+### D127 — The evidence domains stay, and the set is closed
+
+Akash, on D126's open question: **"keep the domains, they are the evidence."**
+
+#### The argument, and it is the stronger one
+
+`zivasuites.com` is not decoration in D40 and D78. Those entries claim the research tier
+kept the redirect plumbing and binned the landing page, and the *only* reason a reader can
+check that is that the actual chain is printed — `google.com/url?...` carrying no redirect
+bit, then three hops that do. Substitute `example.com` and the entry still reads well and can
+no longer be verified by anyone.
+
+**A decision log whose evidence cannot be checked is the thing this project exists against.**
+Every other guard here — parity oracles, committed scripts behind every number, `git ls-files`
+over `.gitignore` — exists to make claims checkable rather than trusted. Redacting the
+evidence to look more careful would have traded the property the log is for against the
+appearance of the property.
+
+Same for D36's verification table. *"Every stored domain is bare, no path or query —
+**observed**"* is a claim about a real browser, and the four domains are what makes it an
+observation rather than an assertion.
+
+#### Two more, which Akash had not been shown when he decided
+
+D126 surfaced five domains. A full sweep of the log found **seven**, and the two extra are a
+different shape: `deepseek.com` at **11.8%** of the Firefox corpus and `insighttimer.com` at
+**15.7%**, in D26, as the reason the `wellness` category exists.
+
+A bare domain says a site was visited. A domain with a share of a corpus says **how much of
+someone's browsing it was**, which is closer to a profile than anything else published here.
+They are recorded under the same decision because the same argument covers them — D26's
+category boundaries are only checkable against what actually drove them — but the difference
+is named rather than folded in, and Akash can reverse this specific pair without disturbing
+the rest.
+
+#### The decision needed an edge, because as stated it has none
+
+*"Real domains may stay when they are evidence"* permits everything. Every domain looks like
+evidence to whoever is pasting it in, and that is exactly how the screenshot allow-list
+grew to eleven files, two of which showed a live hotel booking with a full tracking URL
+(D118).
+
+So the seven are **named** in `EVIDENCE_DOMAINS`, each with the entry it supports, and
+`TestTheEvidenceDomainsAreAClosedSet` fails on any other domain appearing in `DECISIONS.md`.
+Adding one becomes a deliberate act with a name on it rather than a judgement made once and
+never revisited.
+
+**This is the icons rule, not the screenshot rule.** D118's allow-list failed because it
+grew, one "safe" exception at a time, and each addition was judged by whoever was adding it.
+This set is small, fixed, and cannot grow without a test failing first — the same shape as
+the four exact icon paths, which is the allow-list in this repository that has held.
+
+Two further guards, because an allow-list rots quietly: a declared domain that **stops**
+being cited fails too (permission outliving its reason is how the screenshot list became
+wrong), and a planted domain must be detected, so the scan cannot pass by matching nothing.
+Verified by appending a fake employer domain to `DECISIONS.md`: it failed naming the domain
+and telling the reader which of the two lists to put it in.
+
+#### What this does not license
+
+The scan covers `DECISIONS.md`. The shipped category map is a **public vocabulary** and is
+deliberately excluded — D26 keeps employer, school, council and neighbourhood domains out of
+it precisely because a domain list is a profile, and that rule is unchanged. Nothing here
+permits a ranked domain list anywhere: `history-shape-domains-*`, `unknown-domains.md` and
+every export remain forbidden paths, gitignored and tested for.
+
+**The rule is narrow on purpose.** Seven domains, each cited by an entry that needs it, in
+the one file whose job is to be checkable.
+
+955 Python tests plus 3, 527 TypeScript. Both linters clean.

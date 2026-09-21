@@ -74,6 +74,48 @@ PERSONAL_STRINGS = (
     ("C:\\Users\\akash", "a local filesystem path carrying the author's username"),
 )
 
+#: Real domains from the author's own browsing that are **published on purpose** (D127).
+#:
+#: Akash's call: they are the evidence. D78's finding — that the research tier kept the
+#: redirect plumbing and binned the landing page — is checkable only because the actual
+#: chain is printed, and `example.com` in its place would make the entry unfalsifiable.
+#: A decision log whose evidence cannot be checked is the thing this project exists against.
+#:
+#: **The set is closed, and that is the whole point of writing it down.** "Real domains may
+#: stay when they are evidence" has no edge to it: every domain arrives looking like
+#: evidence to whoever is adding it. So the permitted ones are named here, and a domain that
+#: is not on this list fails the build until somebody decides it belongs — which is a
+#: deliberate act with a name on it, rather than a judgement call made once at midnight and
+#: never revisited. This is the icons rule (four exact paths) and not the screenshot rule
+#: (a growing allow-list of things judged safe), because the set is small and does not grow
+#: on its own.
+EVIDENCE_DOMAINS = {
+    "zivasuites.com": "D40/D78 — the real redirect chain the heuristic is judged against",
+    "darkreading.com": "D36 — observed, stored bare",
+    "dominos.co.in": "D34/D36 — observed, and the three-label multi-part suffix case",
+    "nike.in": "D36 — observed, stored bare",
+    "zomato.com": "D36 — observed; also a category-map entry",
+    "deepseek.com": "D26 — 11.8% of the Firefox corpus; why `wellness` exists",
+    "insighttimer.com": "D26 — 15.7% of the Firefox corpus; why `wellness` exists",
+}
+
+#: Domains that are not evidence about anybody: illustrative, infrastructural, or generic
+#: services named in the shipped category map. Separated from the set above so the two
+#: questions stay apart — "is this a real person's browsing?" and "is this a real string?".
+NEUTRAL_DOMAINS = {
+    "example.com",
+    "bbc.co.uk",
+    "google.com",
+    "youtube.com",
+    "holycowstudios.in",
+    "npmjs.org",
+}
+
+DOMAIN_SHAPE = re.compile(
+    r"\b[a-z0-9][a-z0-9-]{1,40}"
+    r"\.(?:com|co\.uk|co\.in|org|net|io|gov\.in|nic\.in|ac\.in|edu|tv|me|org\.uk)\b"
+)
+
 #: This file names every shape it looks for, so it cannot scan itself — the same reason
 #: `privacy.test.ts` strips comments before its own source scan. Nothing else is exempt.
 SCAN_EXEMPT = {"research/tests/test_repository.py"}
@@ -220,3 +262,50 @@ class TestNoCredentialShapedStringIsCommitted:
         """Same reason as above: a guard that cannot fire is decoration."""
         for needle, _ in PERSONAL_STRINGS:
             assert needle in f"prefix {needle} suffix"
+
+
+class TestTheEvidenceDomainsAreAClosedSet:
+    """Real browsing survives in the decision log on purpose, and only the declared part.
+
+    D126 found real domains from the author's own browsing published as evidence and left
+    the question open rather than resolving it quietly. D127 resolved it: they stay, because
+    D78's redirect finding is only checkable against the real chain and a substituted
+    `example.com` would make the entry unfalsifiable.
+
+    **That answer needs an edge or it is not an answer.** "Real domains may stay when they
+    are evidence" permits everything, since a domain always looks like evidence to whoever
+    is pasting it in. So the permitted set is named, and anything else fails here — which
+    turns adding one into a decision somebody makes on the record.
+    """
+
+    #: Where real browsing is allowed to appear. Not the whole repository: the shipped
+    #: category map is a public vocabulary by design (D26), and the lockfile is registries.
+    SCANNED = ("DECISIONS.md",)
+
+    def test_no_undeclared_domain_appears_in_the_decision_log(self):
+        permitted = set(EVIDENCE_DOMAINS) | NEUTRAL_DOMAINS
+        offenders: dict[str, set[str]] = {}
+        for name in self.SCANNED:
+            text = (REPO_ROOT / name).read_text(encoding="utf-8")
+            found = {d for d in DOMAIN_SHAPE.findall(text) if d not in permitted}
+            if found:
+                offenders[name] = found
+        assert not offenders, (
+            f"undeclared domains: {offenders}. If one is a real visit kept as evidence, "
+            "add it to EVIDENCE_DOMAINS with the entry it supports. If it is illustrative, "
+            "add it to NEUTRAL_DOMAINS. Deciding that is the point of this failing."
+        )
+
+    def test_every_declared_evidence_domain_is_still_cited(self):
+        # A stale allow-list is how the screenshot rule failed: entries outlived the thing
+        # they permitted and nobody rechecked them. A domain nothing cites is one nobody
+        # would miss, so it should be removed rather than left standing as permission.
+        text = (REPO_ROOT / "DECISIONS.md").read_text(encoding="utf-8")
+        unused = [domain for domain in EVIDENCE_DOMAINS if domain not in text]
+        assert not unused, f"declared but no longer cited, so no longer needed: {unused}"
+
+    def test_the_domain_scan_can_actually_fire(self):
+        planted = "a visit to someones-real-employer.com was recorded"
+        found = set(DOMAIN_SHAPE.findall(planted))
+        assert found == {"someones-real-employer.com"}
+        assert not found & (set(EVIDENCE_DOMAINS) | NEUTRAL_DOMAINS)
