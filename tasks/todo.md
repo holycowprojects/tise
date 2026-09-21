@@ -425,10 +425,14 @@ published as a failure.
     5,366 events, exactly D64's 334. Nothing stranded, nothing reset to 30 days
   - Verify: 370 TypeScript, 766 Python, both linters clean, builds
 
-- [ ] **T-G · Ship `visit_engaged` end to end** · L · deps: **T-G1, T-G2 done**, and spans
-  - **Akash owes one pass:** reload → popup → *Measure attention* → Allow → **Resume**
-    (he is currently paused) → browse → Export and send the file. It is v3, so it carries
-    the spans and the gate becomes checkable from this side
+- [ ] ~~**T-G · Ship `visit_engaged` end to end**~~ · **WITHHELD — D124. Do not build.**
+  - **The gate is not met and does not close.** D99's rule wants 1,000 watched visits; this
+    profile stands at 497 and the count is a 30-day window that saturates near 656 (D123).
+    Waiting does not close it — it needs ~33 dwelled visits a day against ~22 observed
+  - **T-G1, T-G2 and the span→dwell join below stay done and stay used.** The gate itself
+    runs on every popup open (D101), so if the volume ever changes this un-withholds itself
+  - Everything unticked beneath this entry is deliberately unbuilt (D101): a path nothing
+    can exercise, while the records call it ready, is the defect that entry names
   - [x] **Span→dwell join done.** `features/dwell.ts` — `dwellByEvent`, `attachDwell`,
     `measuredCount`. 11 tests reading `export_v3.json` **directly**, so it is a genuine
     cross-language check: Python reads the same file and asserts the same properties from
@@ -1189,7 +1193,11 @@ published as a failure.
   - Blocked on open questions 4 and 5 (licence holder, policy hosting)
   - Verify: `npm run package`; fresh-profile install of the packaged build
 
-- [ ] **CHECKPOINT E** — all 12 spec success criteria met; every number traceable
+- [ ] **CHECKPOINT E** — the **five** `SPEC.md` success criteria met; every number traceable
+  - **Not twelve.** That number stood here from the scaffold commit until D124 and was never
+    true; `SPEC.md` has listed five since `1e0c26d`. Spelled out in [`plan.md`](plan.md)
+  - **3, 4, 5 are met** — criterion 3 carries a qualification that travels with the tick
+    (D124). **1 and 2** are repository visibility (D122) and T18
 
 ---
 
